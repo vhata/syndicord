@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">syndicord</title>
+  <desc id="description">An RSS signal inside a teal message bubble.</desc>
+  <path fill="#0F9D92" d="M64 28h128a36 36 0 0 1 36 36v104a36 36 0 0 1-36 36h-28l-44 28v-28H64a36 36 0 0 1-36-36V64a36 36 0 0 1 36-36Z"/>
+  <g fill="none" stroke="#F6FCFA" stroke-linecap="round" stroke-width="18">
+    <path d="M80 76a84 84 0 0 1 84 84"/>
+    <path d="M80 116a44 44 0 0 1 44 44"/>
+  </g>
+  <circle cx="80" cy="160" r="12" fill="#F6FCFA"/>
+</svg>

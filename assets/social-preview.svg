@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title description">
+  <title id="title">syndicord — Your feeds. In the conversation.</title>
+  <desc id="description">Original conceptual artwork for an RSS and Atom relay to Discord. A teal signal bubble connects feed cards to a conversation.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#102A33"/>
+      <stop offset="1" stop-color="#0B1E26"/>
+    </linearGradient>
+    <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#32616A"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="640" fill="url(#background)"/>
+  <rect x="730" y="50" width="500" height="540" fill="url(#dots)" opacity=".5"/>
+  <path d="M838 130h230a126 126 0 0 1 126 126v128a126 126 0 0 1-126 126H838" fill="none" stroke="#1B4851" stroke-width="2"/>
+  <g transform="translate(70 58) scale(.34)">
+    <path fill="#0F9D92" d="M64 28h128a36 36 0 0 1 36 36v104a36 36 0 0 1-36 36h-28l-44 28v-28H64a36 36 0 0 1-36-36V64a36 36 0 0 1 36-36Z"/>
+    <g fill="none" stroke="#F6FCFA" stroke-linecap="round" stroke-width="18">
+      <path d="M80 76a84 84 0 0 1 84 84"/>
+      <path d="M80 116a44 44 0 0 1 44 44"/>
+    </g>
+    <circle cx="80" cy="160" r="12" fill="#F6FCFA"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="174" y="119" fill="#F6FCFA" font-size="48" font-weight="700" letter-spacing="-2">syndicord</text>
+    <text x="80" y="245" fill="#86E4D1" font-size="17" font-weight="700" letter-spacing="3">RSS + ATOM → DISCORD</text>
+    <text x="76" y="332" fill="#F6FCFA" font-size="68" font-weight="700" letter-spacing="-2">Your feeds.</text>
+    <text x="76" y="410" fill="#F6FCFA" font-size="68" font-weight="700" letter-spacing="-2">In the conversation.</text>
+    <text x="80" y="477" fill="#AAC2C7" font-size="24">A scheduled relay on Cloudflare Workers.</text>
+    <text x="80" y="573" fill="#7C9DA5" font-size="18">github.com/vhata/syndicord</text>
+  </g>
+  <g transform="translate(925 147)">
+    <rect x="26" y="0" width="186" height="108" rx="18" fill="#24454D" stroke="#3B6970"/>
+    <rect x="13" y="18" width="186" height="108" rx="18" fill="#1E3D46" stroke="#47777C"/>
+    <rect x="0" y="36" width="186" height="108" rx="18" fill="#E4F4ED"/>
+    <circle cx="29" cy="66" r="7" fill="#0F9D92"/>
+    <path d="M51 66h103M29 91h109M29 112h73" fill="none" stroke="#97B7AE" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <path d="M1018 310v42" fill="none" stroke="#86E4D1" stroke-width="3" stroke-linecap="round" stroke-dasharray="4 7"/>
+  <path d="m1010 347 8 8 8-8" fill="none" stroke="#86E4D1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M915 382h207a22 22 0 0 1 22 22v75a22 22 0 0 1-22 22h-37l-23 19v-19H915a22 22 0 0 1-22-22v-75a22 22 0 0 1 22-22Z" fill="#0F9D92"/>
+  <circle cx="925" cy="420" r="9" fill="#F6FCFA"/>
+  <path d="M951 417h153M925 451h179M925 474h113" fill="none" stroke="#C2F0E2" stroke-width="8" stroke-linecap="round"/>
+</svg>
