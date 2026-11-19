@@ -297,8 +297,13 @@ export function formatStatus(
   report: StatusReport,
   target: 'local' | 'remote',
 ): string {
-  const date = (value: number | null) =>
-    value === null ? 'never' : new Date(value).toISOString();
+  const date = (value: number | null) => {
+    if (value === null) return 'never';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? 'beyond the supported date range'
+      : parsed.toISOString();
+  };
   const age = (value: number | null) =>
     value === null ? 'none' : `${Math.floor(value / 60_000)}m`;
   return [

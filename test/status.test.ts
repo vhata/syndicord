@@ -234,6 +234,33 @@ test('status includes active pending age and destination blocks, excluding remov
   }
 });
 
+test('text status preserves cooldowns beyond the JavaScript date range', async () => {
+  const { db, dispose } = await createTestDatabase();
+  try {
+    await runRelay(config, db, {
+      fetcher: async () => new Response(emptyRss),
+      log: quiet,
+    });
+    await db
+      .prepare('UPDATE relay_destinations SET cooldown_until_ms = ?')
+      .bind(Number.MAX_SAFE_INTEGER)
+      .run();
+    const report = summarizeStatus(await snapshot(db), routes);
+    assert.equal(report.health, 'degraded');
+    assert.equal(report.destinations[0]?.state, 'cooldown');
+    assert.equal(
+      report.destinations[0]?.cooldownUntil,
+      Number.MAX_SAFE_INTEGER,
+    );
+    assert.match(
+      formatStatus(report, 'remote'),
+      /cooldown until beyond the supported date range/,
+    );
+  } finally {
+    await dispose();
+  }
+});
+
 test('status thresholds account for feed rotation and disabled configuration', async () => {
   const { db, dispose } = await createTestDatabase();
   try {
