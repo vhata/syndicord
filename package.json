@@ -12,11 +12,12 @@
   },
   "packageManager": "npm@11.20.0",
   "scripts": {
-    "check": "npm run format:check && npm run check:types",
+    "check": "npm run format:check && npm run check:types && npm test",
     "check:types": "npm run types && tsc --noEmit",
     "format": "prettier --write \"**/*.{ts,json,jsonc,md}\"",
     "format:check": "prettier --check \"**/*.{ts,json,jsonc,md}\"",
-    "types": "cf workers types"
+    "types": "cf workers types",
+    "test": "node --test --test-concurrency=2 test/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
