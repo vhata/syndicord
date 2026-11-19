@@ -38,28 +38,48 @@ its delivery ledger.
 
 2. Ensure a Worker named `syndicord` exists in the same account. For a fresh
    installation, create it through **Workers & Pages → Create application**
-   using the initial Worker template. The first GitHub deployment replaces
-   that code, binds D1, installs the schedule, and disables public and preview
-   URLs. An already deployed syndicord Worker needs no replacement.
+   using the initial Worker template. An already deployed syndicord Worker
+   needs no replacement.
 
 3. Set its `WEBHOOKS` secret as described below. Use the destination names in
    the committed `feeds.json`; the initial destination is `updates`.
 
-4. Create a Cloudflare API token scoped to the deployment account with
+4. For a fresh installation only, bootstrap the Worker once from an interactive
+   terminal. Use the [project's Node/npm versions](DEVELOPMENT.md), then run:
+
+   ```sh
+   npm ci
+   npm run check
+   npx cf auth login
+   export CLOUDFLARE_ACCOUNT_ID='your-account-id'
+   export SYNDICORD_DATABASE_ID='your-existing-database-uuid'
+   npx cf d1 migrations apply "$SYNDICORD_DATABASE_ID" --dir migrations
+   npm run deploy
+   ```
+
+   Review and accept the expected replacement of the initial dashboard
+   template's configuration. This installs syndicord, binds D1, installs the
+   schedule, and disables public and preview URLs. The hosted `WEBHOOKS` value
+   is preserved; no local secret file is needed. This interactive step is
+   necessary because CI refuses conflicting dashboard configuration. Do not
+   add `--force` to the regular deployment workflow. Existing installations
+   already deployed with this configuration skip this step.
+
+5. Create a Cloudflare API token scoped to the deployment account with
    **Account → Workers Scripts → Edit** and **Account → D1 → Edit**. The token
    needs Worker deployment, settings, secret-name reads, and D1 migration
    access. This application has no domain routes and needs no zone permissions.
    Store the token in GitHub, not in the repository or a production dotenv file.
 
-5. In GitHub, open **Settings → Environments**, create `production`, and restrict
+6. In GitHub, open **Settings → Environments**, create `production`, and restrict
    its deployment branches to `main`. Add the secret and two variables from
    the table above. Required reviewers pause each deployment for approval;
    omit that rule when pushes to `main` should deploy automatically.
 
-6. Merge the workflow and configuration into `main`. Every subsequent push to
+7. Merge the workflow and configuration into `main`. Every subsequent push to
    `main` checks and deploys automatically. To deploy the current `main` without
    a code change, open **Actions → CI → Run workflow**, select `main`, and run it.
-   The initial run applies all outstanding schema migrations before deploying.
+   Each run applies outstanding schema migrations before deploying.
 
 Configure the environment before merging the deployment workflow. A missing
 credential or ID makes the deployment job fail with setup guidance. Pull
@@ -242,7 +262,9 @@ WHERE destination = 'updates' AND state = 'pending';
 To pause the relay through Git, deploy an empty `feeds.json`. For urgent
 maintenance, disable the GitHub **CI** workflow's automatic runs and remove the
 Worker cron trigger in Cloudflare; allow any running invocation to finish.
-Restore the committed configuration through a checked deployment when ready.
+Re-enable the workflow and restore the committed configuration through a
+checked deployment when ready. If CI reports the intentionally changed cron
+as a dashboard conflict, restore that cron in the dashboard before retrying.
 
 Prefer reverting a faulty change on `main` and letting CI deploy the revert.
 Cloudflare also supports selecting a previous Worker version under
