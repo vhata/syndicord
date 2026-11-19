@@ -12,24 +12,60 @@ npm ci
 npm run check
 ```
 
-The check covers formatting, generated Workers types, TypeScript, the Worker
-build, and tests. Tests use fixture feeds, fake Discord responses, and temporary
-local D1 databases. A runtime test exercises scheduled events in the built
-Worker. These checks need no Cloudflare account or Discord credentials.
+`npm ci` installs the pinned dependencies and Git hooks for this checkout. Run
+it after cloning and after pulling changes to `package.json` or
+`package-lock.json`. Linked worktrees each need their own installation.
+
+The check covers formatting, linting, generated Workers types, TypeScript, the
+Worker build, and tests. Tests use fixture feeds, fake Discord responses, and
+temporary local D1 databases. A runtime test exercises scheduled events in the
+built Worker. These checks need no Cloudflare account or Discord credentials.
 
 Miniflare and type generation start local runtime processes and bind loopback
 ports. Restricted sandboxes must permit those operations. Local tests do not
 measure hosted CPU usage or prove live Discord delivery.
 
 `npm run types` refreshes editor types under `.cloudflare/types/`.
-`npm run format` formats TypeScript, JSON, and Markdown. `npm test` builds the
-Worker and runs the tests. `npm run build` writes the deployment artifact to
-`.cloudflare/output/` without uploading it.
+`npm run format` formats source, configuration, workflows, and Markdown.
+`npm test` builds the Worker and runs the tests. `npm run build` writes the
+deployment artifact to `.cloudflare/output/` without uploading it.
 
 `package-lock.json` pins dependency versions. `package.json` records approvals
 for the pinned native installers used by Cloudflare's tools; review these when
 updating dependencies. Generated files, local databases, and secrets are ignored
 by Git.
+
+## Commit hooks and CI
+
+The pre-commit hook uses Husky and lint-staged to run Oxlint and Prettier on
+staged files. Prettier's formatting changes are included in the commit;
+lint errors block it. lint-staged backs up the original state and preserves
+unstaged changes, including unstaged edits to a partially staged file.
+
+Commits do not run type generation, builds, or tests. There is no pre-push
+hook. Oxlint checks syntax and code correctness without starting the
+TypeScript compiler.
+
+| Command                | Scope                                      |
+| ---------------------- | ------------------------------------------ |
+| `npm run check:staged` | Run the commit checks on staged files      |
+| `npm run lint`         | Check source and configuration with Oxlint |
+| `npm run lint:fix`     | Apply Oxlint's automatic fixes             |
+| `npm run format`       | Apply Prettier formatting                  |
+| `npm run format:check` | Check formatting without editing files     |
+| `npm run check`        | Run all checks, including builds and tests |
+
+GitHub Actions runs `npm ci` and the full `npm run check` on pull requests and
+pushes to `main`. It can also be started manually from the Actions tab.
+The workflow uses the Node version in `.node-version` and the npm version in
+`package.json`, with cached npm downloads. Superseded PR runs are cancelled;
+each push to `main` is checked. Hooks are disabled in CI, which runs the
+checks directly.
+
+If Git reports a missing hook command or package after an update, run
+`npm ci` in that checkout and retry the commit. To inspect a lint-staged
+failure, use `git status` and `git diff --cached` before retrying; an
+interrupted run may retain a `lint-staged automatic backup` in `git stash list`.
 
 ## Run locally
 
