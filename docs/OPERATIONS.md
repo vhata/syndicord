@@ -52,7 +52,13 @@ These commands create or change metered Cloudflare resources. Confirm
 provisioning before running them, even when expected usage fits the free plan.
 The deployment needs one D1 database and one Worker with a cron trigger.
 
-1. Run `npm ci` and `npm run check` and review the result.
+1. Install this checkout's dependencies and hooks, then run the full checks:
+
+   ```sh
+   npm ci
+   npm run check
+   ```
+
 2. Populate `.dev.vars` with the destination webhooks.
 3. Sign in and create the database:
 
@@ -82,8 +88,9 @@ The deployment needs one D1 database and one Worker with a cron trigger.
    The local placeholder database ID is only for local development.
    `workers.dev` and preview URLs are disabled.
 
-Use the same exported database ID and secret file for later deployments.
-Apply new migrations before deploying code that depends on them.
+For later deployments, run `npm ci` after pulling dependency changes and
+`npm run check` before deploying. Use the same exported database ID and
+secret file. Apply new migrations before deploying code that depends on them.
 
 ## Verify the trial
 
