@@ -36,22 +36,16 @@ login. Your account membership needs **API Token Provisioning** (or Super
 Administrator), and your login must permit token creation and the permissions
 being granted. [Cloudflare token provisioning](https://developers.cloudflare.com/changelog/post/2026-10-01-account-api-token-provisioning/)
 
-List the available permission groups:
-
-```sh
-npx cf accounts tokens permission-groups list
-```
-
-Find **Workers Editor** and **D1 Write**, and copy their IDs into
-`ci-token-policy.json`. Replace `ACCOUNT_ID` with your Cloudflare account ID:
+Create `ci-token-policy.json` with the permission IDs for **Workers Editor**
+and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account ID:
 
 ```json
 [
   {
     "effect": "allow",
     "permission_groups": [
-      { "id": "WORKERS_EDITOR_PERMISSION_ID" },
-      { "id": "D1_WRITE_PERMISSION_ID" }
+      { "id": "d7ba8d4dce414197a3efab21b2f87eb8" },
+      { "id": "09b2857d1c31407795e75e3fed8617a1" }
     ],
     "resources": {
       "com.cloudflare.api.account.ACCOUNT_ID": "*"
@@ -61,9 +55,9 @@ Find **Workers Editor** and **D1 Write**, and copy their IDs into
 ```
 
 This grants Worker updates and D1 migration access across that account; no zone
-permissions are needed. **Workers Scripts Write** is the supported legacy API
-name if your account still lists it instead of Workers Editor. The current
-dashboard calls the Workers role **Editor**, and D1 write access **Edit**.
+permissions are needed. The dashboard calls the Workers role **Editor**, and
+D1 write access **Edit**. To look up permission IDs yourself, run
+`npx cf user tokens permission-groups list`.
 [Workers permission reference](https://developers.cloudflare.com/workers/authorization/workers/)
 
 Create the token and save it as the GitHub environment secret:
@@ -78,7 +72,7 @@ only at creation; keep it in the shared password manager. The policy file
 contains IDs and permissions, not the token. Do not give the deployment token
 permission to create more tokens.
 
-If listing or creation returns 403, `npx cf auth login --force` refreshes OAuth
+If creation returns 403, `npx cf auth login --force` refreshes OAuth
 consent. If access is still denied, an account administrator must grant token
 provisioning and the requested product access, or create the token. The dashboard
 path is **Manage account → Account API tokens → Create Token** in the selected
