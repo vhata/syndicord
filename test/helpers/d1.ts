@@ -8,6 +8,7 @@ export async function createTestDatabase(): Promise<{
 }> {
   const runtime = new Miniflare(
     convertV4MiniflareOptions({
+      cf: false,
       modules: true,
       script: 'export default {};',
       compatibilityDate: '2026-11-18',
