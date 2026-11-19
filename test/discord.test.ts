@@ -31,7 +31,7 @@ test('formats one bounded embed with original links and disabled mentions', () =
   );
   const embed = message.embeds[0]!;
   assert.ok(embed.title.length <= 256);
-  assert.ok(embed.description!.length <= 3_000);
+  assert.ok(embed.description!.length <= 700);
   assert.ok((embed.title + embed.description).length < 6_000);
   assert.equal(embed.url, entry.link);
   assert.equal(embed.timestamp, entry.publishedAt);
@@ -57,7 +57,13 @@ test('omits unsafe entry links and empty descriptions', () => {
     },
     feedUrl,
   ).embeds[0]!;
-  assert.deepEqual(embed, { title: 'Untitled', url: feedUrl });
+  assert.deepEqual(embed, {
+    color: 0x0f9d92,
+    author: { name: 'example.test', url: feedUrl },
+    title: 'Untitled',
+    footer: { text: 'syndicord · example.test' },
+    url: feedUrl,
+  });
   assert.equal(
     buildMessage(
       { ...entry, link: 'https://user:password@example.test/' },
@@ -65,6 +71,95 @@ test('omits unsafe entry links and empty descriptions', () => {
     ).embeds[0]?.url,
     undefined,
   );
+});
+
+test('shows the feed name above a compact excerpt without duplicating its heading', () => {
+  const embed = buildMessage(
+    {
+      ...entry,
+      feedTitle: 'News & Notes *daily*',
+      description:
+        'A new post\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n\nFourth paragraph.',
+    },
+    feedUrl,
+  ).embeds[0]!;
+  assert.equal(embed.author.name, 'News & Notes *daily*');
+  assert.equal(embed.author.url, feedUrl);
+  assert.equal(embed.color, 0x0f9d92);
+  assert.equal(embed.footer.text, 'syndicord · example.test');
+  assert.equal(
+    embed.description,
+    'First paragraph\\.\n\nSecond paragraph\\.\n\nThird paragraph…',
+  );
+});
+
+test('truncates Markdown without splitting literal backslash escapes', () => {
+  const embed = buildMessage(
+    { ...entry, title: '\\'.repeat(400), description: '\\'.repeat(800) },
+    feedUrl,
+  ).embeds[0]!;
+  for (const value of [embed.title, embed.description!]) {
+    const match = value.match(/(\\+)…$/);
+    assert.ok(match);
+    const escapes = match[1]!.length;
+    assert.equal(escapes % 2, 0);
+    assert.equal(value.isWellFormed(), true);
+  }
+  const plain = buildMessage({ ...entry, feedTitle: '\\'.repeat(400) }, feedUrl)
+    .embeds[0]!.author.name;
+  assert.equal(plain.length, 256);
+  assert.equal(plain, '\\'.repeat(255) + '…');
+});
+
+test('keeps ordinary opening prose and omits an exact title-only description', () => {
+  assert.equal(
+    buildMessage(
+      {
+        ...entry,
+        title: 'News',
+        description: 'News from the wider community.',
+      },
+      feedUrl,
+    ).embeds[0]?.description,
+    'News from the wider community\\.',
+  );
+  assert.equal(
+    buildMessage({ ...entry, description: entry.title }, feedUrl).embeds[0]
+      ?.description,
+    undefined,
+  );
+  assert.equal(
+    buildMessage(
+      { ...entry, title: 'News', description: 'Newsletter\n\nSomething new.' },
+      feedUrl,
+    ).embeds[0]?.description,
+    'Newsletter\n\nSomething new\\.',
+  );
+});
+
+test('bounds feed metadata and handles legacy payloads without feed titles', () => {
+  const embed = buildMessage(
+    {
+      ...entry,
+      feedTitle: '@everyone <@123> ' + '🚀'.repeat(300),
+      description: 'Word '.repeat(400),
+    },
+    feedUrl,
+  ).embeds[0]!;
+  assert.ok(embed.author.name.length <= 256);
+  assert.equal(embed.author.name.isWellFormed(), true);
+  assert.ok(!embed.author.name.includes('@everyone'));
+  assert.ok(!embed.author.name.includes('<@123>'));
+  assert.ok(embed.description!.length <= 700);
+  assert.ok(embed.description!.endsWith('…'));
+  assert.equal(
+    buildMessage(entry, feedUrl).embeds[0]?.author.name,
+    'example.test',
+  );
+  const missing = buildMessage({ ...entry, feedTitle: '\n\t' }, 'file:///feed')
+    .embeds[0]!;
+  assert.deepEqual(missing.author, { name: 'Feed update' });
+  assert.deepEqual(missing.footer, { text: 'syndicord' });
 });
 
 test('requests server confirmation, preserves thread IDs, and forbids redirects', async () => {

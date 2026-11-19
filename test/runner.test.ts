@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadConfig } from '../src/config.ts';
 import { runRelay } from '../src/runner.ts';
+import { DeliveryLedger } from '../src/ledger.ts';
 import type { RelayEvent } from '../src/runner.ts';
 import type { Fetcher } from '../src/types.ts';
 import { createTestDatabase } from './helpers/d1.ts';
@@ -27,6 +28,7 @@ test('end-to-end baselines then delivers new entries once to each destination', 
       posts.push(url);
       const body = JSON.parse(String(init?.body));
       assert.deepEqual(body.allowed_mentions, { parse: [] });
+      assert.equal(body.embeds[0].author.name, 'News');
       return Response.json({ id: '123456' });
     };
     assert.equal(
@@ -56,11 +58,15 @@ test('failed destination retries persisted content after source disappears witho
     let sourceFails = false;
     const delivered: string[] = [];
     const logs: RelayEvent[] = [];
-    const fetcher: Fetcher = async (url) => {
+    const fetcher: Fetcher = async (url, init) => {
       if (url === feed)
         return sourceFails
           ? new Response('private', { status: 500 })
           : new Response(rss(ids));
+      assert.equal(
+        JSON.parse(String(init?.body)).embeds[0].author.name,
+        'News',
+      );
       if (url.startsWith(hookA) && fail) throw new Error(`sensitive ${hookA}`);
       delivered.push(url);
       return Response.json({ id: '123456' });
@@ -84,6 +90,68 @@ test('failed destination retries persisted content after source disappears witho
     assert.equal((await runRelay(config, db, { fetcher, log: quiet })).sent, 1);
     assert.equal(delivered.filter((url) => url.startsWith(hookB)).length, 1);
     assert.ok(!JSON.stringify(logs).includes('token-a'));
+  } finally {
+    await dispose();
+  }
+});
+
+test('delivers pending payloads created before feed names were recorded', async () => {
+  const { db, dispose } = await createTestDatabase();
+  try {
+    let ids: string[] = [];
+    const unavailable: Fetcher = async (url) =>
+      url === feed
+        ? new Response(rss(ids))
+        : new Response(null, { status: 503 });
+    await runRelay(config, db, { fetcher: unavailable, log: quiet });
+    ids = ['new'];
+    assert.equal(
+      (await runRelay(config, db, { fetcher: unavailable, log: quiet }))
+        .deferred,
+      2,
+    );
+    await db
+      .prepare(
+        "UPDATE relay_deliveries SET payload=json_remove(payload, '$.feedTitle'), next_attempt_ms=0 WHERE state='pending'",
+      )
+      .run();
+    const fetcher: Fetcher = async (url, init) => {
+      if (url === feed) return new Response(null, { status: 500 });
+      const body = JSON.parse(String(init?.body));
+      assert.equal(body.embeds[0].author.name, 'feeds.example');
+      assert.equal(body.embeds[0].title, 'new');
+      return Response.json({ id: '123456' });
+    };
+    assert.equal((await runRelay(config, db, { fetcher, log: quiet })).sent, 2);
+  } finally {
+    await dispose();
+  }
+});
+
+test('paragraph formatting does not resend an existing fingerprinted baseline', async () => {
+  const { db, dispose } = await createTestDatabase();
+  try {
+    const ledger = new DeliveryLedger(db);
+    await ledger.acquire('old-version');
+    await ledger.ingest('old-version', config.feeds[0]!, [
+      {
+        id: 'sha256:8f51e54af06de5d77219ab8b79faa97a96ca1a0c75c4a302bb9b409589f89deb',
+        title: 'Untitled',
+        description: 'one two',
+        link: null,
+        publishedAt: null,
+      },
+    ]);
+    await ledger.release('old-version');
+    const fetcher: Fetcher = async (url) => {
+      assert.equal(url, feed, 'An existing entry must not be posted again');
+      return new Response(
+        '<rss version="2.0"><channel><title>News</title><item><description><![CDATA[<p>one</p><p>two</p>]]></description></item></channel></rss>',
+      );
+    };
+    const result = await runRelay(config, db, { fetcher, log: quiet });
+    assert.equal(result.queued, 0);
+    assert.equal(result.sent, 0);
   } finally {
     await dispose();
   }

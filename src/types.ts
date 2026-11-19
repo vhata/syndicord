@@ -4,6 +4,7 @@ export interface FeedEntry {
   link: string | null;
   description: string;
   publishedAt: string | null;
+  feedTitle?: string;
 }
 
 export interface ParsedFeed {
