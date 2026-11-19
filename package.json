@@ -17,7 +17,11 @@
     "format": "prettier --write \"**/*.{ts,json,jsonc,md}\"",
     "format:check": "prettier --check \"**/*.{ts,json,jsonc,md}\"",
     "types": "cf workers types",
-    "test": "node --test --test-concurrency=2 test/*.test.ts"
+    "build": "cf build",
+    "dev": "cf dev",
+    "db:migrate:local": "cf d1 migrations apply \"${SYNDICORD_DATABASE_ID:-00000000-0000-4000-8000-000000000001}\" --local --dir migrations",
+    "deploy": ": \"${SYNDICORD_DATABASE_ID:?Set SYNDICORD_DATABASE_ID to the provisioned D1 database ID}\" && cf deploy --no-provision",
+    "test": "npm run build && node --test --test-concurrency=2 test/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

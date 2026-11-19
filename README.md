@@ -13,6 +13,15 @@ Messages carry titles, links, and descriptions from the feeds themselves,
 so readers can follow updates in Discord and open the original posts for
 the full story.
 
+The first poll records a baseline without posting a backlog. Delivery state
+is stored in D1, so destinations can retry independently. Each scheduled run
+checks one feed and sends a bounded batch of pending entries.
+
+Configure feeds in `feeds.json` and keep Discord webhook URLs in the
+`WEBHOOKS` secret. See [configuration and operations](docs/OPERATIONS.md)
+for setup and deployment, and [relay behavior](docs/BEHAVIOR.md) for delivery
+semantics.
+
 ## Development
 
 See the [development guide](docs/DEVELOPMENT.md) for local setup, project

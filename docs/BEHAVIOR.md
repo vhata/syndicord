@@ -19,6 +19,11 @@ from a feed. Destinations succeed and retry independently. Removed feeds and
 destinations stop receiving deliveries; restoring the same configuration
 resumes their pending deliveries. A renamed destination starts a new baseline.
 
+Invalid or inaccessible webhooks (HTTP 401, 403, or 404) suspend their
+destination. Replacing its webhook or explicitly resuming it restores delivery;
+pending entries retain their retry times. Rate limits postpone the affected
+destination, or all destinations when Discord reports a global limit.
+
 A durable lease prevents ordinary overlapping polling runs. Delivery records
 change only while the run owns that lease. Failed or ambiguous webhook requests
 remain retryable. A successful Discord send followed by a lost response or
