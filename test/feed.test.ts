@@ -56,6 +56,71 @@ test('normalizes Atom text constructs, xml:base, alternate links, and dates', as
   ]);
 });
 
+test('preserves literal HTML entity names in Atom plain text constructs', async () => {
+  const feed = await parseFeedDocument(
+    `<feed xmlns="http://www.w3.org/2005/Atom">
+    <title type="text">Feed &amp;copy;</title>
+    <entry><id>one</id><title type="text">Literal &amp;copy; and &amp;lt;tag&amp;gt;</title>
+    <summary type="text">An &amp;amp; example.</summary></entry>
+  </feed>`,
+    url,
+  );
+  assert.equal(feed.title, 'Feed &copy;');
+  assert.equal(feed.entries[0]?.title, 'Literal &copy; and &lt;tag&gt;');
+  assert.equal(feed.entries[0]?.description, 'An &amp; example.');
+});
+
+test('preserves literal entity names in RSS titles', async () => {
+  const feed = await parseFeedDocument(
+    rss(
+      '<item><title>Literal &amp;copy; and &amp;lt;tag&amp;gt;</title></item>',
+    ),
+    url,
+  );
+  assert.equal(feed.entries[0]?.title, 'Literal &copy; and &lt;tag&gt;');
+});
+
+test('resolves link-level XML bases with namespace aliases and inherited bases', async () => {
+  const feed = await parseFeedDocument(
+    `<a:feed xmlns:a="http://www.w3.org/2005/Atom" xml:base="https://example.test/base/">
+    <a:title>Example</a:title>
+    <b:entry xmlns:b="http://www.w3.org/2005/Atom" xml:base="entries/">
+      <b:id>one</b:id><b:title>One</b:title>
+      <wrong:link xmlns:wrong="https://other.test/namespace" href="https://wrong.test/"/>
+      <c:link xmlns:c="http://www.w3.org/2005/Atom" href="one" xml:base="https://other.example/posts/"/>
+    </b:entry>
+    <a:entry><a:id>two</a:id><a:title>Two</a:title><a:link xml:base="relative/" href="two?a=1&amp;b=2"/></a:entry>
+  </a:feed>`,
+    url,
+  );
+  assert.equal(feed.entries[0]?.link, 'https://other.example/posts/one');
+  assert.equal(
+    feed.entries[1]?.link,
+    'https://example.test/base/relative/two?a=1&b=2',
+  );
+});
+
+test('declaration examples inside CDATA and comments remain ordinary feed content', async () => {
+  const feed = await parseFeedDocument(
+    rss(
+      '<!-- <!DOCTYPE example> --><item><description><![CDATA[<!DOCTYPE html><p>An example.</p>]]></description></item>',
+    ),
+    url,
+  );
+  assert.equal(feed.entries.length, 1);
+  assert.match(feed.entries[0]!.description, /An example\./);
+});
+
+test('rejects unsafe XML bases rather than resolving links against the wrong parent', async () => {
+  await assert.rejects(
+    parseFeedDocument(
+      '<feed xmlns="http://www.w3.org/2005/Atom"><title>Test</title><entry><id>one</id><link xml:base="https://user:pass@other.test/" href="one"/></entry></feed>',
+      url,
+    ),
+    /base URL/,
+  );
+});
+
 test('stable IDs win over content changes and duplicate items', async () => {
   const first = await parseFeedDocument(
     rss(
