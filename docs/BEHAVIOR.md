@@ -4,6 +4,17 @@ Each configured RSS or Atom feed has one or more named Discord destinations.
 Webhook URLs are secrets. Each new entry produces one message per destination,
 containing the original title, link, and a short description.
 
+Messages show the feed name above a linked entry title, with a teal accent
+and a source footer. A missing feed name falls back to the feed's hostname.
+The description preserves paragraph breaks and shows up to three paragraphs
+within a 700-character excerpt. A repeated opening title is removed when it
+forms a complete paragraph; ordinary prose beginning with the same words is
+preserved. Long excerpts end with an ellipsis. The entry's publication time
+appears when the feed provides a valid date.
+
+Feed HTML is reduced to text and message mentions are disabled. Feed names
+are stored with pending entries so retries retain their source attribution.
+
 The first successful poll of a feed/destination pair records its existing
 entries without sending them. A successful empty feed also establishes this
 baseline. Fetch and parse failures do not establish a baseline. A newly added

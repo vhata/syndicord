@@ -2,6 +2,7 @@ import type { FeedEntry, Fetcher } from './types.ts';
 
 const REQUEST_TIMEOUT_MS = 6_000;
 const MAX_RESPONSE_BYTES = 64 * 1_024;
+const MAX_EXCERPT_LENGTH = 700;
 
 export type SendResult =
   | { ok: true; cooldownMs: number }
@@ -15,28 +16,55 @@ export type SendResult =
     };
 
 interface DiscordEmbed {
+  color: number;
+  author: { name: string; url?: string };
   title: string;
   description?: string;
   url?: string;
   timestamp?: string;
+  footer: { text: string };
 }
 
-function displayText(value: string, maximum: number): string {
-  const escaped = value
+function clipText(value: string, maximum: number, markdown = true): string {
+  const clipped = value.slice(0, maximum).replace(/[\ud800-\udbff]$/, '');
+  const escapes = markdown ? (clipped.match(/\\+$/)?.[0].length ?? 0) : 0;
+  return escapes % 2 ? clipped.slice(0, -1) : clipped;
+}
+
+function displayText(value: string, maximum: number, markdown = true): string {
+  let escaped = value
     // oxlint-disable-next-line no-control-regex -- Strip non-printing controls before sending untrusted feed text.
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
     .replace(/@/g, '@\u200b')
     .replace(/</g, '‹')
-    .replace(/>/g, '›')
-    .replace(/[\\`*_{}[\]()#+.!|~-]/g, '\\$&')
-    .trim();
+    .replace(/>/g, '›');
+  escaped = markdown
+    ? escaped.replace(/[\\`*_{}[\]()#+.!|~-]/g, '\\$&').trim()
+    : escaped.replace(/\s+/gu, ' ').trim();
   if (escaped.length <= maximum) return escaped;
-  return (
-    escaped
-      .slice(0, maximum - 1)
-      .replace(/[\ud800-\udbff]$/, '')
-      .replace(/\\$/, '') + '…'
-  );
+  return clipText(escaped, maximum - 1, markdown) + '…';
+}
+
+function excerpt(entry: FeedEntry): string {
+  const paragraphs = entry.description
+    .replace(/\r\n?/g, '\n')
+    .split(/\n\s*\n/u)
+    .map((paragraph) => paragraph.replace(/\s+/gu, ' ').trim())
+    .filter(Boolean);
+  const heading = entry.title.replace(/\s+/gu, ' ').trim();
+  // Only remove a complete heading, never a title that begins a sentence.
+  while (paragraphs[0] === heading) paragraphs.shift();
+  const selected = paragraphs.slice(0, 3).join('\n\n');
+  const escaped = displayText(selected, MAX_EXCERPT_LENGTH + 1);
+  const omitted = paragraphs.length > 3 || escaped.length > MAX_EXCERPT_LENGTH;
+  if (!omitted) return escaped;
+  let shortened = escaped.slice(0, MAX_EXCERPT_LENGTH - 1);
+  const boundary = shortened.lastIndexOf(' ');
+  if (boundary >= MAX_EXCERPT_LENGTH * 0.75) {
+    shortened = shortened.slice(0, boundary);
+  }
+  shortened = shortened.trimEnd().replace(/(?:\\[.,;:]|[.,;:…])$/, '');
+  return clipText(shortened, shortened.length) + '…';
 }
 
 function messageLink(value: string | null): string | null {
@@ -61,12 +89,24 @@ export function buildMessage(
   embeds: DiscordEmbed[];
   allowed_mentions: { parse: string[] };
 } {
+  const sourceUrl = messageLink(feedUrl);
+  const sourceHost = sourceUrl ? new URL(sourceUrl).hostname : '';
+  const sourceName = displayText(sourceHost, 200, false);
+  const feedTitle = displayText(
+    entry.feedTitle || sourceHost || 'Feed update',
+    256,
+    false,
+  );
   const embed: DiscordEmbed = {
+    color: 0x0f9d92,
+    author: { name: feedTitle || sourceName || 'Feed update' },
     title: displayText(entry.title || 'Untitled', 256) || 'Untitled',
+    footer: { text: sourceName ? `syndicord · ${sourceName}` : 'syndicord' },
   };
-  const description = displayText(entry.description, 3_000);
+  if (sourceUrl) embed.author.url = sourceUrl;
+  const description = excerpt(entry);
   if (description) embed.description = description;
-  const url = messageLink(entry.link) ?? messageLink(feedUrl);
+  const url = messageLink(entry.link) ?? sourceUrl;
   if (url) embed.url = url;
   if (entry.publishedAt && Number.isFinite(Date.parse(entry.publishedAt))) {
     embed.timestamp = new Date(entry.publishedAt).toISOString();
