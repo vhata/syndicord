@@ -10,7 +10,11 @@ const MAX_LINK_LENGTH = 2_048;
 const MAX_TITLE_LENGTH = 512;
 const MAX_DESCRIPTION_LENGTH = 4_000;
 
-function text(value: string | undefined, html = true): string {
+function text(
+  value: string | undefined,
+  html = true,
+  paragraphs = false,
+): string {
   let result = value ?? '';
   if (html) {
     result = result
@@ -18,17 +22,20 @@ function text(value: string | undefined, html = true): string {
       .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
       .replace(
         /<\/?(?:p|div|li|ul|ol|blockquote|br|hr|h[1-6]|tr|td)\b[^>]*>/gi,
-        ' ',
+        paragraphs ? '\n\n' : ' ',
       )
       .replace(/<\/?[a-z][^>]*>/gi, '');
   }
-  return (
-    (html ? decodeHTMLStrict(result) : result)
-      // oxlint-disable-next-line no-control-regex -- Strip non-printing controls from untrusted feed text.
-      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
-      .replace(/\s+/gu, ' ')
-      .trim()
-  );
+  result = (html ? decodeHTMLStrict(result) : result)
+    // oxlint-disable-next-line no-control-regex -- Strip non-printing controls from untrusted feed text.
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '');
+  if (!paragraphs) return result.replace(/\s+/gu, ' ').trim();
+  return result
+    .replace(/\r\n?/g, '\n')
+    .split(/\n\s*\n/u)
+    .map((paragraph) => paragraph.replace(/\s+/gu, ' ').trim())
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function atomText(value: AtomFeed.Text | AtomFeed.Content | undefined): string {
@@ -180,6 +187,7 @@ interface Candidate {
   description: string;
   link: string | null;
   publishedAt: string | null;
+  identityDescription?: string;
 }
 
 async function normalize(candidate: Candidate): Promise<FeedEntry | null> {
@@ -205,7 +213,7 @@ async function normalize(candidate: Candidate): Promise<FeedEntry | null> {
     // Hash before display truncation so entries with a common prefix stay distinct.
     const content = JSON.stringify([
       candidate.title,
-      candidate.description,
+      candidate.identityDescription ?? candidate.description,
       candidate.publishedAt,
     ]);
     const digest = await crypto.subtle.digest(
@@ -254,16 +262,22 @@ export async function parseFeedDocument(
     title = text(parsed.feed.title, false);
     candidates = (parsed.feed.items ?? []).map((item) => {
       const itemBase = resolveBase(item.xml?.base, feedBase);
+      const link =
+        safeLink(item.link, itemBase) ??
+        (item.guid?.isPermaLink === false ||
+        !/^https?:\/\//i.test(item.guid?.value ?? '')
+          ? null
+          : safeLink(item.guid?.value, itemBase));
+      const description = item.description || item.content?.encoded;
       return {
         id: item.guid?.value,
         title: text(item.title, false),
-        description: text(item.description || item.content?.encoded),
-        link:
-          safeLink(item.link, itemBase) ??
-          (item.guid?.isPermaLink === false ||
-          !/^https?:\/\//i.test(item.guid?.value ?? '')
-            ? null
-            : safeLink(item.guid?.value, itemBase)),
+        description: text(description, true, true),
+        // Display changes must not make existing fingerprinted entries new.
+        ...(!item.guid?.value?.trim() && !link
+          ? { identityDescription: text(description) }
+          : {}),
+        link,
         publishedAt: date(item.pubDate ?? item.dc?.dates?.[0]),
       };
     });
@@ -284,15 +298,21 @@ export async function parseFeedDocument(
       const links = (entry.links ?? []).filter(
         (link) => !link.rel || link.rel === 'alternate',
       );
+      const link = linksWithBases
+        ? (linksWithBases[index] ?? null)
+        : (links.map((link) => safeLink(link.href, entryBase)).find(Boolean) ??
+          null);
+      const description = entry.summary ?? entry.content;
+      const html =
+        description?.type === 'html' || description?.type === 'xhtml';
       return {
         id: entry.id,
         title: atomText(entry.title),
-        description: atomText(entry.summary ?? entry.content),
-        link: linksWithBases
-          ? (linksWithBases[index] ?? null)
-          : (links
-              .map((link) => safeLink(link.href, entryBase))
-              .find(Boolean) ?? null),
+        description: text(description?.value, html, true),
+        ...(!entry.id?.trim() && !link
+          ? { identityDescription: atomText(description) }
+          : {}),
+        link,
         publishedAt: date(entry.published ?? entry.updated),
       };
     });
@@ -304,11 +324,13 @@ export async function parseFeedDocument(
     throw new Error('Feed contains too many entries');
   const entries: FeedEntry[] = [];
   const seen = new Set<string>();
+  const feedTitle = truncate(title, MAX_TITLE_LENGTH);
   for (const candidate of candidates) {
     const entry = await normalize(candidate);
     if (!entry || seen.has(entry.id)) continue;
+    if (feedTitle) entry.feedTitle = feedTitle;
     seen.add(entry.id);
     entries.push(entry);
   }
-  return { title: truncate(title, MAX_TITLE_LENGTH), entries };
+  return { title: feedTitle, entries };
 }

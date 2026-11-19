@@ -19,8 +19,9 @@ test('normalizes RSS IDs, relative links, HTML, entities, and undated content', 
       id: 'id:post-1',
       title: 'First & best',
       link: 'https://example.test/posts/one',
-      description: 'Hello © world. Next 🚀.',
+      description: 'Hello © world.\n\nNext 🚀.',
       publishedAt: '2026-11-18T12:00:00.000Z',
+      feedTitle: 'News & Notes',
     },
     {
       id: 'link:https://example.test/feeds/posts/two',
@@ -28,6 +29,7 @@ test('normalizes RSS IDs, relative links, HTML, entities, and undated content', 
       link: 'https://example.test/feeds/posts/two',
       description: 'Undated content.',
       publishedAt: null,
+      feedTitle: 'News & Notes',
     },
   ]);
 });
@@ -45,6 +47,7 @@ test('normalizes Atom text constructs, xml:base, alternate links, and dates', as
       link: 'https://example.test/blog/posts/one',
       description: 'Hello & goodbye.',
       publishedAt: '2026-11-17T11:00:00.000Z',
+      feedTitle: 'Example updates',
     },
     {
       id: 'id:urn:post:two',
@@ -52,8 +55,65 @@ test('normalizes Atom text constructs, xml:base, alternate links, and dates', as
       link: null,
       description: 'Plain <text> stays readable.',
       publishedAt: null,
+      feedTitle: 'Example updates',
     },
   ]);
+});
+
+test('retains RSS paragraphs without changing legacy content fingerprints', async () => {
+  const feed = await parseFeedDocument(
+    rss(
+      '<item><description><![CDATA[<p>one</p><p>two</p>]]></description></item>',
+    ),
+    url,
+  );
+  assert.equal(feed.entries[0]?.description, 'one\n\ntwo');
+  assert.equal(
+    feed.entries[0]?.id,
+    'sha256:8f51e54af06de5d77219ab8b79faa97a96ca1a0c75c4a302bb9b409589f89deb',
+  );
+  const changedTitle = await parseFeedDocument(
+    rss(
+      '<item><description><![CDATA[<p>one</p><p>two</p>]]></description></item>',
+    ).replace('<title>Test</title>', '<title>Renamed</title>'),
+    url,
+  );
+  assert.equal(changedTitle.entries[0]?.id, feed.entries[0]?.id);
+  assert.equal(changedTitle.entries[0]?.feedTitle, 'Renamed');
+});
+
+test('keeps Atom plaintext paragraphs and existing fingerprints', async () => {
+  const feed = await parseFeedDocument(
+    `<feed xmlns="http://www.w3.org/2005/Atom"><title>Updates</title>
+      <entry><content type="text">First paragraph.\n\nSecond paragraph.</content></entry>
+    </feed>`,
+    url,
+  );
+  assert.equal(
+    feed.entries[0]?.description,
+    'First paragraph.\n\nSecond paragraph.',
+  );
+  assert.equal(
+    feed.entries[0]?.id,
+    'sha256:c0a417a3a05f9af3d35d8467a3cc4a773f6d0d84cd365a291c57731b1a863d50',
+  );
+});
+
+test('bounds feed titles stored with entries and omits missing names', async () => {
+  const long = await parseFeedDocument(
+    rss('<item><guid>one</guid></item>').replace(
+      '<title>Test</title>',
+      `<title>${'🚀'.repeat(300)}</title>`,
+    ),
+    url,
+  );
+  assert.equal(long.entries[0]?.feedTitle?.length, 512);
+  assert.equal(long.entries[0]?.feedTitle?.isWellFormed(), true);
+  const unnamed = await parseFeedDocument(
+    rss('<item><guid>one</guid></item>').replace('<title>Test</title>', ''),
+    url,
+  );
+  assert.equal(unnamed.entries[0]?.feedTitle, undefined);
 });
 
 test('preserves literal HTML entity names in Atom plain text constructs', async () => {
