@@ -188,7 +188,7 @@ export async function sendDiscord(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildMessage(entry, feedUrl)),
-      redirect: 'error',
+      redirect: 'manual',
       signal: controller.signal,
     });
     controller.signal.throwIfAborted();

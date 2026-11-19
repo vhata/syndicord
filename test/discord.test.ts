@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
+import { URL as NodeURL } from 'node:url';
+import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { buildMessage, sendDiscord } from '../src/discord.ts';
 import type { FeedEntry, Fetcher } from '../src/types.ts';
 
@@ -71,7 +75,7 @@ test('requests server confirmation, preserves thread IDs, and forbids redirects'
     assert.equal(parsed.searchParams.get('wait'), 'true');
     assert.equal(parsed.searchParams.get('thread_id'), '456');
     assert.equal(init?.method, 'POST');
-    assert.equal(init?.redirect, 'error');
+    assert.equal(init?.redirect, 'manual');
     assert.ok(init?.signal instanceof AbortSignal);
     assert.deepEqual(
       JSON.parse(init!.body as string),
@@ -281,4 +285,50 @@ test('timeout also cancels a response body that stops producing data', async (co
   assert.equal(result.ok, false);
   assert.equal(!result.ok && result.reason, 'network_error');
   assert.equal(cancelled, true);
+});
+
+test('the Workers runtime sends webhook requests and refuses redirect responses', async () => {
+  const source = await readFile(
+    new NodeURL('../src/discord.ts', import.meta.url),
+    'utf8',
+  );
+  const targets: string[] = [];
+  let redirect = false;
+  const runtime = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script: `${stripTypeScriptTypes(source)}\nexport default {
+      async fetch() {
+        return Response.json(await sendDiscord(${JSON.stringify(webhook)}, ${JSON.stringify(entry)}, ${JSON.stringify(feedUrl)}));
+      }
+    };`,
+      compatibilityDate: '2026-11-18',
+      cf: false,
+      outboundService: async (request) => {
+        targets.push(request.url);
+        if (redirect)
+          return new Response(null, {
+            status: 302,
+            headers: { Location: 'https://other.test/collect' },
+          });
+        return Response.json({ id: '123456' });
+      },
+    }),
+  );
+  try {
+    const success = await runtime.dispatchFetch('http://localhost/');
+    assert.deepEqual(await success.json(), { ok: true, cooldownMs: 0 });
+    redirect = true;
+    const refusal = await runtime.dispatchFetch('http://localhost/');
+    assert.deepEqual(await refusal.json(), {
+      ok: false,
+      reason: 'http_error',
+      status: 302,
+      retryAfterMs: null,
+      global: false,
+    });
+    assert.deepEqual(targets, [`${webhook}?wait=true`, `${webhook}?wait=true`]);
+  } finally {
+    await runtime.dispose();
+  }
 });
