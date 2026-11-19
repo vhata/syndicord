@@ -20,66 +20,130 @@ JSON in the shared password-manager item so another operator can replace the
 mapping without reconstructing it from somebody's computer. Store real webhook
 URLs there and in Cloudflare, never in Git, issues, logs, or command arguments.
 
-## One-time production setup
+## First deployment from the CLI
 
-Provisioning the Worker and D1 database creates metered Cloudflare resources;
-deployments and migrations change those resources. Confirm that setup before
-running it, including when expected usage fits the free plan. An existing
-syndicord installation uses its current Worker and database; do not recreate
-its delivery ledger.
+Use Node.js 26.13.0 and npm 11.20.0, as recorded in `.node-version` and
+`package.json`. See [development](DEVELOPMENT.md) for the supported versions.
+Clone the repository you control (fork syndicord first if needed), then install
+and validate the checkout **before creating or changing cloud resources**:
 
-1. Create a D1 database named `syndicord` in the Cloudflare dashboard and record
-   its database ID. For a CLI setup, install this checkout's dependencies with
-   `npm ci`, sign in with `npx cf auth login`, and run:
+```sh
+git clone YOUR_REPOSITORY_URL syndicord
+cd syndicord
+npm ci
+npm run check
+```
+
+The full check runs without Cloudflare or Discord credentials. Stop and fix any
+failure before continuing. Review `feeds.json`; its initial feed sends this
+repository's commit updates to the destination named `updates`. Replace the
+feed URL if you want to follow a different repository or feed.
+
+The following steps create or change metered Cloudflare resources, including
+when expected usage fits the free plan. An existing syndicord installation
+uses its current Worker and database; skip creation and reuse its database ID.
+Do not recreate the delivery ledger.
+
+1. Create a Discord webhook in the destination channel under **Edit Channel →
+   Integrations → Webhooks**. Save the complete destination mapping in the
+   shared password-manager item. For the initial feed, the JSON is:
+
+   ```json
+   { "updates": "https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN" }
+   ```
+
+   Replace the placeholders with the copied URL. Keep this mapping available
+   to the operators; it is the authoritative copy for later additions and
+   rotation. Every name used in `feeds.json` needs a matching entry.
+
+2. Sign in and select the Cloudflare account that owns the installation:
+
+   ```sh
+   npx cf auth login
+   npx cf auth whoami
+   export CLOUDFLARE_ACCOUNT_ID='your-account-id'
+   ```
+
+   Copy the intended account ID from the `whoami` output into the export.
+
+3. Create the D1 database and export the ID returned by the command:
 
    ```sh
    npx cf d1 create --name syndicord
+   export SYNDICORD_DATABASE_ID='the-returned-database-uuid'
+   npx cf d1 migrations apply "$SYNDICORD_DATABASE_ID" --dir migrations
    ```
 
-2. Ensure a Worker named `syndicord` exists in the same account. For a fresh
-   installation, create it through **Workers & Pages → Create application**
-   using the initial Worker template. An already deployed syndicord Worker
-   needs no replacement.
+   Migrations target the hosted database. Local development uses `--local`
+   instead. Keep the database ID for subsequent deployments and GitHub setup.
 
-3. Set its `WEBHOOKS` secret as described below. Use the destination names in
-   the committed `feeds.json`; the initial destination is `updates`.
-
-4. For a fresh installation only, bootstrap the Worker once from an interactive
-   terminal. Use the [project's Node/npm versions](DEVELOPMENT.md), then run:
+4. Deploy the project and its initial secret together. Run this block from the
+   repository; it explicitly starts **Bash**, so it also works when your usual
+   shell is zsh. At the hidden prompt, paste the complete mapping from the
+   shared password-manager item **on one line**, then press Enter:
 
    ```sh
-   npm ci
-   npm run check
-   npx cf auth login
-   export CLOUDFLARE_ACCOUNT_ID='your-account-id'
-   export SYNDICORD_DATABASE_ID='your-existing-database-uuid'
-   npx cf d1 migrations apply "$SYNDICORD_DATABASE_ID" --dir migrations
-   npm run deploy
+   bash <<'BASH'
+   set +x
+   set -euo pipefail
+   read -r -s -p 'Paste the WEBHOOKS JSON on one line: ' syndicord_webhooks </dev/tty
+   printf '\n' >/dev/tty
+   syndicord_secrets="$(printf '%s' "$syndicord_webhooks" | node --input-type=module -e '
+     import feeds from "./feeds.json" with { type: "json" };
+     import { loadConfig } from "./src/config.ts";
+     try {
+       let value = "";
+       for await (const chunk of process.stdin) value += chunk;
+       JSON.parse(value);
+       loadConfig(feeds, value);
+       process.stdout.write(JSON.stringify({ WEBHOOKS: value }));
+     } catch {
+       console.error("Invalid WEBHOOKS JSON or destination configuration.");
+       process.exitCode = 1;
+     }
+   ')"
+   printf '%s' "$syndicord_secrets" | npm run deploy -- --secrets-file /dev/stdin
+   BASH
    ```
 
-   Review and accept the expected replacement of the initial dashboard
-   template's configuration. This installs syndicord, binds D1, installs the
-   schedule, and disables public and preview URLs. The hosted `WEBHOOKS` value
-   is preserved; no local secret file is needed. This interactive step is
-   necessary because CI refuses conflicting dashboard configuration. Do not
-   add `--force` to the regular deployment workflow. Existing installations
-   already deployed with this configuration skip this step.
+   The prompt does not echo the value or put it in shell history. The wrapper
+   validates the mapping before starting deployment and sends the CLI its
+   required outer secrets JSON through standard input. The secret passes
+   through process memory and the pipe; no production secret file is created.
 
-5. Create a Cloudflare API token scoped to the deployment account with
+   `cf deploy` creates the Worker named `syndicord`, uploads `WEBHOOKS` with
+   its code, binds the existing D1 database, and installs the cron schedule.
+   There is no dashboard Worker-creation step. The secret is present when the
+   schedule starts. `--no-provision` prevents creation of missing bindings;
+   public and preview URLs are disabled.
+
+5. [Verify the first baseline and a new delivery](#verify-the-first-deployment)
+   before enabling automatic deployment. For later manual code deployments,
+   run `npm ci` after pulling dependency changes, `npm run check`, apply any
+   outstanding migrations, and run `npm run deploy` with the same exported
+   IDs. Existing hosted secrets are preserved; the initial secret-input block
+   is needed only when creating the Worker or intentionally replacing its map.
+
+## Enable automatic deployment
+
+Complete and verify the CLI installation first. Then configure GitHub so
+future changes use the hosted secret and no operator's local secret file.
+
+1. Create a Cloudflare API token scoped to the deployment account with
    **Account → Workers Scripts → Edit** and **Account → D1 → Edit**. The token
    needs Worker deployment, settings, secret-name reads, and D1 migration
    access. This application has no domain routes and needs no zone permissions.
    Store the token in GitHub, not in the repository or a production dotenv file.
 
-6. In GitHub, open **Settings → Environments**, create `production`, and restrict
-   its deployment branches to `main`. Add the secret and two variables from
-   the table above. Required reviewers pause each deployment for approval;
-   omit that rule when pushes to `main` should deploy automatically.
+2. In GitHub, open **Settings → Environments**, create `production`, and restrict
+   its deployment branches to `main`. Add secret `CLOUDFLARE_API_TOKEN` and
+   variables `CLOUDFLARE_ACCOUNT_ID` and `SYNDICORD_DATABASE_ID`, using the IDs
+   from the working installation. Required reviewers pause each deployment for
+   approval; omit that rule when pushes to `main` should deploy automatically.
 
-7. Merge the workflow and configuration into `main`. Every subsequent push to
-   `main` checks and deploys automatically. To deploy the current `main` without
-   a code change, open **Actions → CI → Run workflow**, select `main`, and run it.
-   Each run applies outstanding schema migrations before deploying.
+3. Once the workflow is on `main`, open **Actions → CI → Run workflow**, select
+   `main`, and run it to check the setup. Every push to `main` then checks,
+   applies outstanding schema migrations, and deploys automatically.
 
 Configure the environment before merging the deployment workflow. A missing
 credential or ID makes the deployment job fail with setup guidance. Pull
@@ -206,21 +270,36 @@ If an upload or verification result is ambiguous, inspect **Cloudflare →
 syndicord → Deployments** before retrying. A Worker upload may have succeeded
 even if later trigger configuration or verification failed.
 
-## Verify operation
+## Verify the first deployment
 
-Watch Worker logs using an authenticated Cloudflare CLI:
+Start a live tail and leave it running while the cron polls:
 
 ```sh
 npx cf observability tail --worker syndicord
 ```
 
-Confirm `feed_checked` and `relay_complete` events. After the first baseline,
-a new entry should produce a `delivery_sent` event and one Discord message.
-Check CPU time and invocation errors in Cloudflare's Worker metrics; local
-checks cannot prove that the actual feeds fit the hosted runtime budget.
+1. Wait for `feed_checked` followed by `relay_complete`. Each new
+   feed/destination pair starts with a silent baseline: entries already in the
+   feed should **not** produce Discord messages. A failed fetch or parse does
+   not establish that baseline.
+2. After that baseline, publish a new entry in a feed you control. For the
+   configured GitHub commit feed, push or merge a new commit to that
+   repository's default branch. Wait for its next scheduled check; with N
+   configured feeds, each is checked approximately every N minutes.
+3. Confirm a `delivery_sent` event and exactly one message in every configured
+   destination. Check that its feed name, title, link, and excerpt are correct.
+4. Wait through further checks of the same feed. The entry should not be sent
+   again. If delivery fails, use the recovery guidance below and inspect the
+   pending records rather than deleting deduplication state.
 
-To inspect delivery counts without reading message payloads, export the same
-non-secret database ID recorded in the GitHub environment and run:
+A successful cron invocation alone does not prove successful feed polling or
+Discord delivery. Check CPU time and invocation errors in Cloudflare's Worker
+metrics; local checks cannot prove that the actual feeds fit the hosted runtime
+budget.
+
+To inspect delivery counts without reading message payloads, use the database
+ID retained from setup (and recorded in the GitHub environment after enabling
+automatic deployment):
 
 ```sh
 export SYNDICORD_DATABASE_ID='your-existing-database-uuid'
