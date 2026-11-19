@@ -1,4 +1,16 @@
-# syndicord
+<p align="center">
+  <img src="assets/syndicord.svg" width="112" height="112" alt="syndicord — a feed signal inside a message bubble">
+</p>
+
+<h1 align="center">syndicord</h1>
+
+<p align="center"><strong>Your feeds. In the conversation.</strong><br>RSS and Atom updates, delivered to Discord.</p>
+
+<p align="center">
+  <a href="docs/OPERATIONS.md">Set up syndicord</a> ·
+  <a href="docs/BEHAVIOR.md">How delivery works</a> ·
+  <a href="docs/DEVELOPMENT.md">Development</a>
+</p>
 
 syndicord is an RSS-to-Discord relay that runs on Cloudflare Workers. It polls
 feeds on a schedule and posts new entries to Discord through one or more
