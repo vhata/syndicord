@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>News &amp; Notes</title>
+    <link>https://example.test/</link>
+    <description>Recent posts</description>
+    <item>
+      <guid isPermaLink="false">post-1</guid>
+      <title>First &amp; best</title>
+      <link>/posts/one</link>
+      <description><![CDATA[<p>Hello &copy; world.</p><script>discard()</script><p>Next &#x1f680;.</p>]]></description>
+      <pubDate>Wed, 18 Nov 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <link>posts/two</link>
+      <content:encoded><![CDATA[<p>Undated <strong>content</strong>.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>
