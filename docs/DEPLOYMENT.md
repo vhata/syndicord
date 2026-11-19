@@ -4,6 +4,10 @@ Complete [the first deployment](SETUP.md) first. These steps connect the working
 installation to GitHub Actions; afterwards, pushes to `main` check the code,
 apply D1 migrations, and deploy. Pull requests only run checks.
 
+Install the GitHub CLI (`gh`) using its
+[official installation instructions](https://github.com/cli/cli#installation)
+before following this guide.
+
 Run commands from your repository with `CLOUDFLARE_ACCOUNT_ID` and
 `SYNDICORD_DATABASE_ID` exported from setup.
 
