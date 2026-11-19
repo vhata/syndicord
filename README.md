@@ -13,6 +13,11 @@ Messages carry titles, links, and descriptions from the feeds themselves,
 so readers can follow updates in Discord and open the original posts for
 the full story.
 
+## Development
+
+See the [development guide](docs/DEVELOPMENT.md) for local setup, project
+layout, and checks.
+
 ## License
 
 [MIT](LICENSE) © 2026 Jonathan Hitchcock.

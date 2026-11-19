@@ -1,0 +1,33 @@
+{
+  "name": "syndicord",
+  "version": "0.0.0",
+  "private": true,
+  "description": "An RSS-to-Discord relay running on Cloudflare Workers.",
+  "license": "MIT",
+  "author": "Jonathan Hitchcock",
+  "type": "module",
+  "engines": {
+    "node": ">=26.12.0 <27",
+    "npm": ">=11 <12"
+  },
+  "packageManager": "npm@11.20.0",
+  "scripts": {
+    "check": "npm run format:check && npm run check:types",
+    "check:types": "npm run types && tsc --noEmit",
+    "format": "prettier --write \"**/*.{ts,json,jsonc,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,json,jsonc,md}\"",
+    "types": "cf workers types"
+  },
+  "devDependencies": {
+    "cf": "1.0.0-rc.1",
+    "prettier": "3.10.1",
+    "typescript": "7.0.2",
+    "wrangler": "4.165.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261118.1": true,
+    "fsevents": false,
+    "workerd@1.20261117.1": true
+  }
+}
