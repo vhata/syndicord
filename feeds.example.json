@@ -1,0 +1,6 @@
+[
+  {
+    "url": "https://example.com/feed.xml",
+    "destinations": ["updates"]
+  }
+]

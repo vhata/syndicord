@@ -1,55 +1,85 @@
 # Development
 
-The project uses TypeScript, npm, and the Cloudflare CLI (`cf`), with
-Wrangler as its bundler. Node.js 26.13.0 is recorded in `.node-version`;
-the package requires Node.js 26.12 or newer in the 26.x line and npm 11.
-The CLI is installed locally as a pinned development dependency.
+syndicord uses TypeScript, npm, and the Cloudflare CLI (`cf`), with Wrangler
+as its bundler. Node.js 26.13.0 is recorded in `.node-version`; the package
+requires Node.js 26.12 or newer in the 26.x line and npm 11. The commands
+use a POSIX shell, such as Bash or zsh.
 
-## Setup
-
-From the repository root:
+## Check the project
 
 ```sh
 npm ci
 npm run check
 ```
 
-`npm ci` installs the versions recorded in `package-lock.json`.
-`package.json` records install-script approvals for the pinned `esbuild`
-and `workerd` binaries used by the Cloudflare tooling. Review those approvals when
-updating dependencies.
+The check covers formatting, generated Workers types, TypeScript, the Worker
+build, and tests. Tests use fixture feeds, fake Discord responses, and temporary
+local D1 databases. A runtime test exercises scheduled events in the built
+Worker. These checks need no Cloudflare account or Discord credentials.
 
-`npm run check` checks formatting, generates Workers types, and type-checks
-the TypeScript configuration. The source and test directories are empty;
-the check does not exercise application behavior.
+Miniflare and type generation start local runtime processes and bind loopback
+ports. Restricted sandboxes must permit those operations. Local tests do not
+measure hosted CPU usage or prove live Discord delivery.
 
-`npm run types` runs `cf workers types` and writes generated declarations
-under `.cloudflare/types/`. These files are ignored by Git and regenerated
-on every check. Run the command separately to refresh editor types after
-changing `cloudflare.config.ts`.
+`npm run types` refreshes editor types under `.cloudflare/types/`.
+`npm run format` formats TypeScript, JSON, and Markdown. `npm test` builds the
+Worker and runs the tests. `npm run build` writes the deployment artifact to
+`.cloudflare/output/` without uploading it.
 
-`npm run format` formats TypeScript, JSON, and Markdown files.
+`package-lock.json` pins dependency versions. `package.json` records approvals
+for the pinned native installers used by Cloudflare's tools; review these when
+updating dependencies. Generated files, local databases, and secrets are ignored
+by Git.
+
+## Run locally
+
+```sh
+cp .dev.vars.example .dev.vars
+```
+
+Edit `.dev.vars` with the real Discord webhook URLs for the destination names
+in `feeds.json`. Keep that file private. Then:
+
+```sh
+npm run db:migrate:local
+npm run dev
+```
+
+The migration command always uses `--local`. It uses the same database ID as
+the Worker configuration: the exported `SYNDICORD_DATABASE_ID`, or the built-in
+local placeholder when that variable is absent. Export that variable in the
+shell when changing it, rather than putting it in a dotenv file.
+
+The local server normally listens on port 8787. Trigger a poll through the local
+runtime's scheduled-event route:
+
+```sh
+curl -fsS 'http://localhost:8787/cdn-cgi/local/scheduled'
+```
+
+This local poll uses the configured feeds and **real Discord webhooks**.
+The first successful poll establishes a silent baseline. Later polls send new
+entries. The scheduled-event route belongs to the local runtime; the deployed
+Worker's HTTP handler returns 404.
+
+Local D1 state is under `.cloudflare/state/` and is separate from hosted state.
+The automated tests create their own databases and do not change this state.
 
 ## Layout
 
-| Path                   | Purpose                                                |
-| ---------------------- | ------------------------------------------------------ |
-| `src/`                 | Worker source directory                                |
-| `test/`                | Test directory                                         |
-| `cloudflare.config.ts` | Worker identity and runtime configuration              |
-| `tsconfig.json`        | Strict TypeScript settings and generated Workers types |
-| `docs/`                | Development documentation                              |
+| Path                   | Purpose                                                 |
+| ---------------------- | ------------------------------------------------------- |
+| `src/config.ts`        | Feed and webhook validation                             |
+| `src/feed.ts`          | RSS and Atom normalization                              |
+| `src/discord.ts`       | Message formatting and confirmed webhook delivery       |
+| `src/ledger.ts`        | D1 baselines, pending deliveries, leases, and cooldowns |
+| `src/runner.ts`        | Bounded polling and delivery orchestration              |
+| `src/index.ts`         | Scheduled Worker entrypoint                             |
+| `test/`                | Unit, D1 integration, and built-Worker tests            |
+| `migrations/`          | D1 schema migrations                                    |
+| `cloudflare.config.ts` | Worker, bindings, schedule, and logging                 |
 
-The Cloudflare configuration names the worker `syndicord` and disables
-`workers.dev` and preview URLs. It has no entrypoint, cron schedule, or
-resource bindings; this scaffold is not a deployable worker.
-
-## Local secrets
-
-Keep Discord webhook URLs and other secrets in `.dev.vars` for local
-development. `.dev.vars` and `.env` files, including environment variants,
-are ignored by Git. Files named `.dev.vars.example` or `.env.example` are
-trackable and must contain placeholders only.
+See [operations](OPERATIONS.md) for configuration, deployment, and recovery.
 
 ## Tooling references
 
