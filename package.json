@@ -19,7 +19,9 @@
     "types": "cf workers types"
   },
   "devDependencies": {
+    "@types/node": "26.6.6",
     "cf": "1.0.0-rc.1",
+    "miniflare": "5.20261118.0-beta",
     "prettier": "3.10.1",
     "typescript": "7.0.2",
     "wrangler": "4.165.0"
@@ -29,5 +31,10 @@
     "workerd@1.20261118.1": true,
     "fsevents": false,
     "workerd@1.20261117.1": true
+  },
+  "dependencies": {
+    "entities": "7.0.1",
+    "fast-xml-parser": "5.12.1",
+    "feedsmith": "3.1.0"
   }
 }
