@@ -31,6 +31,35 @@ selects an existing thread. Each destination has a distinct webhook URL.
 Forum or media channels need that existing thread ID. Do not commit real URLs
 or put them in command-line arguments.
 
+To add feeds and destinations, extend `feeds.json` and the `WEBHOOKS` mapping.
+For example, this sends commits to `updates` and another feed to both channels:
+
+```json
+[
+  {
+    "url": "https://github.com/vhata/syndicord/commits.atom",
+    "destinations": ["updates"]
+  },
+  {
+    "url": "https://example.com/feed.xml",
+    "destinations": ["updates", "security"]
+  }
+]
+```
+
+Replace the example feed URL and add the second webhook to `.dev.vars`,
+preserving the existing `updates` value:
+
+```dotenv
+WEBHOOKS='{"updates":"YOUR_EXISTING_WEBHOOK_URL","security":"YOUR_SECOND_WEBHOOK_URL"}'
+```
+
+Run `npm run check` and deploy with
+`npm run deploy -- --secrets-file .dev.vars`, using the existing exported
+database ID. Each new feed/destination pair records a silent baseline on its
+first successful poll. Keep existing destination names when changing a webhook;
+renaming a destination creates a new pair.
+
 Each cron invocation checks one feed and attempts at most five deliveries.
 Feeds rotate, including after fetch failures. With the default one-minute cron,
 N feeds are each checked about every N minutes. A run stops starting deliveries
