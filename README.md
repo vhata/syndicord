@@ -22,6 +22,9 @@ Configure feeds in `feeds.json` and keep Discord webhook URLs in the
 for setup and deployment, and [relay behavior](docs/BEHAVIOR.md) for delivery
 semantics.
 
+Use the [operational status command](docs/STATUS.md) to inspect feed health,
+pending deliveries, and suspended destinations.
+
 ## Development
 
 See the [development guide](docs/DEVELOPMENT.md) for local setup, project

@@ -70,7 +70,7 @@ function webhookUrl(value: unknown): string {
   return url.href;
 }
 
-export function loadConfig(feeds: unknown, secret: unknown): RelayConfig {
+export function loadFeeds(feeds: unknown): FeedRoute[] {
   if (!Array.isArray(feeds) || feeds.length > MAX_ROUTES) {
     throw new Error(
       `feeds.json must be an array with at most ${MAX_ROUTES} feeds`,
@@ -78,7 +78,6 @@ export function loadConfig(feeds: unknown, secret: unknown): RelayConfig {
   }
   const routes: FeedRoute[] = [];
   const urls = new Set<string>();
-  const destinations = new Set<string>();
   let routeCount = 0;
   for (const raw of feeds) {
     if (
@@ -106,7 +105,6 @@ export function loadConfig(feeds: unknown, secret: unknown): RelayConfig {
         );
       }
       names.push(name);
-      destinations.add(name);
     }
     routeCount += names.length;
     if (routeCount > MAX_ROUTES) {
@@ -116,6 +114,12 @@ export function loadConfig(feeds: unknown, secret: unknown): RelayConfig {
     }
     routes.push({ url, destinations: names });
   }
+  return routes;
+}
+
+export function loadConfig(feeds: unknown, secret: unknown): RelayConfig {
+  const routes = loadFeeds(feeds);
+  const destinations = new Set(routes.flatMap((route) => route.destinations));
   const webhooks: Record<string, string> = Object.create(null);
   if (routes.length === 0) return { feeds: routes, webhooks };
   let values: unknown;

@@ -1,6 +1,22 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { URL } from 'node:url';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
+
+export async function applyTestMigrations(db: D1Database): Promise<void> {
+  const directory = new URL('../../migrations/', import.meta.url);
+  for (const filename of (await readdir(directory))
+    .filter((name) => name.endsWith('.sql'))
+    .sort()) {
+    const migration = await readFile(new URL(filename, directory), 'utf8');
+    await db.batch(
+      migration
+        .split(';')
+        .map((sql) => sql.trim())
+        .filter(Boolean)
+        .map((sql) => db.prepare(sql)),
+    );
+  }
+}
 
 export async function createTestDatabase(): Promise<{
   db: D1Database;
@@ -17,17 +33,7 @@ export async function createTestDatabase(): Promise<{
   );
   try {
     const db = (await runtime.getD1Database('DB')) as unknown as D1Database;
-    const migration = await readFile(
-      new URL('../../migrations/0001_delivery_ledger.sql', import.meta.url),
-      'utf8',
-    );
-    await db.batch(
-      migration
-        .split(';')
-        .map((statement) => statement.trim())
-        .filter(Boolean)
-        .map((statement) => db.prepare(statement)),
-    );
+    await applyTestMigrations(db);
     return { db, dispose: () => runtime.dispose() };
   } catch (error) {
     await runtime.dispose();

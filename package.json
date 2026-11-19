@@ -20,6 +20,7 @@
     "lint": "oxlint --deny-warnings .",
     "lint:fix": "oxlint --fix --deny-warnings .",
     "prepare": "husky",
+    "status": "node scripts/status.ts",
     "types": "cf workers types",
     "build": "cf build",
     "dev": "cf dev",

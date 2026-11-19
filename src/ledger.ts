@@ -44,12 +44,15 @@ export class DeliveryLedger {
     const row = await this.db
       .prepare(
         `
-        INSERT INTO relay_lease (id, owner, expires_at_ms, cursor)
-        VALUES (1, ?, ${NOW_MS} + ?, 1)
+        INSERT INTO relay_lease
+          (id, owner, expires_at_ms, cursor, last_started_ms, last_outcome)
+        VALUES (1, ?, ${NOW_MS} + ?, 1, ${NOW_MS}, 'running')
         ON CONFLICT (id) DO UPDATE SET
           owner = excluded.owner,
           expires_at_ms = excluded.expires_at_ms,
-          cursor = relay_lease.cursor + 1
+          cursor = relay_lease.cursor + 1,
+          last_started_ms = excluded.last_started_ms,
+          last_outcome = 'running'
         WHERE relay_lease.expires_at_ms <= ${NOW_MS}
         RETURNING cursor - 1 AS cursor
       `,
@@ -75,16 +78,20 @@ export class DeliveryLedger {
     return result.meta.changes === 1;
   }
 
-  async release(owner: string): Promise<void> {
-    await this.db
+  async release(owner: string, completed = false): Promise<boolean> {
+    const result = await this.db
       .prepare(
         `
-        UPDATE relay_lease SET owner = '', expires_at_ms = 0
+        UPDATE relay_lease SET owner = '', expires_at_ms = 0,
+          last_completed_ms = CASE WHEN ? THEN ${NOW_MS} ELSE last_completed_ms END,
+          last_outcome = CASE WHEN ? THEN 'completed' ELSE 'failed' END
         WHERE id = 1 AND owner = ? AND expires_at_ms > ${NOW_MS}
       `,
       )
-      .bind(owner)
+      .bind(completed, completed, owner)
       .run();
+    if (completed && result.meta.changes !== 1) throw new LostLeaseError();
+    return result.meta.changes === 1;
   }
 
   // A zero-row renewal does not abort a D1 batch. Every subsequent write
@@ -147,6 +154,19 @@ export class DeliveryLedger {
           destinations,
           owner,
         ),
+      this.db
+        .prepare(
+          `
+          INSERT INTO relay_feed_health
+            (feed_url, last_attempt_ms, last_success_ms, entry_count)
+          SELECT ?, ${NOW_MS}, ${NOW_MS}, ? WHERE ${OWNER_GUARD}
+          ON CONFLICT (feed_url) DO UPDATE SET
+            last_success_ms = excluded.last_success_ms,
+            last_error = NULL, consecutive_failures = 0,
+            entry_count = excluded.entry_count
+        `,
+        )
+        .bind(route.url, uniqueEntries.length, owner),
     ]);
     if (!results) throw new LostLeaseError();
     const baselined = results[0]!.meta.changes;
@@ -157,6 +177,7 @@ export class DeliveryLedger {
   async syncDestinations(
     owner: string,
     fingerprints: Readonly<Record<string, string>>,
+    feedUrl?: string,
   ): Promise<void> {
     const destinations = Object.entries(fingerprints).map(
       ([destination, fingerprint]) => {
@@ -168,7 +189,7 @@ export class DeliveryLedger {
         return { destination, fingerprint };
       },
     );
-    const results = await this.mutate(owner, [
+    const statements = [
       this.db
         .prepare(
           `
@@ -183,6 +204,54 @@ export class DeliveryLedger {
         `,
         )
         .bind(JSON.stringify(destinations), owner),
+    ];
+    if (feedUrl) {
+      statements.push(
+        this.db
+          .prepare(
+            `
+            INSERT INTO relay_feed_health (feed_url, last_attempt_ms)
+            SELECT ?, ${NOW_MS} WHERE ${OWNER_GUARD}
+            ON CONFLICT (feed_url) DO UPDATE SET
+              last_attempt_ms = excluded.last_attempt_ms
+          `,
+          )
+          .bind(feedUrl, owner),
+      );
+    }
+    const results = await this.mutate(owner, statements);
+    if (!results) throw new LostLeaseError();
+  }
+
+  async feedFailed(
+    owner: string,
+    feedUrl: string,
+    reason: string,
+  ): Promise<void> {
+    if (
+      ![
+        'timeout',
+        'network',
+        'http',
+        'redirect',
+        'too_large',
+        'encoding',
+        'parse_error',
+      ].includes(reason)
+    ) {
+      throw new TypeError('Unsupported feed failure reason.');
+    }
+    const results = await this.mutate(owner, [
+      this.db
+        .prepare(
+          `
+        UPDATE relay_feed_health
+        SET last_failure_ms = ${NOW_MS}, last_error = ?,
+          consecutive_failures = consecutive_failures + 1
+        WHERE feed_url = ? AND ${OWNER_GUARD}
+      `,
+        )
+        .bind(reason, feedUrl, owner),
     ]);
     if (!results) throw new LostLeaseError();
   }
