@@ -22,10 +22,13 @@ function text(value: string | undefined, html = true): string {
       )
       .replace(/<\/?[a-z][^>]*>/gi, '');
   }
-  return (html ? decodeHTMLStrict(result) : result)
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
-    .replace(/\s+/gu, ' ')
-    .trim();
+  return (
+    (html ? decodeHTMLStrict(result) : result)
+      // oxlint-disable-next-line no-control-regex -- Strip non-printing controls from untrusted feed text.
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+      .replace(/\s+/gu, ' ')
+      .trim()
+  );
 }
 
 function atomText(value: AtomFeed.Text | AtomFeed.Content | undefined): string {

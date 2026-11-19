@@ -174,6 +174,7 @@ export async function runRelay(
       try {
         await ledger.release(owner);
       } catch {
+        // oxlint-disable-next-line no-unsafe-finally -- A failed lease release must reject even a successful run, with a sanitized error.
         throw new Error('Relay lease release failed');
       }
     }

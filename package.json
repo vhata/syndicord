@@ -12,10 +12,14 @@
   },
   "packageManager": "npm@11.20.0",
   "scripts": {
-    "check": "npm run format:check && npm run check:types && npm test",
+    "check": "npm run format:check && npm run lint && npm run check:types && npm test",
+    "check:staged": "lint-staged",
     "check:types": "npm run types && tsc --noEmit",
-    "format": "prettier --write \"**/*.{ts,json,jsonc,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,json,jsonc,md}\"",
+    "format": "prettier --write \"**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,mdx,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,mdx,yaml,yml}\"",
+    "lint": "oxlint --deny-warnings .",
+    "lint:fix": "oxlint --fix --deny-warnings .",
+    "prepare": "husky",
     "types": "cf workers types",
     "build": "cf build",
     "dev": "cf dev",
@@ -26,7 +30,10 @@
   "devDependencies": {
     "@types/node": "26.6.6",
     "cf": "1.0.0-rc.1",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.1",
     "miniflare": "5.20261118.0-beta",
+    "oxlint": "1.94.0",
     "prettier": "3.10.1",
     "typescript": "7.0.2",
     "wrangler": "4.165.0"

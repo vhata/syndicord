@@ -23,11 +23,12 @@ interface DiscordEmbed {
 
 function displayText(value: string, maximum: number): string {
   const escaped = value
+    // oxlint-disable-next-line no-control-regex -- Strip non-printing controls before sending untrusted feed text.
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
     .replace(/@/g, '@\u200b')
     .replace(/</g, '‹')
     .replace(/>/g, '›')
-    .replace(/[\\`*_{}[\]()#+.!|~\-]/g, '\\$&')
+    .replace(/[\\`*_{}[\]()#+.!|~-]/g, '\\$&')
     .trim();
   if (escaped.length <= maximum) return escaped;
   return (
