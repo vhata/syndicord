@@ -9,6 +9,7 @@ import type { FeedEntry, Fetcher } from '../src/types.ts';
 
 const webhook = 'https://discord.com/api/webhooks/123/test-token';
 const feedUrl = 'https://example.test/feed.xml';
+const sourceUrl = 'https://example.test/';
 const entry: FeedEntry = {
   id: 'id:entry',
   title: 'A new post',
@@ -59,10 +60,10 @@ test('omits unsafe entry links and empty descriptions', () => {
   ).embeds[0]!;
   assert.deepEqual(embed, {
     color: 0x0f9d92,
-    author: { name: 'example.test', url: feedUrl },
+    author: { name: 'example.test', url: sourceUrl },
     title: 'Untitled',
     footer: { text: 'syndicord · example.test' },
-    url: feedUrl,
+    url: sourceUrl,
   });
   assert.equal(
     buildMessage(
@@ -84,13 +85,76 @@ test('shows the feed name above a compact excerpt without duplicating its headin
     feedUrl,
   ).embeds[0]!;
   assert.equal(embed.author.name, 'News & Notes *daily*');
-  assert.equal(embed.author.url, feedUrl);
+  assert.equal(embed.author.url, sourceUrl);
   assert.equal(embed.color, 0x0f9d92);
   assert.equal(embed.footer.text, 'syndicord · example.test');
   assert.equal(
     embed.description,
     'First paragraph\\.\n\nSecond paragraph\\.\n\nThird paragraph…',
   );
+});
+
+test('keeps private feed paths and queries out of source links and entry fallbacks', () => {
+  const publicLink = 'https://example.test/post?ref=keep-this#section';
+  for (const privateFeed of [
+    'https://example.test/feed.xml?access=private-query-token',
+    'https://example.test/private-path-token/feed.xml',
+    'https://example.test:8443/private-path-token/feed.xml?access=private-query-token',
+    'http://example.test/private-path-token/feed.xml?access=private-query-token',
+  ]) {
+    for (const link of [publicLink, null, 'javascript:alert(1)', privateFeed]) {
+      for (const feedTitle of [undefined, 'Fixture updates']) {
+        const candidate = {
+          ...entry,
+          link,
+          ...(feedTitle === undefined ? {} : { feedTitle }),
+        };
+        const unchanged = structuredClone(candidate);
+        const message = buildMessage(candidate, privateFeed);
+        const embed = message.embeds[0]!;
+        const origin = new URL(privateFeed).origin + '/';
+        assert.equal(embed.author.url, origin);
+        assert.equal(embed.url, link === publicLink ? publicLink : origin);
+        assert.equal(embed.author.name, feedTitle ?? 'example.test');
+        assert.equal(embed.footer.text, 'syndicord · example.test');
+        assert.doesNotMatch(
+          JSON.stringify(message),
+          /private-(?:path|query)-token/,
+        );
+        assert.deepEqual(candidate, unchanged);
+      }
+    }
+  }
+});
+
+test('recognizes a normalized entry link pointing at the configured feed', () => {
+  const embed = buildMessage(
+    {
+      ...entry,
+      link: 'https://EXAMPLE.test:443/feed.xml?token=private-query-token',
+    },
+    'https://example.test/feed.xml?token=private-query-token',
+  ).embeds[0]!;
+  assert.equal(embed.url, sourceUrl);
+  assert.equal(embed.author.url, sourceUrl);
+});
+
+test('sends only public source and fallback URLs in the webhook payload', async () => {
+  let body = '';
+  const result = await sendDiscord(
+    webhook,
+    { ...entry, link: null },
+    'https://example.test/private-path-token/feed.xml?access=private-query-token',
+    async (_url, init) => {
+      body = init?.body as string;
+      return json({ id: '123' });
+    },
+  );
+  assert.equal(result.ok, true);
+  assert.doesNotMatch(body, /private-(?:path|query)-token/);
+  const payload = JSON.parse(body);
+  assert.equal(payload.embeds[0].author.url, sourceUrl);
+  assert.equal(payload.embeds[0].url, sourceUrl);
 });
 
 test('truncates Markdown without splitting literal backslash escapes', () => {

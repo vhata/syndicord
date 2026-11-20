@@ -6,6 +6,10 @@ containing the original title, link, and a short description.
 
 Messages show the feed name above a linked entry title, with a teal accent and a
 source footer. A missing feed name falls back to the feed's hostname. The
+feed-name link uses only the site's origin, keeping the configured feed path and
+query private. Entry titles keep their supplied HTTP(S) links; missing or unsafe
+links, and links matching the configured feed URL, use the same origin. Polling
+and delivery identity still use the complete configured feed URL. The
 description preserves paragraph breaks and shows up to three paragraphs within a
 700-character excerpt. A repeated opening title is removed when it forms a
 complete paragraph; ordinary prose beginning with the same words is preserved.

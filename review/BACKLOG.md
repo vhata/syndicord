@@ -16,11 +16,6 @@ they cover. Each finding maps to at most one entry. Follow the
 
 ## Unprioritized
 
-- [RELAY] `protect-feed-access-urls` — **Keep configured feed credentials out of Discord links.** Query and path tokens currently appear in source links and entry-link fallbacks.
-  - Source: [Full review, 2026-11-20](2026-11-20-1045-full.md), 2026-11-20
-  - Starting point: `src/discord.ts` (`buildMessage`) and `test/discord.test.ts`; verify both token forms and absent entry links without changing feed identity.
-  - Findings: `feed-credential-source-links`
-
 - [RELAY] `bound-feed-html-cleanup` — **Make feed HTML cleanup linear in input size.** Repeated unterminated tags consume quadratic CPU inside the existing feed-size bound.
   - Source: [Full review, 2026-11-20](2026-11-20-1045-full.md), 2026-11-20
   - Starting point: `src/feed.ts` (`text`) and `test/feed.test.ts`; use adversarial scaling cases while preserving stored fallback identities.
