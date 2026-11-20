@@ -130,12 +130,6 @@ the saved list when ready:
 syndicord feeds set --file .feeds.json
 ```
 
-For a code rollback, install the intended package version and run
-`syndicord deploy`. Cloudflare's **Deployments → Rollback** also selects an
-earlier Worker version. A Worker rollback reverses neither D1 migrations,
-stored routing, nor Discord messages. A version that bundles feeds uses its
-own historical configuration; inspect that list before rolling back to it.
-
 If GitHub manages deployments, disable the workflow and wait for any active run
 to finish before a manual rollback:
 
@@ -143,6 +137,12 @@ to finish before a manual rollback:
 gh workflow disable check.yml
 gh run list --workflow check.yml --limit 5
 ```
+
+For a code rollback, install the intended package version and run
+`syndicord deploy`. Cloudflare's **Deployments → Rollback** also selects an
+earlier Worker version. A Worker rollback reverses neither D1 migrations,
+stored routing, nor Discord messages. A version that bundles feeds uses its
+own historical configuration; inspect that list before rolling back to it.
 
 Prefer reverting the faulty code commit and deploying the revert. Resume CI
 when `main` contains the code you intend to deploy:
