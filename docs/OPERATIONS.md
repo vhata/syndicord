@@ -3,6 +3,10 @@
 [First deployment](SETUP.md) · [Status](STATUS.md) ·
 [Automatic deployment](DEPLOYMENT.md) · [Troubleshooting](RECOVERY.md)
 
+For browser-based editing, [enable the web interface](WEB.md). It manages the
+same feed routes and stores webhook URLs encrypted in D1. The commands below
+also support installations managed entirely through the CLI.
+
 ## Select an installation
 
 Run commands from your checkout. For the
@@ -19,11 +23,11 @@ export SYNDICORD_DATABASE_ID='your-database-uuid'
 Each independent installation has its own Worker and D1 database. Switching
 these identifiers selects another installation without changing the codebase.
 
-| Setting                                   | Authoritative location               |
-| ----------------------------------------- | ------------------------------------ |
-| Feed URLs, destination names, and routing | D1 `relay_configuration`             |
-| Destination webhook URLs                  | Worker's encrypted `WEBHOOKS` secret |
-| Baselines, pending deliveries, and health | D1 delivery ledger                   |
+| Setting                                   | Authoritative location                                                     |
+| ----------------------------------------- | -------------------------------------------------------------------------- |
+| Feed URLs, destination names, and routing | D1 `relay_configuration`                                                   |
+| Destination webhook URLs                  | Encrypted in D1 after a web save; otherwise the Worker's `WEBHOOKS` secret |
+| Baselines, pending deliveries, and health | D1 delivery ledger                                                         |
 
 Code deployments preserve this configuration. GitHub deployment credentials and
 resource identifiers only control where code is uploaded; GitHub is not required
@@ -73,6 +77,10 @@ Use this for an existing Worker with migrations applied and feed configuration
 stored in D1. The command updates its encrypted `WEBHOOKS` secret immediately
 without building or uploading code. It checks that the new mapping contains
 every destination used by the stored feeds.
+
+After the first save in the web interface, manage webhook changes there. The CLI
+refuses secret replacements because the encrypted D1 map is then authoritative.
+See [web configuration](WEB.md#configuration-and-password-changes).
 
 Create or select a Discord webhook under the channel's **Edit Channel →
 Integrations → Webhooks**. Put the complete mapping in `.webhooks.json`:

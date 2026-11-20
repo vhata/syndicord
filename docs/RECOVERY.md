@@ -38,9 +38,10 @@ Add `--local` to inspect local development state instead.
 
 ## Resume a suspended destination
 
-[Replace its webhook](OPERATIONS.md#update-webhooks-without-deploying) in the
-hosted secret and update its backup. A changed URL clears suspension and its
-destination cooldown on the next poll; pending entries retain their retry times.
+[Replace its webhook](OPERATIONS.md#update-webhooks-without-deploying) through
+the web editor or the CLI, depending on how you manage the installation, and
+update its backup. A changed URL clears suspension and its destination cooldown
+on the next poll; pending entries retain their retry times.
 
 If you repaired permissions without changing the URL, save this as `resume.sql`,
 replacing `updates` with the destination name:

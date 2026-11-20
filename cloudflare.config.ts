@@ -15,10 +15,12 @@ export default defineConfig({
           '00000000-0000-4000-8000-000000000001',
       }),
       WEBHOOKS: bindings.secret(),
+      ADMIN_PASSWORD: bindings.secret(),
+      CONFIG_ENCRYPTION_KEY: bindings.secret(),
     },
     triggers: [triggers.scheduled({ schedule: '* * * * *' })],
     observability: { enabled: true },
-    workersDev: false,
+    workersDev: true,
     previewUrls: false,
   },
 });

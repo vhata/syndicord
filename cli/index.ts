@@ -14,7 +14,12 @@ import {
   type Cf,
   type Environment,
 } from './cloudflare.ts';
-import { deploy, migrate, storedFeeds } from './deploy.ts';
+import {
+  deploy,
+  migrate,
+  requireSecretWebhooks,
+  storedFeeds,
+} from './deploy.ts';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SOURCE_CHECKOUT = import.meta.url.endsWith('/cli/index.ts');
@@ -22,7 +27,7 @@ export const USAGE = `Usage: syndicord <command>
 
   feeds get [--local]              Read the installation's feed routes
   feeds set [--local] --file FILE|-  Replace feed routes from JSON (or stdin)
-  webhooks set --file FILE|-      Replace the complete WEBHOOKS secret
+  webhooks set --file FILE|-      Replace WEBHOOKS before using the web editor
   status [--local] [--json] [--interval-minutes N]
   migrate                         Apply the packaged D1 migrations
   deploy [--dry-run] [--webhooks-file FILE|-]
@@ -30,7 +35,8 @@ export const USAGE = `Usage: syndicord <command>
 
 Set CLOUDFLARE_ACCOUNT_ID and SYNDICORD_DATABASE_ID for the installation.
 SYNDICORD_WORKER_NAME defaults to syndicord. Each installation needs its own D1
-database. Feed routes live in D1; webhook URLs live in the encrypted Worker secret.
+database. Feed routes live in D1. Manage feeds and webhooks at /admin on the Worker.
+Web-saved webhook URLs are encrypted in D1; otherwise WEBHOOKS supplies them.
 Configuration writes do not rebuild or deploy code. Use 'cf auth login' to sign in.
 Cloudflare resources and API operations may be billable under your account plan.`;
 
@@ -127,6 +133,7 @@ export async function runCli(
         await input(fileArgument(rest.slice(1))),
       );
       loadConfig(await storedFeeds(cf, installation), JSON.stringify(webhooks));
+      await requireSecretWebhooks(cf, installation);
       await temporary(async (cwd) => {
         const file = join(cwd, 'webhooks.json');
         await writeFile(file, JSON.stringify(webhooks), { mode: 0o600 });

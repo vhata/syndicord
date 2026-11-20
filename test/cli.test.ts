@@ -211,6 +211,50 @@ async function artifact() {
   return directory;
 }
 
+test('web-managed webhook maps refuse secret replacements through CLI and deploy', async () => {
+  const packageRoot = await artifact();
+  try {
+    for (const args of [
+      ['webhooks', 'set', '--file', '-'],
+      ['deploy', '--webhooks-file', '-'],
+    ]) {
+      const mutations: string[][] = [];
+      const cf: Cf = async (command) => {
+        if (command[1] === 'migrations')
+          return command[2] === 'list' ? '[]' : '';
+        if (command[0] === 'd1') {
+          const statements = JSON.parse(
+            await readFile(command[4]!.slice(1), 'utf8'),
+          );
+          return statements[0].sql.startsWith('SELECT *')
+            ? raw(
+                [[JSON.stringify(feeds), 'private-ciphertext']],
+                ['feeds', 'encrypted_webhooks'],
+              )
+            : raw([[JSON.stringify(feeds)]]);
+        }
+        mutations.push(command);
+        throw new Error('must not upload');
+      };
+      const result = await runCli(args, environment, {
+        cf,
+        readInput: async () => webhooks,
+        packageRoot,
+        sourceCheckout: false,
+      });
+      assert.equal(result.code, 2);
+      assert.match(result.stderr, /managed through the web interface/);
+      assert.doesNotMatch(
+        JSON.stringify(result),
+        /private-ciphertext|webhook-secret/,
+      );
+      assert.deepEqual(mutations, []);
+    }
+  } finally {
+    await rm(packageRoot, { recursive: true, force: true });
+  }
+});
+
 test('package dry runs stage independent target copies, make no API writes, and leave the package unchanged', async () => {
   const packageRoot = await artifact();
   const staged: string[] = [];

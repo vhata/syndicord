@@ -2,7 +2,9 @@
 
 A syndicord installation consists of a Worker, its D1 database, and its
 encrypted `WEBHOOKS` secret. Feeds and routing live in D1. No Git checkout or
-GitHub repository is required to run or configure it.
+GitHub repository is required to run or configure it. After deployment,
+[enable the web interface](WEB.md) to manage feeds, webhooks, and routing in
+your browser.
 
 ## Run from the repository
 

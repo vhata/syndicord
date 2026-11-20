@@ -17,6 +17,20 @@ export async function storedFeeds(cf: Cf, installation: Target, local = false) {
   return parseStoredFeeds(result[0]?.feeds);
 }
 
+export async function requireSecretWebhooks(cf: Cf, installation: Target) {
+  // SELECT * also works before the additive web-admin migration. Never print
+  // the stored configuration: feed URLs and ciphertext are private data.
+  const result = rows(
+    await query(cf, installation.database, [
+      { sql: 'SELECT * FROM relay_configuration WHERE id = 1' },
+    ]),
+  );
+  if (result.some((row) => row.encrypted_webhooks != null))
+    throw new Error(
+      'Webhooks are managed through the web interface. Add or rotate them there; replacing WEBHOOKS would not change the active destinations.',
+    );
+}
+
 export async function migrate(
   cf: Cf,
   installation: Target,
@@ -123,8 +137,10 @@ export async function deploy(
     if (!options.dryRun) {
       await migrate(cf, installation, packageRoot);
       const feeds = await storedFeeds(cf, installation);
-      if (options.webhooks) loadConfig(feeds, JSON.stringify(options.webhooks));
-      else {
+      if (options.webhooks) {
+        await requireSecretWebhooks(cf, installation);
+        loadConfig(feeds, JSON.stringify(options.webhooks));
+      } else {
         const secretNames = await temporary(async (cwd) => {
           try {
             return JSON.parse(

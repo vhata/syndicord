@@ -168,7 +168,8 @@ gh run view RUN_ID --log-failed
 ```
 
 Missing credentials or IDs stop deployment with setup guidance. GitHub stores
-the deployment token; Cloudflare keeps `WEBHOOKS`. No local secrets file is used
+the deployment token; Cloudflare keeps `WEBHOOKS` and the optional web interface
+secrets. Web-managed configuration remains in D1. No local secrets file is used
 by CI. [Change feeds or webhooks](OPERATIONS.md) independently of these
 credentials.
 
