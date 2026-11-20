@@ -5,8 +5,9 @@
 
 ## Select an installation
 
-Run commands from your checkout. If you use the [global CLI](SETUP.md#optional-global-cli),
-replace `npm run syndicord --` with `syndicord` and run from any directory:
+Run commands from your checkout. For the [npm-installed CLI](SETUP.md#optional-npm-installation),
+use `npx --no-install syndicord` from its installation directory instead of
+`npm run syndicord --`:
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID='your-account-id'

@@ -14,8 +14,8 @@ before following this guide.
 
 Run commands from your checkout with `CLOUDFLARE_ACCOUNT_ID`,
 `SYNDICORD_DATABASE_ID`, and `SYNDICORD_WORKER_NAME` exported from setup.
-The [global CLI](SETUP.md#optional-global-cli) uses the same commands with
-`syndicord` in place of `npm run syndicord --`.
+The [npm-installed CLI](SETUP.md#optional-npm-installation) uses the same commands
+with `npx --no-install syndicord` in place of `npm run syndicord --`.
 
 ## Create the GitHub environment
 

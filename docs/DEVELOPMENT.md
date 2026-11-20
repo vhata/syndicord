@@ -134,7 +134,7 @@ cleans up its fixtures afterwards.
 No installation-specific identifiers, live feeds, secrets, or local state are
 included in the npm package. Registry publication is a separate release operation.
 
-See [setup](SETUP.md#optional-global-cli) for normal npm installation from GitHub.
+See [setup](SETUP.md#optional-npm-installation) for normal npm installation from GitHub.
 
 ## Layout
 

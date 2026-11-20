@@ -10,7 +10,8 @@ npm run syndicord -- status
 ```
 
 The command uses the project's `cf` dependency and its existing authentication.
-For the [global CLI](SETUP.md#optional-global-cli), use `syndicord status`. It only
+For the [npm-installed CLI](SETUP.md#optional-npm-installation),
+use `npx --no-install syndicord status`. It only
 queries D1; it needs no webhook secret or `.dev.vars` file. Hosted reads count
 toward D1 usage. The database ID is non-secret deployment configuration; use
 the ID recorded for the deployment rather than creating a new database.

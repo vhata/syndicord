@@ -21,27 +21,28 @@ CLI directly from source, and `npm run deploy` builds the current Worker before
 applying migrations and deploying. No global CLI installation is required.
 These installation and validation steps do not create Cloudflare resources.
 
-### Optional global CLI
+### Optional npm installation
 
-To use the CLI without keeping a checkout, install it through npm from GitHub:
+To use the CLI without a source checkout, install it through npm from GitHub.
+Run this in a directory of your choice outside the syndicord repository:
 
 ```sh
-npm install --global github:vhata/syndicord
-syndicord --help
+npm install github:vhata/syndicord
+npx --no-install syndicord --help
 ```
 
 This uses npm's Git package support and requires Git during installation. npm
-builds the CLI and Worker during installation; afterwards, the CLI runs from
-any directory without a source checkout.
+builds the CLI and Worker during installation. Run the installed CLI from that
+directory with `npx --no-install syndicord`; it needs no retained source checkout.
 
 The same operations are available through either entry point:
 
-| From the checkout                                  | Global CLI                                        |
-| -------------------------------------------------- | ------------------------------------------------- |
-| `npm run syndicord -- feeds get`                   | `syndicord feeds get`                             |
-| `npm run --silent syndicord -- feeds get`          | `syndicord feeds get`                             |
-| `npm run deploy -- --webhooks-file .webhooks.json` | `syndicord deploy --webhooks-file .webhooks.json` |
-| `npm run deploy`                                   | `syndicord deploy`                                |
+| From the checkout                                  | npm-installed CLI                                                  |
+| -------------------------------------------------- | ------------------------------------------------------------------ |
+| `npm run syndicord -- feeds get`                   | `npx --no-install syndicord feeds get`                             |
+| `npm run --silent syndicord -- feeds get`          | `npx --no-install syndicord feeds get`                             |
+| `npm run deploy -- --webhooks-file .webhooks.json` | `npx --no-install syndicord deploy --webhooks-file .webhooks.json` |
+| `npm run deploy`                                   | `npx --no-install syndicord deploy`                                |
 
 The examples below use the checkout commands. `--silent` suppresses npm's
 banner when exporting JSON.
@@ -111,7 +112,7 @@ Every destination used by a feed needs an entry. Deploy the Worker:
 npm run deploy -- --webhooks-file .webhooks.json
 ```
 
-From a checkout, deployment first builds the current source. The global CLI uses
+From a checkout, deployment first builds the current source. The npm-installed CLI uses
 the Worker built during npm installation. Both apply outstanding migrations and
 check that feed configuration exists. It creates the Worker, uploads its secret,
 binds D1, and installs the cron schedule.
@@ -146,6 +147,6 @@ in Cloudflare's Worker metrics. Local tests do not establish hosted CPU headroom
 Use [operations](OPERATIONS.md) for configuration changes and
 [recovery](RECOVERY.md) for failures. To update code, pull the desired revision,
 run `npm ci` and `npm run check`, then run `npm run deploy` with the same
-identifiers. Stored feeds and webhook secrets are preserved. For a global CLI
+identifiers. Stored feeds and webhook secrets are preserved. For an npm CLI
 installation, repeat the npm installation command to update it, then run
-`syndicord deploy`. [Automatic deployment from GitHub](DEPLOYMENT.md) is optional.
+`npx --no-install syndicord deploy`. [Automatic deployment from GitHub](DEPLOYMENT.md) is optional.

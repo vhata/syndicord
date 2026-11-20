@@ -7,7 +7,7 @@ destination names. Historical ledger rows can include removed routes and cannot
 reconstruct that configuration.
 
 Use the current [repository checkout](SETUP.md#run-from-the-repository) or
-[global CLI](SETUP.md#optional-global-cli), select the existing installation,
+[npm-installed CLI](SETUP.md#optional-npm-installation), select the existing installation,
 and apply the additive migrations:
 
 ```sh
