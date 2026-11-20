@@ -24,7 +24,7 @@
     "build": "cf build",
     "dev": "cf dev",
     "db:migrate:local": "cf d1 migrations apply \"${SYNDICORD_DATABASE_ID:-00000000-0000-4000-8000-000000000001}\" --local --dir migrations",
-    "deploy": ": \"${SYNDICORD_DATABASE_ID:?Set SYNDICORD_DATABASE_ID to the provisioned D1 database ID}\" && cf deploy --no-provision",
+    "deploy": "node cli/index.ts deploy",
     "test": "npm run build && node --test --test-concurrency=2 test/*.test.ts",
     "syndicord": "node cli/index.ts",
     "package": "npm run build && node scripts/build-package.ts",

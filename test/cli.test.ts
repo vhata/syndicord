@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  cp,
   mkdtemp,
   mkdir,
   readFile,
@@ -197,6 +198,16 @@ async function artifact() {
       },
     }),
   );
+  await mkdir(join(worker, 'bundle'));
+  await writeFile(join(worker, 'bundle/index.js'), 'export default {};');
+  const configPath = join(worker, 'worker.config.json');
+  const config = JSON.parse(await readFile(configPath, 'utf8'));
+  config.manifest = {
+    type: 'complete',
+    mainModule: 'index.js',
+    modules: { 'index.js': { type: 'esm' } },
+  };
+  await writeFile(configPath, JSON.stringify(config));
   return directory;
 }
 
@@ -242,7 +253,13 @@ test('package dry runs stage independent target copies, make no API writes, and 
         return '';
       };
       assert.equal(
-        (await runCli(['deploy', '--dry-run'], env, { cf, packageRoot })).code,
+        (
+          await runCli(['deploy', '--dry-run'], env, {
+            cf,
+            packageRoot,
+            sourceCheckout: false,
+          })
+        ).code,
         0,
       );
     }
@@ -295,7 +312,11 @@ test('deployment migrates, checks hosted config, preserves secrets, and verifies
     throw new Error('unexpected command');
   };
   try {
-    const result = await runCli(['deploy'], environment, { cf, packageRoot });
+    const result = await runCli(['deploy'], environment, {
+      cf,
+      packageRoot,
+      sourceCheckout: false,
+    });
     assert.equal(result.code, 0, result.stderr);
     assert.match(result.stdout, /Worker version:/);
     assert.deepEqual(
@@ -333,7 +354,11 @@ test('deployment stops before upload for missing configuration or incomplete mig
             : '';
         return raw([]);
       };
-      const result = await runCli(['deploy'], environment, { cf, packageRoot });
+      const result = await runCli(['deploy'], environment, {
+        cf,
+        packageRoot,
+        sourceCheckout: false,
+      });
       assert.equal(result.code, 2);
       assert.equal(uploaded, false);
     }
@@ -384,7 +409,12 @@ test('first deployment uploads a validated secret through a private temporary fi
     const result = await runCli(
       ['deploy', '--webhooks-file', '-'],
       environment,
-      { cf, packageRoot, readInput: async () => webhooks },
+      {
+        cf,
+        packageRoot,
+        sourceCheckout: false,
+        readInput: async () => webhooks,
+      },
     );
     assert.equal(result.code, 0, result.stderr);
     assert.equal(uploads, 1);
@@ -420,10 +450,127 @@ test('an ambiguous upload result is not retried or reported as a verified deploy
     });
   };
   try {
-    const result = await runCli(['deploy'], environment, { cf, packageRoot });
+    const result = await runCli(['deploy'], environment, {
+      cf,
+      packageRoot,
+      sourceCheckout: false,
+    });
     assert.equal(result.code, 2);
     assert.equal(uploads, 1);
     assert.match(result.stderr, /active Worker version could not be verified/);
+  } finally {
+    await rm(packageRoot, { recursive: true, force: true });
+  }
+});
+
+test('source deployment builds the current source without dist and never reuses an old bundle', async () => {
+  const packageRoot = await artifact();
+  const template = join(packageRoot, 'build-template');
+  await cp(join(packageRoot, 'dist/worker/v1'), template, { recursive: true });
+  await rm(join(packageRoot, 'dist'), { recursive: true });
+  const source = join(packageRoot, 'source.js');
+  const output = join(packageRoot, '.cloudflare/output/v1');
+  const observed: string[] = [];
+  let builds = 0;
+  const cf: Cf = async (args, { cwd }) => {
+    if (args[0] === 'build') {
+      builds++;
+      assert.equal(cwd, packageRoot);
+      await assert.rejects(
+        readFile(join(output, 'workers/default/bundle/index.js')),
+      );
+      await mkdir(join(packageRoot, '.cloudflare/output'), { recursive: true });
+      await cp(template, output, { recursive: true });
+      await writeFile(
+        join(output, 'workers/default/bundle/index.js'),
+        await readFile(source),
+      );
+      return '';
+    }
+    assert.equal(args[0], 'deploy');
+    assert.ok(args.includes('--dry-run'));
+    observed.push(
+      await readFile(
+        join(cwd, '.cloudflare/output/v1/workers/default/bundle/index.js'),
+        'utf8',
+      ),
+    );
+    return '';
+  };
+  try {
+    for (const revision of [
+      'first source revision',
+      'second source revision',
+    ]) {
+      await writeFile(source, revision);
+      const result = await runCli(['deploy', '--dry-run'], environment, {
+        cf,
+        packageRoot,
+        sourceCheckout: true,
+      });
+      assert.equal(result.code, 0, result.stderr);
+      assert.match(result.stdout, /Validated source/);
+    }
+    assert.equal(builds, 2);
+    assert.deepEqual(observed, [
+      'first source revision',
+      'second source revision',
+    ]);
+    await assert.rejects(
+      readFile(join(packageRoot, 'dist/worker/v1/config.json')),
+    );
+  } finally {
+    await rm(packageRoot, { recursive: true, force: true });
+  }
+});
+
+test('a failed or incomplete source build stops before any Cloudflare mutation', async () => {
+  for (const partial of [false, true]) {
+    const packageRoot = await artifact();
+    const output = join(packageRoot, '.cloudflare/output/v1');
+    await cp(join(packageRoot, 'dist/worker/v1'), output, { recursive: true });
+    const calls: string[][] = [];
+    const cf: Cf = async (args) => {
+      calls.push(args);
+      if (!partial) throw new Error('compiler failure');
+      return '';
+    };
+    try {
+      const result = await runCli(['deploy'], environment, {
+        cf,
+        packageRoot,
+        sourceCheckout: true,
+      });
+      assert.equal(result.code, 2);
+      assert.deepEqual(calls, [['build']]);
+      await assert.rejects(readFile(join(output, 'config.json')));
+    } finally {
+      await rm(packageRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test('incomplete module manifests fail before migrations', async () => {
+  const packageRoot = await artifact();
+  const configPath = join(
+    packageRoot,
+    'dist/worker/v1/workers/default/worker.config.json',
+  );
+  const config = JSON.parse(await readFile(configPath, 'utf8'));
+  config.manifest.modules['missing.js.map'] = { type: 'sourcemap' };
+  await writeFile(configPath, JSON.stringify(config));
+  try {
+    const calls: string[][] = [];
+    const result = await runCli(['deploy'], environment, {
+      packageRoot,
+      sourceCheckout: false,
+      cf: async (args) => {
+        calls.push(args);
+        return '';
+      },
+    });
+    assert.equal(result.code, 2);
+    assert.deepEqual(calls, []);
   } finally {
     await rm(packageRoot, { recursive: true, force: true });
   }

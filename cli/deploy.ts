@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { CONFIGURATION_SQL, parseStoredFeeds } from '../src/config-store.ts';
 import { loadConfig } from '../src/config.ts';
@@ -55,15 +55,29 @@ export async function migrate(
 }
 
 export async function stageWorker(
-  packageRoot: string,
+  artifact: string,
   directory: string,
   installation: Target,
 ) {
   const output = join(directory, '.cloudflare/output/v1');
   await mkdir(join(directory, '.cloudflare/output'), { recursive: true });
-  await cp(join(packageRoot, 'dist/worker/v1'), output, { recursive: true });
+  await cp(artifact, output, { recursive: true });
   const configPath = join(output, 'workers/default/worker.config.json');
   const config = JSON.parse(await readFile(configPath, 'utf8'));
+  const modules = config.manifest?.modules;
+  if (
+    typeof config.manifest?.mainModule !== 'string' ||
+    !modules ||
+    typeof modules !== 'object' ||
+    Array.isArray(modules) ||
+    !Object.hasOwn(modules, config.manifest.mainModule)
+  )
+    throw new Error('Worker artifact is missing its entrypoint.');
+  await Promise.all(
+    Object.keys(modules).map((name) =>
+      access(join(output, 'workers/default/bundle', name)),
+    ),
+  );
   config.name = installation.worker;
   config.env.DB = {
     type: 'd1',
@@ -82,38 +96,56 @@ export async function deploy(
   cf: Cf,
   installation: Target,
   packageRoot: string,
-  options: { dryRun: boolean; webhooks?: Record<string, string> },
+  options: {
+    dryRun: boolean;
+    webhooks?: Record<string, string>;
+    sourceCheckout?: boolean;
+  },
 ): Promise<string> {
-  if (!options.dryRun) {
-    await migrate(cf, installation, packageRoot);
-    const feeds = await storedFeeds(cf, installation);
-    if (options.webhooks) loadConfig(feeds, JSON.stringify(options.webhooks));
-    else {
-      const secretNames = await temporary(async (cwd) => {
-        try {
-          return JSON.parse(
-            await cf(
-              ['workers', 'secrets', 'list', '--worker', installation.worker],
-              { cwd },
-            ),
-          );
-        } catch {
-          throw new Error(
-            'Could not inspect the Worker secrets. For the first deployment, provide --webhooks-file FILE.',
-          );
-        }
-      });
-      if (
-        !Array.isArray(secretNames) ||
-        !secretNames.some((secret) => secret?.name === 'WEBHOOKS')
-      )
-        throw new Error(
-          'WEBHOOKS is missing. For the first deployment, provide --webhooks-file FILE.',
-        );
+  let artifact = join(packageRoot, 'dist/worker/v1');
+  if (options.sourceCheckout) {
+    artifact = join(packageRoot, '.cloudflare/output/v1');
+    // A failed or partial build must never fall back to yesterday's bundle.
+    await rm(artifact, { recursive: true, force: true });
+    try {
+      await cf(['build'], { cwd: packageRoot });
+    } catch {
+      throw new Error(
+        'Worker build failed. Run npm run build for diagnostics; no Cloudflare changes were made.',
+      );
     }
   }
   return temporary(async (cwd) => {
-    await stageWorker(packageRoot, cwd, installation);
+    // Check the selected artifact before migrations can change the database.
+    await stageWorker(artifact, cwd, installation);
+    if (!options.dryRun) {
+      await migrate(cf, installation, packageRoot);
+      const feeds = await storedFeeds(cf, installation);
+      if (options.webhooks) loadConfig(feeds, JSON.stringify(options.webhooks));
+      else {
+        const secretNames = await temporary(async (cwd) => {
+          try {
+            return JSON.parse(
+              await cf(
+                ['workers', 'secrets', 'list', '--worker', installation.worker],
+                { cwd },
+              ),
+            );
+          } catch {
+            throw new Error(
+              'Could not inspect the Worker secrets. For the first deployment, provide --webhooks-file FILE.',
+            );
+          }
+        });
+        if (
+          !Array.isArray(secretNames) ||
+          !secretNames.some((secret) => secret?.name === 'WEBHOOKS')
+        )
+          throw new Error(
+            'WEBHOOKS is missing. For the first deployment, provide --webhooks-file FILE.',
+          );
+      }
+    }
     const version = JSON.parse(
       await readFile(join(packageRoot, 'package.json'), 'utf8'),
     ).version;
@@ -137,7 +169,7 @@ export async function deploy(
     }
     await cf(args, { cwd });
     if (options.dryRun)
-      return `Validated package for Worker ${installation.worker}; no Cloudflare resources changed.`;
+      return `Validated ${options.sourceCheckout ? 'source' : 'package'} for Worker ${installation.worker}; no Cloudflare resources changed.`;
     let versionId: string;
     try {
       const history = JSON.parse(

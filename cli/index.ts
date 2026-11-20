@@ -17,6 +17,7 @@ import {
 import { deploy, migrate, storedFeeds } from './deploy.ts';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../', import.meta.url));
+const SOURCE_CHECKOUT = import.meta.url.endsWith('/cli/index.ts');
 export const USAGE = `Usage: syndicord <command>
 
   feeds get [--local]              Read the installation's feed routes
@@ -37,6 +38,7 @@ interface Dependencies {
   cf?: Cf;
   readInput?: (path: string) => Promise<unknown>;
   packageRoot?: string;
+  sourceCheckout?: boolean;
 }
 
 async function readInput(path: string): Promise<unknown> {
@@ -169,7 +171,12 @@ export async function runCli(
         options.webhooks = validateWebhooks(
           await input(fileArgument(remaining, '--webhooks-file')),
         );
-      return ok(await deploy(cf, installation, packageRoot, options));
+      return ok(
+        await deploy(cf, installation, packageRoot, {
+          ...options,
+          sourceCheckout: dependencies.sourceCheckout ?? SOURCE_CHECKOUT,
+        }),
+      );
     }
     throw new Error(USAGE);
   } catch (error) {
