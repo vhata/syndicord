@@ -73,11 +73,13 @@ interrupted run may retain a `lint-staged automatic backup` in `git stash list`.
 cp .dev.vars.example .dev.vars
 ```
 
-Edit `.dev.vars` with the real Discord webhook URLs for the destination names
-in `feeds.json`. Keep that file private. Then:
+Copy `feeds.example.json` to `.feeds.json` and edit the sample routes. Edit
+`.dev.vars` with Discord webhook URLs for those destination names. Keep both
+files private, then load the routes into the local database:
 
 ```sh
 npm run db:migrate:local
+npm run syndicord -- feeds set --local --file .feeds.json
 npm run dev
 ```
 
@@ -101,6 +103,32 @@ Worker's HTTP handler returns 404.
 Local D1 state is under `.cloudflare/state/` and is separate from hosted state.
 The automated tests create their own databases and do not change this state.
 
+## Build a package
+
+```sh
+npm ci
+npm run check
+npm pack
+```
+
+The prepack step builds the CLI as JavaScript and includes a generic prebuilt
+Worker, migrations, examples, and documentation in `syndicord-0.0.0.tgz`.
+`npm run package` builds these artifacts without creating a tarball. No installation-specific identifiers, live feed list, webhook secret, Git
+metadata, or local state is packaged.
+Install the tarball in a separate directory to exercise the installed CLI;
+package installation does not build the Worker or require a Git checkout.
+
+For development without installing the package, use
+`npm run syndicord -- <command>`. `npm run status -- --remote` remains available
+for scripts; unlike the installed CLI, that wrapper requires an explicit
+`--remote` or `--local` target.
+
+Run `syndicord --help` for operational commands. `syndicord cf` exposes the pinned
+Cloudflare CLI for authentication, database creation, and log inspection.
+Package deployments use temporary staged artifacts, preserving the installed
+package and keeping target identifiers outside it. Publishing a tarball to a
+registry is a separate release operation.
+
 ## Layout
 
 | Path                   | Purpose                                                 |
@@ -110,6 +138,8 @@ The automated tests create their own databases and do not change this state.
 | `src/discord.ts`       | Message formatting and confirmed webhook delivery       |
 | `src/ledger.ts`        | D1 baselines, pending deliveries, leases, and cooldowns |
 | `src/runner.ts`        | Bounded polling and delivery orchestration              |
+| `src/config-store.ts`  | Installation configuration in D1                        |
+| `cli/`                 | Installed command-line interface                        |
 | `src/index.ts`         | Scheduled Worker entrypoint                             |
 | `test/`                | Unit, D1 integration, and built-Worker tests            |
 | `migrations/`          | D1 schema migrations                                    |

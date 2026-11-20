@@ -16,6 +16,12 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["cloudflare.config.ts", "src/**/*.ts", "test/**/*.ts"],
+  "include": [
+    "cloudflare.config.ts",
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "cli/**/*.ts",
+    "test/**/*.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

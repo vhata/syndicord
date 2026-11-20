@@ -29,10 +29,14 @@ The first poll records a baseline without posting a backlog. Delivery state
 is stored in D1, so destinations can retry independently. Each scheduled run
 checks one feed and sends a bounded batch of pending entries.
 
-Configure feeds in `feeds.json` and keep Discord webhook URLs in the
-`WEBHOOKS` secret. Start with [setup](docs/SETUP.md), then see
+Feeds and routing live in Cloudflare D1; Discord webhook URLs live in the
+Worker's encrypted `WEBHOOKS` secret. The installable CLI manages each
+installation without a Git checkout. The same code can serve separate
+accounts or Workers, each with its own database and configuration.
+
+Start with [setup](docs/SETUP.md), then see
 [feeds and webhooks](docs/OPERATIONS.md) for routine changes and
-[automatic deployment](docs/DEPLOYMENT.md) for GitHub Actions. See
+[optional automatic deployment](docs/DEPLOYMENT.md) for GitHub Actions. See
 [relay behavior](docs/BEHAVIOR.md) for delivery semantics.
 
 Use the [operational status command](docs/STATUS.md) to inspect feed health,

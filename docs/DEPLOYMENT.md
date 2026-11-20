@@ -4,6 +4,7 @@ The repository includes the CI workflow in `.github/workflows/check.yml`.
 It checks pull requests and pushes to `main`. For pushes to `main`, it also
 applies D1 migrations and deploys using the GitHub `production` environment.
 
+GitHub deploys code; the service reads its live configuration from Cloudflare.
 Complete [the first deployment](SETUP.md), then configure that environment
 using the steps below.
 
@@ -12,7 +13,7 @@ Install the GitHub CLI (`gh`) using its
 before following this guide.
 
 Run commands from your repository with `CLOUDFLARE_ACCOUNT_ID` and
-`SYNDICORD_DATABASE_ID` exported from setup.
+`SYNDICORD_DATABASE_ID` and `SYNDICORD_WORKER_NAME` exported from setup.
 
 ## Create the GitHub environment
 
@@ -31,6 +32,7 @@ gh api --method POST 'repos/{owner}/{repo}/environments/production/deployment-br
   -f name=main -f type=branch
 gh variable set CLOUDFLARE_ACCOUNT_ID --env production --body "$CLOUDFLARE_ACCOUNT_ID"
 gh variable set SYNDICORD_DATABASE_ID --env production --body "$SYNDICORD_DATABASE_ID"
+gh variable set SYNDICORD_WORKER_NAME --env production --body "$SYNDICORD_WORKER_NAME"
 ```
 
 `{owner}` and `{repo}` are filled in from `GH_REPO`. For an existing environment, check
@@ -68,14 +70,14 @@ dashboard for the narrower **Workers Editor** permission.
 Check the saved login before creating the token:
 
 ```sh
-npx cf auth scopes --filter account_api_tokens
-npx cf auth scopes --filter workers-scripts.write
-npx cf auth scopes --filter d1.write
+syndicord cf auth scopes --filter account_api_tokens
+syndicord cf auth scopes --filter workers-scripts.write
+syndicord cf auth scopes --filter d1.write
 ```
 
 These must show `account_api_tokens:create`, `workers-scripts.write`, and
 `d1.write`. If a grant is missing, run
-`npx cf auth login --force`. On the browser authorization page, open
+`syndicord cf auth login --force`. On the browser authorization page, open
 **Additional access → Sensitive scopes** and enable **Account API Token
 Provisioning**. **API Tokens Write** manages user-owned tokens and can remain
 off; it is not needed to create this account-owned token. Keep Workers and D1
@@ -107,7 +109,7 @@ access.
 Create the token:
 
 ```sh
-npx cf accounts tokens create --name syndicord-github --policies @ci-token-policy.json
+syndicord cf accounts tokens create --name syndicord-github --policies @ci-token-policy.json
 ```
 
 In the JSON printed by `cf`, copy the complete `value` string (beginning with
@@ -128,10 +130,10 @@ password manager.
 
 ## Run and inspect deployment
 
-CI builds GitHub's `main`, including `feeds.json` and `cloudflare.config.ts`.
-After saving the credentials above, run `npm run check` and publish any local
-edits to those configuration files to your repository's `main` using your normal
-Git workflow. This ensures CI deploys the configuration you verified locally.
+CI builds GitHub's `main` and targets the account, Worker, and database selected
+by the environment. Feed and webhook changes use [the CLI](OPERATIONS.md) and
+do not require GitHub changes. For an installation with bundled feeds, complete
+[the configuration import](UPGRADING.md) before deploying this code.
 
 Enable the workflow and start a run to verify the setup:
 
@@ -169,7 +171,8 @@ by CI. [Change feeds or webhooks](OPERATIONS.md) independently of these credenti
 
 Only the checked commit on `main` can deploy. The job builds for the configured
 database, validates the build, then applies outstanding migrations and verifies
-that none remain before upload. Only that final step receives Cloudflare
+that none remain before upload. It also requires valid feed configuration in D1;
+missing configuration stops the upload while the running Worker stays in place. Only that final step receives Cloudflare
 credentials. It preserves hosted secrets, provisions no missing database, and
 checks the active Worker's commit annotation after upload.
 
