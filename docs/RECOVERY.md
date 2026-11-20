@@ -1,11 +1,11 @@
 # Troubleshooting and recovery
 
-See [setup](SETUP.md) for the first-delivery check,
-[operations](OPERATIONS.md) for feeds and webhooks, and
-[deployment](DEPLOYMENT.md) for CI configuration.
+See [setup](SETUP.md) for the first-delivery check, [operations](OPERATIONS.md)
+for feeds and webhooks, and [deployment](DEPLOYMENT.md) for CI configuration.
 
-Select the installation as described in [operations](OPERATIONS.md#select-an-installation).
-For optional GitHub deployment commands, also select its repository:
+Select the installation as described in
+[operations](OPERATIONS.md#select-an-installation). For optional GitHub
+deployment commands, also select its repository:
 
 ```sh
 export GH_REPO='YOUR_OWNER/YOUR_REPOSITORY'
@@ -38,9 +38,9 @@ Add `--local` to inspect local development state instead.
 
 ## Resume a suspended destination
 
-[Replace its webhook](OPERATIONS.md#update-webhooks-without-deploying) in the hosted
-secret and update its backup. A changed URL clears suspension and its destination
-cooldown on the next poll; pending entries retain their retry times.
+[Replace its webhook](OPERATIONS.md#update-webhooks-without-deploying) in the
+hosted secret and update its backup. A changed URL clears suspension and its
+destination cooldown on the next poll; pending entries retain their retry times.
 
 If you repaired permissions without changing the URL, save this as `resume.sql`,
 replacing `updates` with the destination name:
@@ -74,9 +74,9 @@ npm run syndicord -- cf workers deployments list --worker "$SYNDICORD_WORKER_NAM
 ```
 
 Check the reported error and `npm run syndicord -- feeds get`. Missing
-configuration must be supplied before upload; see [upgrading](UPGRADING.md) for bundled-feed
-installations. Applied migrations stay in place after an upload failure.
-Once the cause is resolved, retry from your checkout:
+configuration must be supplied before upload; see [upgrading](UPGRADING.md) for
+bundled-feed installations. Applied migrations stay in place after an upload
+failure. Once the cause is resolved, retry from your checkout:
 
 ```sh
 npm run deploy
@@ -140,14 +140,15 @@ gh run list --workflow check.yml --limit 5
 
 For a code rollback, check out the intended revision, run `npm ci`, and run
 `npm run deploy`. For the npm-installed CLI, install the intended Git ref using
-`npm install github:vhata/syndicord#COMMIT_OR_TAG` in its installation directory,
-then run `npx --no-install syndicord deploy`. Cloudflare's **Deployments → Rollback** also selects an
-earlier Worker version. A Worker rollback reverses neither D1 migrations,
-stored routing, nor Discord messages. A version that bundles feeds uses its
-own historical configuration; inspect that list before rolling back to it.
+`npm install github:vhata/syndicord#COMMIT_OR_TAG` in its installation
+directory, then run `npx --no-install syndicord deploy`. Cloudflare's
+**Deployments → Rollback** also selects an earlier Worker version. A Worker
+rollback reverses neither D1 migrations, stored routing, nor Discord messages. A
+version that bundles feeds uses its own historical configuration; inspect that
+list before rolling back to it.
 
-Prefer reverting the faulty code commit and deploying the revert. Resume CI
-when `main` contains the code you intend to deploy:
+Prefer reverting the faulty code commit and deploying the revert. Resume CI when
+`main` contains the code you intend to deploy:
 
 ```sh
 gh workflow enable check.yml
@@ -161,10 +162,10 @@ retains seven days on Workers Free. A restore overwrites the database. Disable
 the Worker's cron trigger in Cloudflare, prevent concurrent code deployments,
 and allow running invocations to finish before recording the current restore
 point and restoring D1. A pause stored as `[]` is insufficient: restoring D1
-also restores the old feed configuration. Inspect the restored configuration
-and ledger before restoring the cron trigger. Restoring an older
-ledger can forget successful sends and produce duplicate Discord messages.
-Inspect pending deliveries before resuming; practise recovery on an isolated
-database before relying on it. CI never restores or resets D1 automatically.
+also restores the old feed configuration. Inspect the restored configuration and
+ledger before restoring the cron trigger. Restoring an older ledger can forget
+successful sends and produce duplicate Discord messages. Inspect pending
+deliveries before resuming; practise recovery on an isolated database before
+relying on it. CI never restores or resets D1 automatically.
 
 [Worker rollback reference](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)

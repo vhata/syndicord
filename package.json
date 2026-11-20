@@ -16,6 +16,8 @@
     "check:types": "npm run types && tsc --noEmit",
     "format": "prettier --write \"**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,mdx,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,mdx,yaml,yml}\"",
+    "format:markdown": "prettier --write \"**/*.{md,mdx}\"",
+    "format:markdown:check": "prettier --check \"**/*.{md,mdx}\"",
     "lint": "oxlint --deny-warnings .",
     "lint:fix": "oxlint --fix --deny-warnings .",
     "prepare": "node scripts/prepare.mjs",

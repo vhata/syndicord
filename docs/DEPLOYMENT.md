@@ -1,28 +1,28 @@
 # Automatic deployment
 
-The repository includes the CI workflow in `.github/workflows/check.yml`.
-It checks pull requests and pushes to `main`. For pushes to `main`, it also
-applies D1 migrations and deploys using the GitHub `production` environment.
+The repository includes the CI workflow in `.github/workflows/check.yml`. It
+checks pull requests and pushes to `main`. For pushes to `main`, it also applies
+D1 migrations and deploys using the GitHub `production` environment.
 
 GitHub deploys code; the service reads its live configuration from Cloudflare.
-Complete [the first deployment](SETUP.md), then configure that environment
-using the steps below.
+Complete [the first deployment](SETUP.md), then configure that environment using
+the steps below.
 
 Install the GitHub CLI (`gh`) using its
 [official installation instructions](https://github.com/cli/cli#installation)
 before following this guide.
 
 Run commands from your checkout with `CLOUDFLARE_ACCOUNT_ID`,
-`SYNDICORD_DATABASE_ID`, and `SYNDICORD_WORKER_NAME` exported from setup.
-The [npm-installed CLI](SETUP.md#optional-npm-installation) uses the same commands
+`SYNDICORD_DATABASE_ID`, and `SYNDICORD_WORKER_NAME` exported from setup. The
+[npm-installed CLI](SETUP.md#optional-npm-installation) uses the same commands
 with `npx --no-install syndicord` in place of `npm run syndicord --`.
 
 ## Create the GitHub environment
 
 Sign in with repository administration access. Set `GH_REPO` to the GitHub
 repository for your installation, such as your fork, so every `gh` command
-targets it explicitly. Then create `production` and allow deployments from
-the `main` branch:
+targets it explicitly. Then create `production` and allow deployments from the
+`main` branch:
 
 ```sh
 gh auth login
@@ -37,11 +37,12 @@ gh variable set SYNDICORD_DATABASE_ID --env production --body "$SYNDICORD_DATABA
 gh variable set SYNDICORD_WORKER_NAME --env production --body "$SYNDICORD_WORKER_NAME"
 ```
 
-`{owner}` and `{repo}` are filled in from `GH_REPO`. For an existing environment, check
-its settings instead of recreating the branch rule: it should allow only
-`main`. Required reviewers pause deployments; leave that rule unset for
-automatic deployment. Environment support depends on your GitHub plan for
-private repositories. [GitHub environment reference](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
+`{owner}` and `{repo}` are filled in from `GH_REPO`. For an existing
+environment, check its settings instead of recreating the branch rule: it should
+allow only `main`. Required reviewers pause deployments; leave that rule unset
+for automatic deployment. Environment support depends on your GitHub plan for
+private repositories.
+[GitHub environment reference](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
 
 ## Create the Cloudflare token
 
@@ -58,9 +59,9 @@ Choose one path:
 
 ### Create through the dashboard
 
-Open **Manage account → Account API tokens → Create
-Token**, select Workers **Editor** and D1 **Edit**, and limit the token to the
-deployment account. Create the token, copy its complete value, then continue to
+Open **Manage account → Account API tokens → Create Token**, select Workers
+**Editor** and D1 **Edit**, and limit the token to the deployment account.
+Create the token, copy its complete value, then continue to
 [store the token in GitHub](#store-the-token-in-github).
 
 ### Create through the CLI
@@ -79,16 +80,17 @@ npm run syndicord -- cf auth scopes --filter d1.write
 
 These must show `account_api_tokens:create`, `workers-scripts.write`, and
 `d1.write`. If a grant is missing, run
-`npm run syndicord -- cf auth login --force`. On the browser authorization page, open
-**Additional access → Sensitive scopes** and enable **Account API Token
+`npm run syndicord -- cf auth login --force`. On the browser authorization page,
+open **Additional access → Sensitive scopes** and enable **Account API Token
 Provisioning**. **API Tokens Write** manages user-owned tokens and can remain
 off; it is not needed to create this account-owned token. Keep Workers and D1
 access enabled, complete authorization, then check the scopes again.
 
 This login consent is required even for a Super Administrator.
 
-Create `ci-token-policy.json` with the permission IDs for **Workers Scripts Write**
-and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account ID:
+Create `ci-token-policy.json` with the permission IDs for **Workers Scripts
+Write** and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare
+account ID:
 
 ```json
 [
@@ -133,8 +135,8 @@ password manager.
 ## Run and inspect deployment
 
 CI builds GitHub's `main` and targets the account, Worker, and database selected
-by the environment. Feed and webhook changes use [the CLI](OPERATIONS.md) and
-do not require GitHub changes. For an installation with bundled feeds, complete
+by the environment. Feed and webhook changes use [the CLI](OPERATIONS.md) and do
+not require GitHub changes. For an installation with bundled feeds, complete
 [the configuration import](UPGRADING.md) before deploying this code.
 
 Enable the workflow and start a run to verify the setup:
@@ -152,14 +154,14 @@ gh run watch RUN_ID --exit-status
 gh run view RUN_ID --web
 ```
 
-The second command opens the run summary in your browser.
-Confirm that **Check** and **Deploy production** succeed and the summary
-contains **Deployed commit** and **Worker version** for the expected deployment.
-If it says **Skipped** because `main` has advanced, inspect the newer run instead.
+The second command opens the run summary in your browser. Confirm that **Check**
+and **Deploy production** succeed and the summary contains **Deployed commit**
+and **Worker version** for the expected deployment. If it says **Skipped**
+because `main` has advanced, inspect the newer run instead.
 
 Subsequent pushes to `main` run the same checks, migrations, and deployment
-automatically; use the command above whenever you need another manual run.
-For a failed run:
+automatically; use the command above whenever you need another manual run. For a
+failed run:
 
 ```sh
 gh run view RUN_ID --log-failed
@@ -167,24 +169,27 @@ gh run view RUN_ID --log-failed
 
 Missing credentials or IDs stop deployment with setup guidance. GitHub stores
 the deployment token; Cloudflare keeps `WEBHOOKS`. No local secrets file is used
-by CI. [Change feeds or webhooks](OPERATIONS.md) independently of these credentials.
+by CI. [Change feeds or webhooks](OPERATIONS.md) independently of these
+credentials.
 
 ## Deployment and migration behavior
 
 Only the checked commit on `main` can deploy. The job builds for the configured
 database, validates the build, then applies outstanding migrations and verifies
 that none remain before upload. It also requires valid feed configuration in D1;
-missing configuration stops the upload while the running Worker stays in place. Only that final step receives Cloudflare
-credentials. It preserves hosted secrets, provisions no missing database, and
-checks the active Worker's commit annotation after upload.
+missing configuration stops the upload while the running Worker stays in place.
+Only that final step receives Cloudflare credentials. It preserves hosted
+secrets, provisions no missing database, and checks the active Worker's commit
+annotation after upload.
 
 Migration and deployment are serialized. A newer push does not cancel work
-already running; stale pending revisions are skipped. A push during an upload
-is handled by the next deployment.
+already running; stale pending revisions are skipped. A push during an upload is
+handled by the next deployment.
 
 Add new numbered SQL migrations; never edit ones already applied. Test them
-against both a fresh and an existing schema. They must be additive and compatible
-with the running Worker, which keeps polling until deployment completes.
-Migration failure stops upload. An upload failure leaves completed migrations
-in place; the next attempt applies only outstanding ones. CI never rolls back
-the database automatically. See [recovery](RECOVERY.md) for failed deployments.
+against both a fresh and an existing schema. They must be additive and
+compatible with the running Worker, which keeps polling until deployment
+completes. Migration failure stops upload. An upload failure leaves completed
+migrations in place; the next attempt applies only outstanding ones. CI never
+rolls back the database automatically. See [recovery](RECOVERY.md) for failed
+deployments.
