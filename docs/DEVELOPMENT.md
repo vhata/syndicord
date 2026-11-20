@@ -119,6 +119,11 @@ npm run syndicord -- status
 npm run deploy -- --dry-run
 ```
 
+The repository's `.npmrc` sets `loglevel=silent` so npm script banners do not
+pollute JSON output. Commands still write their own output and errors and retain
+their exit status. To see npm's own diagnostics, override the setting for that
+invocation, for example `npm --loglevel=notice ci`.
+
 Deployment builds the current source before touching the hosted installation.
 It does not depend on a previously generated package or a globally installed
 CLI. `npm run status -- --remote` also remains available for existing scripts;

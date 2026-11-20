@@ -33,7 +33,7 @@ for the service to function.
 Read the current configuration into a temporary file:
 
 ```sh
-npm run --silent syndicord -- feeds get > .feeds.json
+npm run syndicord -- feeds get > .feeds.json
 ```
 
 Edit the file. Each feed appears once and lists its destination names:

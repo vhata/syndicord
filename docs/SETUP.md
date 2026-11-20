@@ -40,12 +40,11 @@ The same operations are available through either entry point:
 | From the checkout                                  | npm-installed CLI                                                  |
 | -------------------------------------------------- | ------------------------------------------------------------------ |
 | `npm run syndicord -- feeds get`                   | `npx --no-install syndicord feeds get`                             |
-| `npm run --silent syndicord -- feeds get`          | `npx --no-install syndicord feeds get`                             |
 | `npm run deploy -- --webhooks-file .webhooks.json` | `npx --no-install syndicord deploy --webhooks-file .webhooks.json` |
 | `npm run deploy`                                   | `npx --no-install syndicord deploy`                                |
 
-The examples below use the checkout commands. `--silent` suppresses npm's
-banner when exporting JSON.
+The examples below use the checkout commands. The repository's `.npmrc`
+suppresses npm's script banners so JSON output can be piped directly to `jq`.
 
 ## Select an installation
 

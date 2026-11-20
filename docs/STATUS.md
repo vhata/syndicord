@@ -74,7 +74,7 @@ npm run syndicord -- status --interval-minutes 5
 For machine-readable output:
 
 ```sh
-npm run --silent syndicord -- status --json
+npm run syndicord -- status --json
 ```
 
 JSON timestamps are Unix milliseconds; ages and thresholds are milliseconds.

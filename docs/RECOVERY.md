@@ -114,7 +114,7 @@ gh run view NEW_RUN_ID --web
 Save the current feed configuration first:
 
 ```sh
-npm run --silent syndicord -- feeds get > .feeds.json
+npm run syndicord -- feeds get > .feeds.json
 ```
 
 Create `.feeds-paused.json` containing `[]`, then pause polling and delivery:
