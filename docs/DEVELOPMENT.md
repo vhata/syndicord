@@ -57,6 +57,11 @@ TypeScript compiler.
 
 GitHub Actions runs `npm ci` and the full `npm run check` on pull requests and
 pushes to `main`. It can also be started manually from the Actions tab.
+CI also runs `npm run test:package` to install a tarball with production
+dependencies in a temporary directory and exercise the installed CLI, local D1,
+and deployment dry-runs. This check needs npm registry access but no Cloudflare
+credentials. It does not run in commit hooks.
+
 The workflow uses the Node version in `.node-version` and the npm version in
 `package.json`, with cached npm downloads. Superseded PR runs are cancelled;
 each push to `main` is checked. Hooks are disabled in CI, which runs the
