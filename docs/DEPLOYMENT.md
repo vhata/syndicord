@@ -47,9 +47,14 @@ npx cf auth scopes --filter account_api_tokens
 ```
 
 It must include `account_api_tokens:create`. If it is missing, run
-`npx cf auth login --force`, approve token creation in the browser, then check
-the scopes again. An existing login can deploy Workers yet lack this grant,
-even when your account role is Super Administrator.
+`npx cf auth login --force`. On the browser authorization page, open
+**Additional access → Sensitive scopes** and enable **Account API Token
+Provisioning**. **API Tokens Write** manages user-owned tokens and can remain
+off; it is not needed to create this account-owned token. Keep Workers and D1
+access enabled, complete authorization, then check the scopes again.
+
+This login consent is separate from your account role. An existing login can
+deploy Workers yet lack token-creation consent, even for a Super Administrator.
 
 Create `ci-token-policy.json` with the permission IDs for **Workers Editor**
 and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account ID:
