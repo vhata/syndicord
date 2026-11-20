@@ -58,6 +58,9 @@ jobs:
       - name: Run all checks
         run: npm run check
 
+      - name: Verify the installed package
+        run: npm run test:package
+
   deploy:
     name: Deploy production
     needs: check
