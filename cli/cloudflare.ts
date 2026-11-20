@@ -127,7 +127,13 @@ export async function query(
         database,
         '--batch',
         `@${path}`,
-        ...(local ? ['--local'] : []),
+        ...(local
+          ? [
+              '--local',
+              '--persist-to',
+              join(process.cwd(), '.cloudflare/state'),
+            ]
+          : []),
       ],
       {
         cwd: local ? process.cwd() : cwd,

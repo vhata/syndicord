@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { loadConfig, loadFeeds, validateWebhooks } from '../src/config.ts';
 import { WRITE_CONFIGURATION_SQL } from '../src/config-store.ts';
@@ -181,10 +181,7 @@ export async function runCli(
   }
 }
 
-if (
-  process.argv[1] &&
-  fileURLToPath(import.meta.url) === resolve(process.argv[1])
-) {
+if (import.meta.main) {
   const result = await runCli(process.argv.slice(2));
   if (result.stdout) console.log(result.stdout);
   if (result.stderr) console.error(result.stderr);

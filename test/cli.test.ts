@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -330,6 +337,93 @@ test('deployment stops before upload for missing configuration or incomplete mig
       assert.equal(result.code, 2);
       assert.equal(uploaded, false);
     }
+  } finally {
+    await rm(packageRoot, { recursive: true, force: true });
+  }
+});
+
+test('first deployment uploads a validated secret through a private temporary file and verifies activation', async () => {
+  const packageRoot = await artifact();
+  let secretsFile = '';
+  let message = '';
+  let uploads = 0;
+  const cf: Cf = async (args) => {
+    assert.ok(!args.join(' ').includes('webhook-secret'));
+    if (args[1] === 'migrations') return args[2] === 'list' ? '[]' : '';
+    if (args[0] === 'd1') return raw([[JSON.stringify(feeds)]]);
+    if (args[1] === 'secrets')
+      throw new Error('fresh Worker cannot have a secret yet');
+    if (args[0] === 'deploy') {
+      uploads++;
+      message = args[4]!;
+      secretsFile = args[args.indexOf('--secrets-file') + 1]!;
+      assert.equal((await stat(secretsFile)).mode & 0o777, 0o600);
+      assert.deepEqual(JSON.parse(await readFile(secretsFile, 'utf8')), {
+        WEBHOOKS: JSON.stringify(webhooks),
+      });
+      return '';
+    }
+    if (args[1] === 'deployments')
+      return JSON.stringify({
+        deployments: [
+          {
+            versions: [
+              {
+                version_id: '87654321-4321-4321-4321-cba987654321',
+                percentage: 100,
+              },
+            ],
+          },
+        ],
+      });
+    if (args[1] === 'versions')
+      return JSON.stringify({ annotations: { 'workers/message': message } });
+    throw new Error('unexpected command');
+  };
+  try {
+    const result = await runCli(
+      ['deploy', '--webhooks-file', '-'],
+      environment,
+      { cf, packageRoot, readInput: async () => webhooks },
+    );
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(uploads, 1);
+    assert.doesNotMatch(JSON.stringify(result), /webhook-secret/);
+    await assert.rejects(readFile(secretsFile));
+  } finally {
+    await rm(packageRoot, { recursive: true, force: true });
+  }
+});
+
+test('an ambiguous upload result is not retried or reported as a verified deployment', async () => {
+  const packageRoot = await artifact();
+  let uploads = 0;
+  const cf: Cf = async (args) => {
+    if (args[1] === 'migrations') return args[2] === 'list' ? '[]' : '';
+    if (args[0] === 'd1') return raw([[JSON.stringify(feeds)]]);
+    if (args[1] === 'secrets') return '[{"name":"WEBHOOKS"}]';
+    if (args[0] === 'deploy') {
+      uploads++;
+      return '';
+    }
+    return JSON.stringify({
+      deployments: [
+        {
+          versions: [
+            {
+              version_id: '87654321-4321-4321-4321-cba987654321',
+              percentage: 100,
+            },
+          ],
+        },
+      ],
+    });
+  };
+  try {
+    const result = await runCli(['deploy'], environment, { cf, packageRoot });
+    assert.equal(result.code, 2);
+    assert.equal(uploads, 1);
+    assert.match(result.stderr, /active Worker version could not be verified/);
   } finally {
     await rm(packageRoot, { recursive: true, force: true });
   }

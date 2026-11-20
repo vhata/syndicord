@@ -151,7 +151,10 @@ export async function deploy(
         !Array.isArray(active) ||
         active.length !== 1 ||
         active[0]?.percentage !== 100 ||
-        typeof active[0]?.version_id !== 'string'
+        typeof active[0]?.version_id !== 'string' ||
+        !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(
+          active[0].version_id,
+        )
       )
         throw new Error();
       versionId = active[0].version_id;
