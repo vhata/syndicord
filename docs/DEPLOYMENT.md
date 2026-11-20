@@ -1,8 +1,11 @@
 # Automatic deployment
 
-Complete [the first deployment](SETUP.md) first. These steps connect the working
-installation to GitHub Actions; afterwards, pushes to `main` check the code,
-apply D1 migrations, and deploy. Pull requests only run checks.
+The repository includes the CI workflow in `.github/workflows/check.yml`.
+It checks pull requests and pushes to `main`. For pushes to `main`, it also
+applies D1 migrations and deploys using the GitHub `production` environment.
+
+Complete [the first deployment](SETUP.md), then configure that environment
+using the steps below.
 
 Install the GitHub CLI (`gh`) using its
 [official installation instructions](https://github.com/cli/cli#installation)
@@ -129,23 +132,30 @@ Alternatively, create the Editor token through the dashboard. Enabling
 
 ## Run and inspect deployment
 
-Once the workflow is on `main`, start it and select its run ID from the list:
+After saving the environment variables and token, start CI to verify the setup:
 
 ```sh
 gh workflow run check.yml --ref main
 gh run list --workflow check.yml --branch main --event workflow_dispatch --limit 5
+```
+
+Find the run you just started in the list. Replace `RUN_ID` with its numeric ID:
+
+```sh
 gh run watch RUN_ID --exit-status
 ```
 
-The run summary records the commit and active Worker version. For a failed run:
+Confirm that **Check** and **Deploy production** succeed and the run summary
+records the expected commit and active Worker version. Subsequent pushes to `main` run
+the same checks, migrations, and deployment automatically; use the command above
+whenever you need another manual run. For a failed run:
 
 ```sh
 gh run view RUN_ID --log-failed
 ```
 
-Configure the environment before merging changes that use it. Missing
-credentials or IDs stop deployment with setup guidance. GitHub stores the
-deployment token; Cloudflare keeps `WEBHOOKS`. No local secrets file is used
+Missing credentials or IDs stop deployment with setup guidance. GitHub stores
+the deployment token; Cloudflare keeps `WEBHOOKS`. No local secrets file is used
 by CI. [Change feeds or webhooks](OPERATIONS.md) independently of these credentials.
 
 ## Deployment and migration behavior
