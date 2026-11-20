@@ -40,7 +40,6 @@ codebase reviews. The comment reads:
 
 ```md
 ## Review
-
 Independent review by <agent> at <commit>: <verdict>. Verified: <claims and how>. Findings: <n> (<fixed in <commit> | disposition>). Not checked: <gaps>.
 ```
 
@@ -68,30 +67,22 @@ The focus areas the reviewer concentrates on are listed under [Review inputs](..
 ```md
 # <Full|Incremental> review, YYYY-MM-DD
 
-| Field           | Value                                                                                                            |
-| --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Type            | Full / Incremental                                                                                               |
-| Reviewed commit | `<sha>` on main                                                                                                  |
-| Previous review | <file> at `<sha>` / None                                                                                         |
-| Reviewers       | <coordinator; independent agents and the areas each covered>                                                     |
-| Baseline        | `bash scripts/check.sh`: <result>; <each baseline command from the Review inputs in `docs/QUALITY.md`>: <result> |
+| Field | Value |
+| --- | --- |
+| Type | Full / Incremental |
+| Reviewed commit | `<sha>` on main |
+| Previous review | <file> at `<sha>` / None |
+| Reviewers | <coordinator; independent agents and the areas each covered> |
+| Baseline | `bash scripts/check.sh`: <result>; <each baseline command from the Review inputs in `docs/QUALITY.md`>: <result> |
 
 ## Summary
-
 ## Invariants
-
 ## Findings
-
 ### Open and Moved
-
 ### Closed
-
 ## Backlog mapping
-
 | Backlog entry | Findings | Decision |
-
 ## Suggested order of work
-
 ## Verification limits
 ```
 
@@ -157,7 +148,6 @@ Base is the newest snapshot's reviewed commit.
    ```
 
    Language-specific checks (lint-suppression counts, documented flags or controls against the code, and the rest) are the drift checks listed under [Review inputs](../docs/QUALITY.md#review-inputs) in `docs/QUALITY.md`. Compare every number with the previous snapshot and record it even when unchanged.
-
 5. Re-read files touched by most changes in the delta.
 6. Review-close triage, snapshot, index row, reviewed change (from a
    `task/` branch, as above).

@@ -8,17 +8,19 @@ use a POSIX shell, such as Bash or zsh.
 ## Check the project
 
 ```sh
-npm ci
-npm run check
+bash scripts/setup.sh
+bash scripts/check.sh
+bash docket/scripts/ci.sh
 ```
 
-`npm ci` installs the pinned dependencies, builds the CLI and Worker, and
+`scripts/setup.sh` runs `npm ci`, which installs the pinned dependencies, builds the CLI and Worker, and
 installs Git hooks for this checkout. Run
 it after cloning and after pulling changes to `package.json` or
 `package-lock.json`. Linked worktrees each need their own installation.
 
-The check covers formatting, linting, generated Workers types, TypeScript, the
-Worker build, and tests. Tests use fixture feeds, fake Discord responses, and
+`scripts/check.sh` runs `npm run check` and `npm run test:package`.
+These cover formatting, linting, generated Workers types, TypeScript, the
+Worker build, tests, and npm installation. Tests use fixture feeds, fake Discord responses, and
 temporary local D1 databases. A runtime test exercises scheduled events in the
 built Worker. These checks need no Cloudflare account or Discord credentials.
 
@@ -62,6 +64,11 @@ CI also runs `npm run test:package` to verify npm installation with production
 dependencies in a temporary directory and exercise the installed CLI, local D1,
 and deployment dry-runs. This check needs npm registry access but no Cloudflare
 credentials. It does not run in commit hooks.
+
+The same complete gate is available as `bash scripts/check.sh`. A separate
+**Queue and PR hygiene** job validates Docket queues, links, and PR
+descriptions. See [quality and validation](QUALITY.md) for review inputs,
+test policy, and hosting settings.
 
 The workflow uses the Node version in `.node-version` and the npm version in
 `package.json`, with cached npm downloads. Superseded PR runs are cancelled;

@@ -2,12 +2,14 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: >-
@@ -53,17 +55,36 @@ jobs:
           test "npm@$(npm --version)" = "$project_npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: bash scripts/setup.sh
 
       - name: Run all checks
-        run: npm run check
+        run: bash scripts/check.sh
 
-      - name: Verify the installed package
-        run: npm run test:package
+  workflow:
+    name: Queue and PR hygiene
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out source and base history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate queues, links, and PR markers
+        run: bash docket/scripts/ci.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
 
   deploy:
     name: Deploy production
-    needs: check
+    needs: [check, workflow]
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
