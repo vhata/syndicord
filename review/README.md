@@ -12,7 +12,7 @@ review's baseline; the newest Full row is the cumulative churn baseline.
 
 | Review (UTC)                                | Type | Reviewed commit                            | Open findings at close |
 | ------------------------------------------- | ---- | ------------------------------------------ | ---------------------- |
-| [2026-11-20 10:45](2026-11-20-1045-full.md) | Full | `1a0a56b0ab4f75ee4e5a2f61240a3dff546cbb27` | 5                      |
+| [2026-11-20 10:45](2026-11-20-1045-full.md) | Full | `b4e3bb11e600ef3fe28b5ede3b5853c55e2151a3` | 5                      |
 
 The first snapshot reviews the completed setup branch, preserved by
 [PR #8](https://github.com/vhata/syndicord/pull/8). Its corresponding main
