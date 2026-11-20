@@ -105,10 +105,12 @@ npx cf accounts tokens create --name syndicord-github --policies @ci-token-polic
 gh secret set CLOUDFLARE_API_TOKEN --env production
 ```
 
-Copy the returned token into the hidden `gh` prompt. Cloudflare shows the value
-only at creation; keep it in the shared password manager. The policy file
-contains IDs and permissions, not the token. Do not give the deployment token
-permission to create more tokens.
+In the JSON printed by `cf`, copy the complete `value` string (beginning with
+`cfat_`), without the surrounding quotes. Paste it into the hidden `gh` prompt
+and press Enter. Cloudflare shows this value only at creation; keep the same
+complete string in the shared password manager. The policy file contains IDs
+and permissions, not the token. Do not give the deployment token permission to
+create more tokens.
 
 If creation still returns 403 with the required scope, check `npx cf auth whoami`:
 an API token from `CLOUDFLARE_API_TOKEN` or a dotenv file overrides the OAuth
