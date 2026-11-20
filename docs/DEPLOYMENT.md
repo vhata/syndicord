@@ -12,8 +12,8 @@ Install the GitHub CLI (`gh`) using its
 [official installation instructions](https://github.com/cli/cli#installation)
 before following this guide.
 
-Run commands from your repository with `CLOUDFLARE_ACCOUNT_ID` and
-`SYNDICORD_DATABASE_ID` and `SYNDICORD_WORKER_NAME` exported from setup.
+Run commands with `CLOUDFLARE_ACCOUNT_ID`, `SYNDICORD_DATABASE_ID`, and
+`SYNDICORD_WORKER_NAME` exported from setup.
 
 ## Create the GitHub environment
 

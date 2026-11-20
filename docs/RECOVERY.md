@@ -66,26 +66,36 @@ old entries again. Pending records already retain the content needed to retry.
 
 ## Failed deployment
 
-Inspect the failed GitHub run, replacing `FAILED_RUN_ID` with its numeric ID:
-
-```sh
-gh run view FAILED_RUN_ID --log-failed
-```
-
-If an upload or readback was ambiguous, check the active deployment before
+If an upload or readback was ambiguous, inspect the active deployment before
 retrying; uploading can succeed before a later step fails:
 
 ```sh
 syndicord cf workers deployments list --worker "$SYNDICORD_WORKER_NAME"
 ```
 
-Keep intended configuration changes in `cloudflare.config.ts`. A conflict with
-dashboard configuration stops deployment; inspect and reconcile it before
-retrying. Secret-value changes are preserved. Do not suppress an unexplained
-conflict with `--force`.
+Check the reported error and `syndicord feeds get`. Missing configuration must
+be supplied before upload; see [upgrading](UPGRADING.md) for bundled-feed
+installations. Applied migrations stay in place after an upload failure.
+Once the cause is resolved, retry the installed package:
+
+```sh
+syndicord deploy
+```
+
+A conflict with dashboard-managed Worker settings stops deployment. Inspect and
+reconcile it before retrying; do not suppress an unexplained conflict with
+`--force`. Operators using a custom source build keep their intended runtime
+settings in `cloudflare.config.ts`. Hosted feeds and secrets are preserved.
+
+For optional GitHub deployment, inspect the failed run instead of uploading a
+local package, replacing `FAILED_RUN_ID` with its numeric ID:
+
+```sh
+gh run view FAILED_RUN_ID --log-failed
+```
 
 After checking the active deployment and addressing the failure, start CI for
-the current `main`:
+current `main`:
 
 ```sh
 gh workflow run check.yml --ref main
@@ -101,30 +111,41 @@ gh run view NEW_RUN_ID --web
 
 ## Pause and roll back
 
-To pause polling and delivery, save `[]` in `.feeds.json` and run:
+Save the current feed configuration first:
+
+```sh
+syndicord feeds get > .feeds.json
+```
+
+Create `.feeds-paused.json` containing `[]`, then pause polling and delivery:
+
+```sh
+syndicord feeds set --file .feeds-paused.json
+```
+
+Allow any running invocation to finish. No code deployment is needed. Restore
+the saved list when ready:
 
 ```sh
 syndicord feeds set --file .feeds.json
 ```
 
-Allow any running invocation to finish. Save the previous configuration first
-with `syndicord feeds get` so you can restore it. No code deployment is needed.
-For a code rollback managed through GitHub, disable future CI runs and wait for
-any active deployment to finish:
+For a code rollback, install the intended package version and run
+`syndicord deploy`. Cloudflare's **Deployments → Rollback** also selects an
+earlier Worker version. A Worker rollback reverses neither D1 migrations,
+stored routing, nor Discord messages. A version that bundles feeds uses its
+own historical configuration; inspect that list before rolling back to it.
+
+If GitHub manages deployments, disable the workflow and wait for any active run
+to finish before a manual rollback:
 
 ```sh
 gh workflow disable check.yml
 gh run list --workflow check.yml --limit 5
 ```
 
-Prefer reverting a faulty commit and deploying the revert. For an immediate
-code rollback, Cloudflare's **Deployments → Rollback** selects an earlier
-Worker version. Keep automatic deployment disabled during a manual rollback.
-A Worker rollback reverses neither D1 migrations, stored routing, nor Discord
-messages. A version that bundles feeds uses its own historical configuration;
-inspect that list before rolling back to it.
-
-Restore the saved feed configuration when ready, then resume checked deploys:
+Prefer reverting the faulty code commit and deploying the revert. Resume CI
+when `main` contains the code you intend to deploy:
 
 ```sh
 gh workflow enable check.yml
@@ -134,8 +155,12 @@ gh workflow run check.yml --ref main
 ## Restore D1
 
 [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
-retains seven days on Workers Free. A restore overwrites the database: pause
-the relay and record the current restore point first. D1 restoration also restores the feed configuration. Restoring an older
+retains seven days on Workers Free. A restore overwrites the database. Disable
+the Worker's cron trigger in Cloudflare, prevent concurrent code deployments,
+and allow running invocations to finish before recording the current restore
+point and restoring D1. A pause stored as `[]` is insufficient: restoring D1
+also restores the old feed configuration. Inspect the restored configuration
+and ledger before restoring the cron trigger. Restoring an older
 ledger can forget successful sends and produce duplicate Discord messages.
 Inspect pending deliveries before resuming; practise recovery on an isolated
 database before relying on it. CI never restores or resets D1 automatically.

@@ -11,7 +11,7 @@ coverage/
 .env*
 !.env.example
 .webhooks.json
-.feeds.json
+.feeds*.json
 syndicord-*.tgz
 
 *.log
