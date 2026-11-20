@@ -14,9 +14,9 @@ export default defineConfig({
           process.env.SYNDICORD_DATABASE_ID ??
           '00000000-0000-4000-8000-000000000001',
       }),
-      WEBHOOKS: bindings.secret(),
-      ADMIN_PASSWORD: bindings.secret(),
-      CONFIG_ENCRYPTION_KEY: bindings.secret(),
+      // Runtime secrets are supplied by the operator and preserved on deploy.
+      // Declaring bindings.secret() makes them mandatory and filters .dev.vars,
+      // which would prevent installations without web administration from running.
     },
     triggers: [triggers.scheduled({ schedule: '* * * * *' })],
     observability: { enabled: true },

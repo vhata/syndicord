@@ -30,7 +30,6 @@ worker.env = {
     name: 'syndicord',
     id: '00000000-0000-4000-8000-000000000001',
   },
-  WEBHOOKS: { type: 'secret' },
 };
 await writeFile(workerPath, JSON.stringify(worker));
 const rootPath = new URL('worker/v1/config.json', dist);
