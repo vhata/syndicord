@@ -180,7 +180,9 @@ that none remain before upload. It also requires valid feed configuration in D1;
 missing configuration stops the upload while the running Worker stays in place.
 Only that final step receives Cloudflare credentials. It preserves hosted
 secrets, provisions no missing database, and checks the active Worker's commit
-annotation after upload.
+annotation after upload. Verification retries reads briefly to allow for stale
+Cloudflare metadata; [recovery](RECOVERY.md#failed-deployment) describes the
+retry limit and how to inspect a failure.
 
 Migration and deployment are serialized. A newer push does not cancel work
 already running; stale pending revisions are skipped. A push during an upload is

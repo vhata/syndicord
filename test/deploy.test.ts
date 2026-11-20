@@ -6,6 +6,7 @@ const sha = 'a'.repeat(40);
 const newer = 'b'.repeat(40);
 const database = '12345678-1234-1234-1234-123456789abc';
 const version = '87654321-4321-4321-4321-cba987654321';
+const previousVersion = '11111111-4321-4321-4321-cba987654321';
 const env: Record<string, string | undefined> = {
   GITHUB_ACTIONS: 'true',
   GITHUB_REF: 'refs/heads/main',
@@ -28,6 +29,7 @@ function harness(
 ) {
   const calls: string[][] = [];
   const reports: string[] = [];
+  const waits: number[] = [];
   const heads = [...(options.heads ?? [sha])];
   const run = () =>
     deploy({
@@ -60,13 +62,16 @@ function harness(
       },
       main: async () => (heads.length > 1 ? heads.shift()! : heads[0]!),
       report: (message) => reports.push(message),
+      wait: async (milliseconds) => {
+        waits.push(milliseconds);
+      },
     });
   const mutations = () =>
     calls.filter(
       (call) =>
         call[1] === 'deploy' || (call[1] === 'd1' && call[3] === 'apply'),
     );
-  return { run, calls, reports, mutations };
+  return { run, calls, reports, waits, mutations };
 }
 
 test('production deployment applies migrations first, preserves hosted secrets, and verifies the serving commit', async () => {
@@ -92,6 +97,29 @@ test('production deployment applies migrations first, preserves hosted secrets, 
     false,
   );
   assert.match(h.reports[0]!, new RegExp(sha));
+  assert.match(h.reports[0]!, new RegExp(version));
+});
+
+test('production verification rereads stale history without repeating upload or migrations', async () => {
+  let reads = 0;
+  const h = harness({
+    reply: (args) => {
+      if (args[1] === 'deployments' && reads++ === 0)
+        return JSON.stringify({
+          deployments: [
+            { versions: [{ version_id: previousVersion, percentage: 100 }] },
+          ],
+        });
+      if (args[1] === 'versions' && args[3] === previousVersion)
+        return JSON.stringify({
+          annotations: { 'workers/message': 'previous deployment' },
+        });
+    },
+  });
+  assert.equal(await h.run(), 'deployed');
+  assert.equal(reads, 2);
+  assert.deepEqual(h.waits, [2_000]);
+  assert.equal(h.mutations().length, 2);
   assert.match(h.reports[0]!, new RegExp(version));
 });
 
@@ -241,6 +269,7 @@ test('successful CLI exit is not accepted without a single serving version annot
         !error.message.includes('PRIVATE_REMOTE_DIAGNOSTIC'),
     );
     assert.equal(h.mutations().length, 2);
+    assert.deepEqual(h.waits, Array(5).fill(2_000));
     assert.deepEqual(h.reports, []);
   }
 });
