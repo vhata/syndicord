@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { URL as NodeURL } from 'node:url';
@@ -80,6 +81,73 @@ test('retains RSS paragraphs without changing legacy content fingerprints', asyn
   );
   assert.equal(changedTitle.entries[0]?.id, feed.entries[0]?.id);
   assert.equal(changedTitle.entries[0]?.feedTitle, 'Renamed');
+});
+
+test('HTML cleanup preserves malformed markup outputs and stored fallback fingerprints', async () => {
+  const cases: { html: string; description: string; id: string }[] = JSON.parse(
+    await readFile(
+      new NodeURL('./fixtures/html-cleanup.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  for (const { html, description, id } of cases) {
+    const feed = await parseFeedDocument(
+      rss(`<item><description><![CDATA[${html}]]></description></item>`),
+      url,
+    );
+    assert.equal(feed.entries[0]?.description, description, html);
+    assert.equal(feed.entries[0]?.id, id, html);
+  }
+});
+
+test('HTML cleanup stays bounded across increasing adversarial feed sizes', async (t) => {
+  for (const pattern of [
+    '<a',
+    '<p',
+    '<!--',
+    '<script>',
+    '<style>',
+    '<script ',
+  ]) {
+    await t.test(JSON.stringify(pattern), () => {
+      // A child timeout also catches synchronous regex stalls. The generous
+      // process CPU ceiling detects rescanning, not hosted Worker headroom.
+      const child = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import assert from 'node:assert/strict';
+          import { parseFeedDocument } from ${JSON.stringify(new NodeURL('../src/feed.ts', import.meta.url).href)};
+          const pattern = ${JSON.stringify(pattern)};
+          const results = [];
+          for (const size of [16_000, 64_000, 240_000]) {
+            const body = pattern.repeat(Math.floor(size / pattern.length));
+            const xml = '<rss version="2.0"><channel><title>Test</title><item>' +
+              '<guid isPermaLink="false">stable</guid><description><![CDATA[' +
+              body + ']]></description></item></channel></rss>';
+            assert.ok(Buffer.byteLength(xml) < 256 * 1024);
+            const before = process.cpuUsage();
+            for (let i = 0; i < 4; i++) {
+              const feed = await parseFeedDocument(xml, 'https://example.test/feed');
+              assert.equal(feed.entries[0].id, 'id:stable');
+            }
+            const cpu = process.cpuUsage(before);
+            results.push({ size, cpuMs: (cpu.user + cpu.system) / 1000 });
+          }
+          console.log(JSON.stringify(results));`,
+        ],
+        { encoding: 'utf8', timeout: 5_000 },
+      );
+      assert.equal(child.status, 0, child.error?.message ?? child.stderr);
+      const results: { size: number; cpuMs: number }[] = JSON.parse(
+        child.stdout,
+      );
+      assert.equal(results.length, 3);
+      for (const { size, cpuMs } of results)
+        assert.ok(cpuMs < 750, `${pattern}: ${size} bytes took ${cpuMs}ms CPU`);
+    });
+  }
 });
 
 test('keeps Atom plaintext paragraphs and existing fingerprints', async () => {
