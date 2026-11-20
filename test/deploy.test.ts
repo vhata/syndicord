@@ -143,6 +143,13 @@ test('missing or invalid hosted routing stops upload after additive migrations',
     [],
     [['not json']],
     [['{}']],
+    [
+      [
+        JSON.stringify([
+          { url: 'https://EXAMPLE.com', destinations: ['updates'] },
+        ]),
+      ],
+    ],
     [[JSON.stringify([{ url: 'https://example.com/feed', destinations: [] }])]],
   ]) {
     const h = harness({

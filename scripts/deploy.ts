@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadFeeds } from '../src/config.ts';
+import { parseStoredFeeds } from '../src/config-store.ts';
 
 type Environment = Record<string, string | undefined>;
 type Run = (command: string, args: string[], capture?: boolean) => string;
@@ -175,7 +175,7 @@ export async function deploy(options: {
       typeof rows[0][0] !== 'string'
     )
       throw new Error('Missing feed configuration');
-    loadFeeds(JSON.parse(rows[0][0]));
+    parseStoredFeeds(rows[0][0]);
   } catch {
     throw new Error(
       'Configure feeds in the selected D1 database with syndicord feeds set before deploying. The running Worker has not been replaced.',
