@@ -120,3 +120,122 @@ test('the cf-built Worker handles scheduled events with local D1 and mocked outb
     await runtime.dispose();
   }
 });
+
+test('the built web interface persists routes and encrypted webhooks used by the next scheduled poll', async () => {
+  const feedUrl = 'https://admin-feed.example/feed';
+  const webhook = 'https://discord.com/api/webhooks/9000/web-created-token';
+  const sent: string[] = [];
+  let hasNewEntry = false;
+  const authorization = `Basic ${Buffer.from('admin:runtime-password').toString('base64')}`;
+  const runtime = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      scriptPath: fileURLToPath(
+        new URL(
+          '../.cloudflare/output/v1/workers/default/bundle/index.js',
+          import.meta.url,
+        ),
+      ),
+      compatibilityDate: '2026-11-18',
+      cf: false,
+      unsafeTriggerHandlers: true,
+      d1Databases: { DB: 'syndicord-admin-runtime' },
+      bindings: {
+        ADMIN_PASSWORD: 'runtime-password',
+        CONFIG_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString('base64'),
+        WEBHOOKS: JSON.stringify({
+          unused: 'https://discord.com/api/webhooks/8000/old-secret-token',
+        }),
+      },
+      outboundService: async (request) => {
+        if (request.url === feedUrl)
+          return new Response(
+            `<rss version="2.0"><channel><title>Web-managed feed</title><item><guid>old</guid><title>Old</title></item>${hasNewEntry ? '<item><guid>new</guid><title>New from web-managed route</title></item>' : ''}</channel></rss>`,
+          );
+        assert.equal(request.url, `${webhook}?wait=true`);
+        sent.push(request.url);
+        return Response.json({ id: '98765' });
+      },
+    }),
+  );
+  try {
+    const db = await runtime.getD1Database('DB');
+    await applyTestMigrations(db as unknown as D1Database);
+    assert.equal(
+      (await runtime.dispatchFetch('http://localhost/admin')).status,
+      401,
+    );
+    const page = await runtime.dispatchFetch('http://localhost/admin', {
+      headers: { Authorization: authorization },
+    });
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /syndicord/i);
+    const endpoint = 'http://localhost/admin/api/config';
+    const initialResponse = await runtime.dispatchFetch(endpoint, {
+      headers: { Authorization: authorization },
+    });
+    assert.equal(initialResponse.status, 200);
+    const initial = (await initialResponse.json()) as { revision: string };
+    const saved = await runtime.dispatchFetch(endpoint, {
+      method: 'PUT',
+      headers: {
+        Authorization: authorization,
+        Origin: 'http://localhost',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        revision: initial.revision,
+        feeds: [{ url: feedUrl, destinations: ['news'] }],
+        webhooks: { news: webhook },
+      }),
+    });
+    assert.equal(saved.status, 200, await saved.clone().text());
+    assert.doesNotMatch(
+      await saved.text(),
+      /web-created-token|old-secret-token/,
+    );
+    const stored = await db
+      .prepare('SELECT encrypted_webhooks FROM relay_configuration')
+      .first<{ encrypted_webhooks: string }>();
+    assert.match(stored!.encrypted_webhooks, /^v1\./);
+    assert.doesNotMatch(
+      stored!.encrypted_webhooks,
+      /web-created-token|old-secret-token/,
+    );
+    const trigger = async () => {
+      const response = await runtime.dispatchFetch(
+        'http://localhost/cdn-cgi/local/scheduled',
+      );
+      assert.equal(response.status, 200, await response.text());
+    };
+    await trigger();
+    assert.equal(
+      sent.length,
+      0,
+      'a web-created route establishes a silent baseline',
+    );
+    hasNewEntry = true;
+    await trigger();
+    assert.deepEqual(sent, [`${webhook}?wait=true`]);
+    await trigger();
+    assert.equal(
+      sent.length,
+      1,
+      'delivery identities survive configuration managed through the web',
+    );
+    const reloaded = await runtime.dispatchFetch(endpoint, {
+      headers: { Authorization: authorization },
+    });
+    const configuration = (await reloaded.json()) as {
+      revision: string;
+      feeds: unknown;
+      destinations: string[];
+    };
+    assert.deepEqual(configuration.feeds, [
+      { url: feedUrl, destinations: ['news'] },
+    ]);
+    assert.deepEqual(configuration.destinations, ['news', 'unused']);
+  } finally {
+    await runtime.dispose();
+  }
+});
