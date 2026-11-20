@@ -1,7 +1,6 @@
 {
   "name": "syndicord",
   "version": "0.0.0",
-  "private": true,
   "description": "An RSS-to-Discord relay running on Cloudflare Workers.",
   "license": "MIT",
   "author": "Jonathan Hitchcock",
@@ -26,18 +25,21 @@
     "dev": "cf dev",
     "db:migrate:local": "cf d1 migrations apply \"${SYNDICORD_DATABASE_ID:-00000000-0000-4000-8000-000000000001}\" --local --dir migrations",
     "deploy": ": \"${SYNDICORD_DATABASE_ID:?Set SYNDICORD_DATABASE_ID to the provisioned D1 database ID}\" && cf deploy --no-provision",
-    "test": "npm run build && node --test --test-concurrency=2 test/*.test.ts"
+    "test": "npm run build && node --test --test-concurrency=2 test/*.test.ts",
+    "syndicord": "node cli/index.ts",
+    "package": "npm run build && node scripts/build-package.ts",
+    "prepack": "npm run package"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
-    "cf": "1.0.0-rc.1",
     "husky": "9.1.7",
     "lint-staged": "17.6.1",
     "miniflare": "5.20261118.0-beta",
     "oxlint": "1.94.0",
     "prettier": "3.10.1",
     "typescript": "7.0.2",
-    "wrangler": "4.165.0"
+    "wrangler": "4.165.0",
+    "esbuild": "0.28.2"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
@@ -48,6 +50,18 @@
   "dependencies": {
     "entities": "7.0.1",
     "fast-xml-parser": "5.12.1",
-    "feedsmith": "3.1.0"
-  }
+    "feedsmith": "3.1.0",
+    "cf": "1.0.0-rc.1"
+  },
+  "bin": {
+    "syndicord": "dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "migrations/",
+    "feeds.example.json",
+    "docs/",
+    "LICENSE",
+    "README.md"
+  ]
 }
