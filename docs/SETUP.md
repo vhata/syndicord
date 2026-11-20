@@ -18,7 +18,9 @@ npm run check
 
 These checks need no Cloudflare or Discord credentials. Fix any failures before
 continuing. Edit `feeds.json` to choose your feeds; the default follows this
-repository's commits and sends them to the destination named `updates`.
+project's upstream `vhata/syndicord` commits and sends them to `updates`.
+For the first-delivery check, use a feed you control, such as your own fork's
+commit feed: `https://github.com/YOUR_OWNER/YOUR_REPOSITORY/commits.atom`.
 
 ## Create the database
 

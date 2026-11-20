@@ -4,6 +4,12 @@ See [setup](SETUP.md) for the first-delivery check,
 [operations](OPERATIONS.md) for feeds and webhooks, and
 [deployment](DEPLOYMENT.md) for CI configuration.
 
+For the GitHub commands on this page, select your installation's repository:
+
+```sh
+export GH_REPO='YOUR_OWNER/YOUR_REPOSITORY'
+```
+
 ## Inspect a run
 
 ```sh
@@ -59,13 +65,10 @@ old entries again. Pending records already retain the content needed to retry.
 
 ## Failed deployment
 
-Inspect the failed GitHub run, then start CI for the current `main`:
+Inspect the failed GitHub run, replacing `FAILED_RUN_ID` with its numeric ID:
 
 ```sh
-gh run view RUN_ID --log-failed
-gh workflow run check.yml --ref main
-gh run list --workflow check.yml --branch main --limit 5
-gh run watch RUN_ID --exit-status
+gh run view FAILED_RUN_ID --log-failed
 ```
 
 If an upload or readback was ambiguous, check the active deployment before
@@ -79,6 +82,21 @@ Keep intended configuration changes in `cloudflare.config.ts`. A conflict with
 dashboard configuration stops deployment; inspect and reconcile it before
 retrying. Secret-value changes are preserved. Do not suppress an unexplained
 conflict with `--force`.
+
+After checking the active deployment and addressing the failure, start CI for
+the current `main`:
+
+```sh
+gh workflow run check.yml --ref main
+gh run list --workflow check.yml --branch main --event workflow_dispatch --limit 5
+```
+
+Use the new run's numeric ID to follow it and inspect the deployment summary:
+
+```sh
+gh run watch NEW_RUN_ID --exit-status
+gh run view NEW_RUN_ID --web
+```
 
 ## Pause and roll back
 

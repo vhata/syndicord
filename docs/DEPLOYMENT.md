@@ -16,11 +16,14 @@ Run commands from your repository with `CLOUDFLARE_ACCOUNT_ID` and
 
 ## Create the GitHub environment
 
-Sign in with repository administration access. Create `production` and allow
-deployments from the `main` branch:
+Sign in with repository administration access. Set `GH_REPO` to the GitHub
+repository for your installation, such as your fork, so every `gh` command
+targets it explicitly. Then create `production` and allow deployments from
+the `main` branch:
 
 ```sh
 gh auth login
+export GH_REPO='YOUR_OWNER/YOUR_REPOSITORY'
 gh api --method PUT 'repos/{owner}/{repo}/environments/production' \
   -F 'deployment_branch_policy[protected_branches]=false' \
   -F 'deployment_branch_policy[custom_branch_policies]=true'
@@ -30,7 +33,7 @@ gh variable set CLOUDFLARE_ACCOUNT_ID --env production --body "$CLOUDFLARE_ACCOU
 gh variable set SYNDICORD_DATABASE_ID --env production --body "$SYNDICORD_DATABASE_ID"
 ```
 
-`{owner}` and `{repo}` are filled in by `gh`. For an existing environment, check
+`{owner}` and `{repo}` are filled in from `GH_REPO`. For an existing environment, check
 its settings instead of recreating the branch rule: it should allow only
 `main`. Required reviewers pause deployments; leave that rule unset for
 automatic deployment. Environment support depends on your GitHub plan for
@@ -39,7 +42,10 @@ private repositories. [GitHub environment reference](https://docs.github.com/en/
 ## Create the Cloudflare token
 
 Your account membership needs **API Token Provisioning** (or Super
-Administrator), with the product permissions you want to grant. Choose one path:
+Administrator), with the product permissions you want to grant.
+[Account token requirements](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
+
+Choose one path:
 
 | Creation method  | Worker permission         | Scope of Worker access                                          |
 | ---------------- | ------------------------- | --------------------------------------------------------------- |
@@ -51,10 +57,8 @@ Token**, select Workers **Editor** and D1 **Edit**, and limit the token to the
 deployment account. Save it with `gh secret set CLOUDFLARE_API_TOKEN --env production`,
 then continue to [run deployment](#run-and-inspect-deployment).
 
-The pinned `cf` 1.0.0-rc.1 can create tokens with **Workers Scripts Write**.
-It cannot request `workers-scripts.edit`, the OAuth scope needed to grant
-**Workers Editor**. These are different permissions; another login does not
-make the Editor policy work with this CLI version.
+The pinned CLI's OAuth scopes support **Workers Scripts Write**. Use the
+dashboard for the narrower **Workers Editor** permission.
 [Workers permission reference](https://developers.cloudflare.com/workers/authorization/workers/)
 
 ### Create through the CLI
@@ -75,8 +79,7 @@ Provisioning**. **API Tokens Write** manages user-owned tokens and can remain
 off; it is not needed to create this account-owned token. Keep Workers and D1
 access enabled, complete authorization, then check the scopes again.
 
-This login consent is separate from your account role. An existing login can
-deploy Workers yet lack token-creation consent, even for a Super Administrator.
+This login consent is required even for a Super Administrator.
 
 Create `ci-token-policy.json` with the permission IDs for **Workers Scripts Write**
 and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account ID:
@@ -96,10 +99,8 @@ and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account I
 ]
 ```
 
-This grants Worker script management and D1 migration access across that account;
-no zone permissions are needed. The policy uses the supported legacy Workers
-permission that matches the CLI's `workers-scripts.write` OAuth grant. To inspect
-permission IDs, run `npx cf user tokens permission-groups list`.
+Both permissions apply across the selected account. The policy grants no zone
+access.
 
 Create the token and save it as the GitHub environment secret:
 
@@ -111,30 +112,19 @@ gh secret set CLOUDFLARE_API_TOKEN --env production
 In the JSON printed by `cf`, copy the complete `value` string (beginning with
 `cfat_`), without the surrounding quotes. Paste it into the hidden `gh` prompt
 and press Enter. Cloudflare shows this value only at creation; keep the same
-complete string in the shared password manager. The policy file contains IDs
-and permissions, not the token. Do not give the deployment token permission to
-create more tokens.
-
-If creation still returns 403 with the required scope, check `npx cf auth whoami`:
-an API token from `CLOUDFLARE_API_TOKEN` or a dotenv file overrides the OAuth
-login. Confirm the selected account has the required role and product access;
-an administrator can grant missing permissions. Tokens can also be created at
-**Manage account → Account API tokens → Create Token** in the selected account.
-[Account token reference](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
-
-Error 1001 naming **Workers Editor** means the policy asks for a permission that
-this CLI cannot obtain through OAuth. If the broader CLI permission is acceptable,
-replace the Workers Editor ID `d7ba8d4dce414197a3efab21b2f87eb8` in your policy
-with the Workers Scripts Write ID `e086da7e2179491d91ee5f35b3ca210a`. Keep the
-D1 Write entry `09b2857d1c31407795e75e3fed8617a1` and your account ID unchanged.
-Alternatively, create the Editor token through the dashboard. Enabling
-**API Tokens Write** does not resolve this mismatch.
+complete string in the shared password manager.
 
 ## Run and inspect deployment
 
-After saving the environment variables and token, start CI to verify the setup:
+CI builds GitHub's `main`, including `feeds.json` and `cloudflare.config.ts`.
+After saving the credentials above, run `npm run check` and publish any local
+edits to those configuration files to your repository's `main` using your normal
+Git workflow. This ensures CI deploys the configuration you verified locally.
+
+Enable the workflow and start a run to verify the setup:
 
 ```sh
+gh workflow enable check.yml
 gh workflow run check.yml --ref main
 gh run list --workflow check.yml --branch main --event workflow_dispatch --limit 5
 ```
@@ -143,9 +133,11 @@ Find the run you just started in the list. Replace `RUN_ID` with its numeric ID:
 
 ```sh
 gh run watch RUN_ID --exit-status
+gh run view RUN_ID --web
 ```
 
-Confirm that **Check** and **Deploy production** succeed and the run summary
+The second command opens the run summary in your browser.
+Confirm that **Check** and **Deploy production** succeed and the summary
 contains **Deployed commit** and **Worker version** for the expected deployment.
 If it says **Skipped** because `main` has advanced, inspect the newer run instead.
 
