@@ -6,18 +6,19 @@ sending a Discord message:
 ```sh
 export CLOUDFLARE_ACCOUNT_ID='your-account-id'
 export SYNDICORD_DATABASE_ID='your-existing-database-uuid'
-syndicord status
+npm run syndicord -- status
 ```
 
-The command uses the packaged `cf` CLI and its existing authentication. It only
+The command uses the project's `cf` dependency and its existing authentication.
+For the [global CLI](SETUP.md#optional-global-cli), use `syndicord status`. It only
 queries D1; it needs no webhook secret or `.dev.vars` file. Hosted reads count
 toward D1 usage. The database ID is non-secret deployment configuration; use
 the ID recorded for the deployment rather than creating a new database.
-Use `syndicord status --local` from a development checkout for its local D1
-state instead. Remote is the default for the installed CLI; the command never changes
+Use `npm run syndicord -- status --local` from a development checkout for its local D1
+state instead. Remote is the default for the CLI; the command never changes
 migrations, releases a lease, or resumes a suspended destination.
 
-Apply the packaged migrations with `syndicord migrate` and configure feeds
+Apply the migrations with `npm run syndicord -- migrate` and configure feeds
 before deploying. Missing configuration produces a setup error. Until the Worker
 records completed polls, status is `unknown`; older delivery history does not
 establish current health. See [upgrading](UPGRADING.md) for installations that
@@ -50,7 +51,7 @@ checks both the run heartbeat and each feed's health.
 The output includes pending counts and oldest pending age for active routes,
 alongside destination suspension/cooldown state. Removed routes are excluded;
 their retained pending deliveries resume if the same configuration is restored.
-Feed indices identify entries in `syndicord feeds get`. Only hostnames are printed;
+Feed indices identify entries in `npm run syndicord -- feeds get`. Only hostnames are printed;
 feed paths/query strings, webhook URLs, fingerprints, and message payloads are
 not included.
 
@@ -66,13 +67,13 @@ longer.
 If the deployed cron interval changes, supply its interval in minutes:
 
 ```sh
-syndicord status --interval-minutes 5
+npm run syndicord -- status --interval-minutes 5
 ```
 
 For machine-readable output:
 
 ```sh
-syndicord status --json
+npm run --silent syndicord -- status --json
 ```
 
 JSON timestamps are Unix milliseconds; ages and thresholds are milliseconds.

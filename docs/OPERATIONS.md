@@ -5,7 +5,8 @@
 
 ## Select an installation
 
-Run the installed CLI from any directory:
+Run commands from your checkout. If you use the [global CLI](SETUP.md#optional-global-cli),
+replace `npm run syndicord --` with `syndicord` and run from any directory:
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID='your-account-id'
@@ -31,7 +32,7 @@ for the service to function.
 Read the current configuration into a temporary file:
 
 ```sh
-syndicord feeds get > .feeds.json
+npm run --silent syndicord -- feeds get > .feeds.json
 ```
 
 Edit the file. Each feed appears once and lists its destination names:
@@ -48,8 +49,8 @@ Edit the file. Each feed appears once and lists its destination names:
 Add any new webhook destinations first, then upload the complete feed list:
 
 ```sh
-syndicord feeds set --file .feeds.json
-syndicord status
+npm run syndicord -- feeds set --file .feeds.json
+npm run syndicord -- status
 ```
 
 The command validates and atomically replaces D1 configuration. The next scheduled
@@ -81,7 +82,7 @@ values, so include every destination still in use when replacing the map. Upload
 it while no code deployment is running:
 
 ```sh
-syndicord webhooks set --file .webhooks.json
+npm run syndicord -- webhooks set --file .webhooks.json
 ```
 
 This replaces the complete hosted secret and activates it immediately. No code

@@ -12,7 +12,8 @@ npm ci
 npm run check
 ```
 
-`npm ci` installs the pinned dependencies and Git hooks for this checkout. Run
+`npm ci` installs the pinned dependencies, builds the CLI and Worker, and
+installs Git hooks for this checkout. Run
 it after cloning and after pulling changes to `package.json` or
 `package-lock.json`. Linked worktrees each need their own installation.
 
@@ -57,7 +58,7 @@ TypeScript compiler.
 
 GitHub Actions runs `npm ci` and the full `npm run check` on pull requests and
 pushes to `main`. It can also be started manually from the Actions tab.
-CI also runs `npm run test:package` to install a tarball with production
+CI also runs `npm run test:package` to verify npm installation with production
 dependencies in a temporary directory and exercise the installed CLI, local D1,
 and deployment dry-runs. This check needs npm registry access but no Cloudflare
 credentials. It does not run in commit hooks.
@@ -108,31 +109,32 @@ Worker's HTTP handler returns 404.
 Local D1 state is under `.cloudflare/state/` and is separate from hosted state.
 The automated tests create their own databases and do not change this state.
 
-## Build a package
+## CLI development and installation checks
+
+Run every operational command directly from the checkout:
 
 ```sh
-npm ci
-npm run check
-npm pack
+npm run syndicord -- --help
+npm run syndicord -- status
+npm run deploy -- --dry-run
 ```
 
-The prepack step builds the CLI as JavaScript and includes a generic prebuilt
-Worker, migrations, examples, and documentation in `syndicord-0.0.0.tgz`.
-`npm run package` builds these artifacts without creating a tarball. No installation-specific identifiers, live feed list, webhook secret, Git
-metadata, or local state is packaged.
-Install the tarball in a separate directory to exercise the installed CLI;
-package installation does not build the Worker or require a Git checkout.
+Deployment builds the current source before touching the hosted installation.
+It does not depend on a previously generated package or a globally installed
+CLI. `npm run status -- --remote` also remains available for existing scripts;
+that wrapper requires an explicit `--remote` or `--local` target.
 
-For development without installing the package, use
-`npm run syndicord -- <command>`. `npm run status -- --remote` remains available
-for scripts; unlike the installed CLI, that wrapper requires an explicit
-`--remote` or `--local` target.
+`npm run package` builds the distributable CLI and Worker under ignored `dist/`.
+The npm prepare lifecycle performs this build when installing from Git. It does
+nothing in a built npm package, which contains no source or development tools.
+The installed CLI uses its bundled Worker; source deployment always rebuilds.
 
-Run `syndicord --help` for operational commands. `syndicord cf` exposes the pinned
-Cloudflare CLI for authentication, database creation, and log inspection.
-Package deployments use temporary staged artifacts, preserving the installed
-package and keeping target identifiers outside it. Publishing a tarball to a
-registry is a separate release operation.
+`npm run test:package` checks the installed form in disposable directories and
+cleans up its fixtures afterwards.
+No installation-specific identifiers, live feeds, secrets, or local state are
+included in the npm package. Registry publication is a separate release operation.
+
+See [setup](SETUP.md#optional-global-cli) for normal npm installation from GitHub.
 
 ## Layout
 

@@ -12,8 +12,10 @@ Install the GitHub CLI (`gh`) using its
 [official installation instructions](https://github.com/cli/cli#installation)
 before following this guide.
 
-Run commands with `CLOUDFLARE_ACCOUNT_ID`, `SYNDICORD_DATABASE_ID`, and
-`SYNDICORD_WORKER_NAME` exported from setup.
+Run commands from your checkout with `CLOUDFLARE_ACCOUNT_ID`,
+`SYNDICORD_DATABASE_ID`, and `SYNDICORD_WORKER_NAME` exported from setup.
+The [global CLI](SETUP.md#optional-global-cli) uses the same commands with
+`syndicord` in place of `npm run syndicord --`.
 
 ## Create the GitHub environment
 
@@ -70,14 +72,14 @@ dashboard for the narrower **Workers Editor** permission.
 Check the saved login before creating the token:
 
 ```sh
-syndicord cf auth scopes --filter account_api_tokens
-syndicord cf auth scopes --filter workers-scripts.write
-syndicord cf auth scopes --filter d1.write
+npm run syndicord -- cf auth scopes --filter account_api_tokens
+npm run syndicord -- cf auth scopes --filter workers-scripts.write
+npm run syndicord -- cf auth scopes --filter d1.write
 ```
 
 These must show `account_api_tokens:create`, `workers-scripts.write`, and
 `d1.write`. If a grant is missing, run
-`syndicord cf auth login --force`. On the browser authorization page, open
+`npm run syndicord -- cf auth login --force`. On the browser authorization page, open
 **Additional access → Sensitive scopes** and enable **Account API Token
 Provisioning**. **API Tokens Write** manages user-owned tokens and can remain
 off; it is not needed to create this account-owned token. Keep Workers and D1
@@ -109,7 +111,7 @@ access.
 Create the token:
 
 ```sh
-syndicord cf accounts tokens create --name syndicord-github --policies @ci-token-policy.json
+npm run syndicord -- cf accounts tokens create --name syndicord-github --policies @ci-token-policy.json
 ```
 
 In the JSON printed by `cf`, copy the complete `value` string (beginning with

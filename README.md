@@ -30,8 +30,8 @@ is stored in D1, so destinations can retry independently. Each scheduled run
 checks one feed and sends a bounded batch of pending entries.
 
 Feeds and routing live in Cloudflare D1; Discord webhook URLs live in the
-Worker's encrypted `WEBHOOKS` secret. The installable CLI manages each
-installation without a Git checkout. The same code can serve separate
+Worker's encrypted `WEBHOOKS` secret. Run the CLI directly from the repository
+or install it through npm to manage an installation without a checkout. The same code can serve separate
 accounts or Workers, each with its own database and configuration.
 
 Start with [setup](docs/SETUP.md), then see
