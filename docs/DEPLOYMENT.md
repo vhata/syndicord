@@ -40,6 +40,17 @@ login. Your account membership needs **API Token Provisioning** (or Super
 Administrator), and your login must permit token creation and the permissions
 being granted. [Cloudflare token provisioning](https://developers.cloudflare.com/changelog/post/2026-10-01-account-api-token-provisioning/)
 
+Check the saved login before creating the token:
+
+```sh
+npx cf auth scopes --filter account_api_tokens
+```
+
+It must include `account_api_tokens:create`. If it is missing, run
+`npx cf auth login --force`, approve token creation in the browser, then check
+the scopes again. An existing login can deploy Workers yet lack this grant,
+even when your account role is Super Administrator.
+
 Create `ci-token-policy.json` with the permission IDs for **Workers Editor**
 and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account ID:
 
@@ -76,11 +87,12 @@ only at creation; keep it in the shared password manager. The policy file
 contains IDs and permissions, not the token. Do not give the deployment token
 permission to create more tokens.
 
-If creation returns 403, `npx cf auth login --force` refreshes OAuth
-consent. If access is still denied, an account administrator must grant token
-provisioning and the requested product access, or create the token. The dashboard
-path is **Manage account → Account API tokens → Create Token** in the selected
-account. [Account token reference](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
+If creation still returns 403 with the required scope, check `npx cf auth whoami`:
+an API token from `CLOUDFLARE_API_TOKEN` or a dotenv file overrides the OAuth
+login. Confirm the selected account has the required role and product access;
+an administrator can grant missing permissions. Tokens can also be created at
+**Manage account → Account API tokens → Create Token** in the selected account.
+[Account token reference](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
 
 ## Run and inspect deployment
 
