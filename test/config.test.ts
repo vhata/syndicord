@@ -1,9 +1,32 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadConfig, webhookFingerprints } from '../src/config.ts';
+import {
+  loadConfig,
+  validateWebhooks,
+  webhookFingerprints,
+} from '../src/config.ts';
 
 const hook = 'https://discord.com/api/webhooks/123456/secret-token';
 const feeds = [{ url: 'https://example.com/feed', destinations: ['updates'] }];
+
+test('whole webhook maps validate every destination without needing feed configuration', () => {
+  assert.deepEqual(Object.keys(validateWebhooks({})), []);
+  assert.equal(validateWebhooks({ updates: `${hook}/` }).updates, hook);
+  for (const value of [
+    null,
+    [],
+    { 'bad name': hook },
+    { updates: hook, other: `${hook}/` },
+    { updates: 'https://invalid.example/private-token' },
+    JSON.parse('{"__proto__":"private-token"}'),
+  ]) {
+    assert.throws(
+      () => validateWebhooks(value),
+      (error: unknown) =>
+        error instanceof Error && !error.message.includes('private-token'),
+    );
+  }
+});
 
 test('configuration normalizes URLs, supports threads, and ignores unused secrets', () => {
   const config = loadConfig(

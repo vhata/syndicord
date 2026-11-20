@@ -70,10 +70,29 @@ function webhookUrl(value: unknown): string {
   return url.href;
 }
 
+export function validateWebhooks(value: unknown): Record<string, string> {
+  if (!record(value)) throw new Error('WEBHOOKS must be a JSON object');
+  const webhooks: Record<string, string> = Object.create(null);
+  const used = new Set<string>();
+  for (const [name, raw] of Object.entries(value)) {
+    if (!NAME.test(name)) {
+      throw new Error(
+        'Destination names must be letters, digits, underscores or hyphens, starting with a letter',
+      );
+    }
+    const url = webhookUrl(raw);
+    if (used.has(url))
+      throw new Error('Each destination must have a distinct webhook URL');
+    used.add(url);
+    webhooks[name] = url;
+  }
+  return webhooks;
+}
+
 export function loadFeeds(feeds: unknown): FeedRoute[] {
   if (!Array.isArray(feeds) || feeds.length > MAX_ROUTES) {
     throw new Error(
-      `feeds.json must be an array with at most ${MAX_ROUTES} feeds`,
+      `Feed configuration must be an array with at most ${MAX_ROUTES} feeds`,
     );
   }
   const routes: FeedRoute[] = [];
