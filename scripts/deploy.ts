@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadFeeds } from '../src/config.ts';
 
 type Environment = Record<string, string | undefined>;
 type Run = (command: string, args: string[], capture?: boolean) => string;
@@ -31,6 +32,7 @@ function configuration(env: Environment) {
   const repository = required(env, 'GITHUB_REPOSITORY');
   const account = required(env, 'CLOUDFLARE_ACCOUNT_ID');
   const database = required(env, 'SYNDICORD_DATABASE_ID');
+  const worker = env.SYNDICORD_WORKER_NAME ?? 'syndicord';
   required(env, 'CLOUDFLARE_API_TOKEN');
   required(env, 'GITHUB_TOKEN');
   if (!SHA.test(sha) || !/^[\w.-]+\/[\w.-]+$/.test(repository)) {
@@ -44,7 +46,10 @@ function configuration(env: Environment) {
       'SYNDICORD_DATABASE_ID must identify the production database.',
     );
   }
-  return { sha, repository, database };
+  if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(worker)) {
+    throw new Error('SYNDICORD_WORKER_NAME must be a valid Worker name.');
+  }
+  return { sha, repository, database, worker };
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -97,7 +102,7 @@ export async function deploy(options: {
   report: (message: string) => void;
 }): Promise<'deployed' | 'superseded'> {
   const { env, run, main, report } = options;
-  const { sha, database } = configuration(env);
+  const { sha, database, worker } = configuration(env);
   if (run('git', ['rev-parse', 'HEAD'], true).trim() !== sha) {
     throw new Error('The checkout does not match the commit checked by CI.');
   }
@@ -120,13 +125,13 @@ export async function deploy(options: {
   };
   if (!(await fresh())) return 'superseded';
 
-  const secrets = json(['workers', 'secrets', 'list', '--worker', 'syndicord']);
+  const secrets = json(['workers', 'secrets', 'list', '--worker', worker]);
   if (
     !Array.isArray(secrets) ||
     !secrets.some((secret) => record(secret)?.name === 'WEBHOOKS')
   ) {
     throw new Error(
-      'Set the WEBHOOKS secret on the syndicord Worker before deploying.',
+      'Set the WEBHOOKS secret on the selected Worker before deploying.',
     );
   }
 
@@ -146,12 +151,42 @@ export async function deploy(options: {
       'Database migrations are incomplete; Worker deployment stopped.',
     );
   }
+  const stored = json([
+    'd1',
+    'raw',
+    database,
+    '--sql',
+    'SELECT feeds FROM relay_configuration WHERE id = 1',
+  ]);
+  try {
+    const query =
+      Array.isArray(stored) && stored.length === 1 ? record(stored[0]) : null;
+    const result = record(query?.results);
+    const rows = result?.rows;
+    if (
+      query?.success !== true ||
+      !Array.isArray(result?.columns) ||
+      result.columns.length !== 1 ||
+      result.columns[0] !== 'feeds' ||
+      !Array.isArray(rows) ||
+      rows.length !== 1 ||
+      !Array.isArray(rows[0]) ||
+      rows[0].length !== 1 ||
+      typeof rows[0][0] !== 'string'
+    )
+      throw new Error('Missing feed configuration');
+    loadFeeds(JSON.parse(rows[0][0]));
+  } catch {
+    throw new Error(
+      'Configure feeds in the selected D1 database with syndicord feeds set before deploying. The running Worker has not been replaced.',
+    );
+  }
   if (!(await fresh(true))) return 'superseded';
   const message = `syndicord commit ${sha}`;
   run(cf, ['deploy', '--prebuilt', '--no-provision', '--message', message]);
 
   const history = record(
-    json(['workers', 'deployments', 'list', '--worker', 'syndicord']),
+    json(['workers', 'deployments', 'list', '--worker', worker]),
   );
   const latest = Array.isArray(history?.deployments)
     ? record(history.deployments[0])
@@ -172,7 +207,7 @@ export async function deploy(options: {
     );
   }
   const version = record(
-    json(['workers', 'versions', 'get', versionId, '--worker', 'syndicord']),
+    json(['workers', 'versions', 'get', versionId, '--worker', worker]),
   );
   if (record(version?.annotations)?.['workers/message'] !== message) {
     throw new Error(
