@@ -118,9 +118,12 @@ an administrator can grant missing permissions. Tokens can also be created at
 [Account token reference](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
 
 Error 1001 naming **Workers Editor** means the policy asks for a permission that
-this CLI cannot obtain through OAuth. Use the **Workers Scripts Write** policy
-above if its broader access is acceptable, or create the Editor token through
-the dashboard. Enabling **API Tokens Write** does not resolve this mismatch.
+this CLI cannot obtain through OAuth. If the broader CLI permission is acceptable,
+replace the Workers Editor ID `d7ba8d4dce414197a3efab21b2f87eb8` in your policy
+with the Workers Scripts Write ID `e086da7e2179491d91ee5f35b3ca210a`. Keep the
+D1 Write entry `09b2857d1c31407795e75e3fed8617a1` and your account ID unchanged.
+Alternatively, create the Editor token through the dashboard. Enabling
+**API Tokens Write** does not resolve this mismatch.
 
 ## Run and inspect deployment
 
