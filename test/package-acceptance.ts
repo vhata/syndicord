@@ -6,6 +6,7 @@ import {
   mkdtemp,
   mkdir,
   readFile,
+  readdir,
   rm,
   symlink,
   writeFile,
@@ -14,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL, URL } from 'node:url';
 import test from 'node:test';
+import { isolatedGitEnvironment } from './helpers/git-environment.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
@@ -25,7 +27,7 @@ test(
       join(tmpdir(), 'syndicord package acceptance '),
     );
     const environment = {
-      ...process.env,
+      ...isolatedGitEnvironment(process.env),
       CF_SEND_TELEMETRY: 'false',
       CI: 'true',
       WRANGLER_SEND_METRICS: 'false',
@@ -264,12 +266,12 @@ test(
 );
 
 test(
-  'normal npm Git installation builds the CLI and runs without a retained checkout',
+  'normal npm Git installation isolates caller Git state and runs without a retained checkout',
   { timeout: 240_000 },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), 'syndicord git install '));
-    const environment = {
-      ...process.env,
+    let environment: NodeJS.ProcessEnv = {
+      ...isolatedGitEnvironment(process.env),
       CI: 'true',
       HUSKY: '0',
       CF_SEND_TELEMETRY: 'false',
@@ -300,7 +302,74 @@ test(
       );
       return result.stdout;
     };
+    const parent = join(directory, 'caller repository');
+    // Bootstrap and inspect the disposable parent independently of the helper
+    // under test, so a regression can never redirect these safety checks.
+    const bootstrap = Object.fromEntries(
+      Object.entries(environment).filter(([name]) => !name.startsWith('GIT_')),
+    );
+    const snapshot = async () => {
+      const paths = (await readdir(parent, { recursive: true }))
+        .filter((path) => path !== '.git' && !path.startsWith('.git/'))
+        .sort();
+      return {
+        head: run('git', ['rev-parse', 'HEAD'], parent, bootstrap),
+        index: await readFile(join(parent, '.git/index')),
+        config: await readFile(join(parent, '.git/config')),
+        files: await Promise.all(
+          paths.map(async (path) => [path, await readFile(join(parent, path))]),
+        ),
+      };
+    };
+    let before: Awaited<ReturnType<typeof snapshot>> | undefined;
     try {
+      await mkdir(parent);
+      run('git', ['init', '--initial-branch=main'], parent, bootstrap);
+      await writeFile(join(parent, 'original.txt'), 'committed\n');
+      run('git', ['add', '--all'], parent, bootstrap);
+      run(
+        'git',
+        [
+          '-c',
+          'core.hooksPath=/dev/null',
+          '-c',
+          'user.name=Package Test',
+          '-c',
+          'user.email=package-test@example.com',
+          'commit',
+          '-m',
+          'Disposable parent',
+        ],
+        parent,
+        bootstrap,
+      );
+      await writeFile(join(parent, 'original.txt'), 'staged\n');
+      run('git', ['add', '--all'], parent, bootstrap);
+      await writeFile(join(parent, 'original.txt'), 'unstaged\n');
+      await writeFile(join(parent, 'untracked.txt'), 'keep me\n');
+      before = await snapshot();
+      const inherited: NodeJS.ProcessEnv = {
+        ...environment,
+        GIT_DIR: join(parent, '.git'),
+        GIT_WORK_TREE: parent,
+        GIT_COMMON_DIR: join(parent, '.git'),
+        GIT_INDEX_FILE: join(parent, '.git/index'),
+        GIT_OBJECT_DIRECTORY: join(parent, '.git/objects'),
+        GIT_ALTERNATE_OBJECT_DIRECTORIES: join(parent, '.git/objects'),
+        GIT_CONFIG: join(parent, '.git/config'),
+        GIT_CONFIG_PARAMETERS: "'core.bare=true'",
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'core.worktree',
+        GIT_CONFIG_VALUE_0: parent,
+        GIT_PREFIX: 'caller/',
+      };
+      environment = isolatedGitEnvironment(inherited);
+      assert.equal(inherited.GIT_DIR, join(parent, '.git'));
+      assert.equal(environment.PATH, inherited.PATH);
+      assert.equal(
+        environment.CLOUDFLARE_API_TOKEN,
+        inherited.CLOUDFLARE_API_TOKEN,
+      );
       const fixture = join(directory, 'git source');
       const prefix = join(directory, 'installation');
       await mkdir(fixture);
@@ -321,6 +390,7 @@ test(
           recursive: true,
         });
       run('git', ['init', '--initial-branch=main'], fixture);
+      assert.equal((await lstat(join(fixture, '.git'))).isDirectory(), true);
       run('git', ['add', '--all'], fixture);
       run(
         'git',
@@ -378,7 +448,11 @@ test(
         /Validated package for Worker git-package-test/,
       );
     } finally {
-      await rm(directory, { recursive: true, force: true });
+      try {
+        if (before) assert.deepEqual(await snapshot(), before);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
     }
   },
 );
