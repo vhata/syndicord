@@ -47,21 +47,23 @@ Administrator), with the product permissions you want to grant.
 
 Choose one path:
 
-| Creation method  | Worker permission         | Scope of Worker access                                          |
-| ---------------- | ------------------------- | --------------------------------------------------------------- |
-| Dashboard        | **Workers Editor**        | Update and deploy existing Workers.                             |
-| CLI recipe below | **Workers Scripts Write** | Manage Worker scripts, including creating and deleting Workers. |
+| Creation method                            | Worker permission         | Scope of Worker access                                          |
+| ------------------------------------------ | ------------------------- | --------------------------------------------------------------- |
+| [Dashboard](#create-through-the-dashboard) | **Workers Editor**        | Update and deploy existing Workers.                             |
+| [CLI](#create-through-the-cli)             | **Workers Scripts Write** | Manage Worker scripts, including creating and deleting Workers. |
 
-For **Workers Editor**, open **Manage account → Account API tokens → Create
+### Create through the dashboard
+
+Open **Manage account → Account API tokens → Create
 Token**, select Workers **Editor** and D1 **Edit**, and limit the token to the
-deployment account. Save it with `gh secret set CLOUDFLARE_API_TOKEN --env production`,
-then continue to [run deployment](#run-and-inspect-deployment).
+deployment account. Create the token, copy its complete value, then continue to
+[store the token in GitHub](#store-the-token-in-github).
+
+### Create through the CLI
 
 The pinned CLI's OAuth scopes support **Workers Scripts Write**. Use the
 dashboard for the narrower **Workers Editor** permission.
 [Workers permission reference](https://developers.cloudflare.com/workers/authorization/workers/)
-
-### Create through the CLI
 
 Check the saved login before creating the token:
 
@@ -102,17 +104,27 @@ and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account I
 Both permissions apply across the selected account. The policy grants no zone
 access.
 
-Create the token and save it as the GitHub environment secret:
+Create the token:
 
 ```sh
 npx cf accounts tokens create --name syndicord-github --policies @ci-token-policy.json
-gh secret set CLOUDFLARE_API_TOKEN --env production
 ```
 
 In the JSON printed by `cf`, copy the complete `value` string (beginning with
-`cfat_`), without the surrounding quotes. Paste it into the hidden `gh` prompt
-and press Enter. Cloudflare shows this value only at creation; keep the same
-complete string in the shared password manager.
+`cfat_`), without the surrounding quotes.
+
+## Store the token in GitHub
+
+Whichever creation method you chose, save the token as the GitHub environment
+secret:
+
+```sh
+gh secret set CLOUDFLARE_API_TOKEN --env production
+```
+
+Paste the complete token into the hidden prompt and press Enter. Cloudflare
+shows the token only at creation; keep the same complete string in the shared
+password manager.
 
 ## Run and inspect deployment
 
