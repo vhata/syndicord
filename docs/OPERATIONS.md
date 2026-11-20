@@ -1,38 +1,25 @@
-# Configuration and operations
+# Feeds and webhooks
 
-## Feeds and destinations
+[First deployment](SETUP.md) · [Automatic deployment](DEPLOYMENT.md) ·
+[Troubleshooting](RECOVERY.md)
 
-`feeds.json` is bundled into the Worker. It contains the initial trial feed:
+## Where configuration lives
 
-```json
-[
-  {
-    "url": "https://github.com/vhata/syndicord/commits.atom",
-    "destinations": ["updates"]
-  }
-]
-```
+| Setting                         | Authoritative location                                                            |
+| ------------------------------- | --------------------------------------------------------------------------------- |
+| Feed URLs and destination names | `feeds.json` in Git                                                               |
+| Complete webhook mapping        | Shared password-manager item                                                      |
+| Runtime webhook URLs            | Cloudflare's encrypted `WEBHOOKS` secret                                          |
+| Deployment token                | GitHub `production` secret `CLOUDFLARE_API_TOKEN`                                 |
+| Account and database IDs        | GitHub `production` variables `CLOUDFLARE_ACCOUNT_ID` and `SYNDICORD_DATABASE_ID` |
 
-Each feed URL appears once and has one or more destination names. Names start
-with a letter and contain letters, digits, underscores, or hyphens. The limit
-is 20 feed/destination pairs. An empty array disables polling and delivery.
-Feed changes require a new build and deployment.
+CI preserves the hosted secret. Cloudflare does not return its value, so keep
+all destinations together in the shared password-manager item; another
+operator should be able to replace the mapping without your checkout.
 
-`WEBHOOKS` is a secret containing a JSON object mapping names to Discord webhook
-URLs. In the ignored `.dev.vars` file:
+## Add or change a feed
 
-```dotenv
-WEBHOOKS='{"updates":"https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN"}'
-```
-
-Replace the placeholders with the webhook copied from Discord. URLs must use
-`https://discord.com/api/webhooks/ID/TOKEN`; a numeric `thread_id` query parameter
-selects an existing thread. Each destination has a distinct webhook URL.
-Forum or media channels need that existing thread ID. Do not commit real URLs
-or put them in command-line arguments.
-
-To add feeds and destinations, extend `feeds.json` and the `WEBHOOKS` mapping.
-For example, this sends commits to `updates` and another feed to both channels:
+Edit `feeds.json`. Each feed appears once and lists its destination names:
 
 ```json
 [
@@ -47,138 +34,65 @@ For example, this sends commits to `updates` and another feed to both channels:
 ]
 ```
 
-Replace the example feed URL and add the second webhook to `.dev.vars`,
-preserving the existing `updates` value:
+Add any new webhook destinations first, then open a PR with the feed change.
+After checks pass and you merge, CI applies migrations and deploys the routing.
+CI cannot read hosted webhook values: every destination must already exist in
+`WEBHOOKS`.
 
-```dotenv
-WEBHOOKS='{"updates":"YOUR_EXISTING_WEBHOOK_URL","security":"YOUR_SECOND_WEBHOOK_URL"}'
+A new feed/destination pair silently records its current entries, then sends
+new ones. Removing a route stops delivery; restoring the same route resumes
+pending entries. Renaming a destination creates a new baseline. An empty array
+pauses polling and delivery.
+
+## Manage webhook destinations
+
+Create or select a Discord webhook under the channel's **Edit Channel →
+Integrations → Webhooks**. Update the complete mapping in the shared password
+manager, then copy it into a temporary `.webhooks.json` file (ignored by Git):
+
+```json
+{
+  "updates": "https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN",
+  "security": "https://discord.com/api/webhooks/OTHER_ID/OTHER_TOKEN"
+}
 ```
 
-Run `npm run check` and deploy with
-`npm run deploy -- --secrets-file .dev.vars`, using the existing exported
-database ID. Each new feed/destination pair records a silent baseline on its
-first successful poll. Keep existing destination names when changing a webhook;
-renaming a destination creates a new pair.
-
-Each cron invocation checks one feed and attempts at most five deliveries.
-Feeds rotate, including after fetch failures. With the default one-minute cron,
-N feeds are each checked about every N minutes. A run stops starting deliveries
-after its 30-second work budget; individual HTTP requests have six-second
-deadlines. Leases and per-destination cooldowns can delay work further.
-
-Feed responses are UTF-8 XML, at most 256 KiB and 200 entries. Redirects are
-limited to three and HTTPS downgrades are rejected. Malformed XML, unsupported
-document declarations, and oversized responses fail without changing a baseline.
-Identity records remain in D1 indefinitely; pending payloads are cleared after
-delivery. Monitor database growth for busy feeds.
-
-See [relay behavior](BEHAVIOR.md) for first-poll baselines, entry identity,
-configuration changes, and the possible duplicate after an ambiguous send.
-
-## First deployment
-
-These commands create or change metered Cloudflare resources. Confirm
-provisioning before running them, even when expected usage fits the free plan.
-The deployment needs one D1 database and one Worker with a cron trigger.
-
-1. Install this checkout's dependencies and hooks, then run the full checks:
-
-   ```sh
-   npm ci
-   npm run check
-   ```
-
-2. Populate `.dev.vars` with the destination webhooks.
-3. Sign in and create the database:
-
-   ```sh
-   npx cf auth login
-   npx cf d1 create --name syndicord
-   ```
-
-4. Export the database ID returned by that command and apply the schema:
-
-   ```sh
-   export SYNDICORD_DATABASE_ID='the-returned-database-uuid'
-   npx cf d1 migrations apply "$SYNDICORD_DATABASE_ID" --dir migrations
-   ```
-
-   This command targets the hosted database. The local development command
-   includes `--local` instead.
-
-5. Deploy the Worker and secret together:
-
-   ```sh
-   npm run deploy -- --secrets-file .dev.vars
-   ```
-
-   The deployment script requires an exported database ID and uses
-   `--no-provision`, so it does not automatically create resource bindings.
-   The local placeholder database ID is only for local development.
-   `workers.dev` and preview URLs are disabled.
-
-For later deployments, run `npm ci` after pulling dependency changes and
-`npm run check` before deploying. Use the same exported database ID and
-secret file. Apply new migrations before deploying code that depends on them.
-
-## Verify the trial
-
-Watch Worker logs:
+Replace the example URLs and retain every destination still used by
+`feeds.json`. Upload the secret while no GitHub deployment is running:
 
 ```sh
-npx cf observability tail --worker syndicord
+npx cf auth login
+export CLOUDFLARE_ACCOUNT_ID='your-account-id'
+npx cf workers secrets update WEBHOOKS --worker syndicord --type secret_text --text @.webhooks.json
 ```
 
-The first successful poll records current entries and sends nothing. Confirm
-`feed_checked` and `relay_complete` events, then wait for a new commit to the
-configured repository's default branch. That entry should produce one Discord
-message. Further polls should leave it unchanged. Check CPU time and invocation
-errors in Cloudflare's Worker metrics during the trial; local tests cannot prove
-that a particular feed fits the hosted runtime budget.
+The command replaces the entire `WEBHOOKS` value and activates it immediately;
+no code deployment or CI run is needed. Delete the temporary file afterwards.
+This file contains the JSON map itself; the initial deployment uses a dotenv
+file because its secrets-file option accepts several named secrets. For a new
+Worker, use the [initial deployment](SETUP.md) instead.
 
-Inspect delivery counts without reading message payloads:
+| Change               | Order                                                                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add a destination    | Add it to the shared mapping and hosted secret, then merge the feed change. Unused map entries are allowed.                                                      |
+| Rotate a webhook     | Replace its URL under the same destination name in both places. Pending deliveries keep their identities; the next poll clears suspension caused by the old URL. |
+| Remove a destination | Deploy its removal from `feeds.json`, then remove the mapping entry and retire the Discord webhook.                                                              |
 
-```sh
-npx cf d1 raw "$SYNDICORD_DATABASE_ID" --sql 'SELECT destination, state, COUNT(*) AS count FROM relay_deliveries GROUP BY destination, state'
-```
+Destination names start with a letter and contain letters, digits, underscores,
+or hyphens. Each needs a distinct webhook URL. A numeric `thread_id` query
+parameter selects an existing thread; forum/media channels require one.
 
-This is a hosted read. Add `--local` to inspect local development state.
+## Polling limits
 
-## Failures and recovery
+The default one-minute cron checks one feed and attempts at most five deliveries
+per run. With N feeds, each is checked about every N minutes. The limit is 20
+feed/destination pairs; a feed sent to two destinations uses two pairs.
 
-`feed_failed` identifies the feed by its zero-based index in `feeds.json` and a
-sanitized reason. Fetch and parse errors leave pending deliveries available.
-`relay_busy` means another invocation owns the lease. A terminated invocation's
-lease expires after two minutes.
+Runs stop starting deliveries after 30 seconds; HTTP requests have six-second
+deadlines. Leases, retries, and Discord cooldowns can delay work further. Feeds
+must be UTF-8 XML, at most 256 KiB and 200 entries, with at most three redirects
+and no HTTPS downgrade. Malformed or unsupported XML does not change a baseline.
 
-`delivery_deferred` identifies the destination and status. Retries use
-exponential backoff from one minute to six hours. A longer Discord retry delay
-takes precedence. Discord rate limits apply to the whole destination, or every
-destination when Discord reports a global limit.
-
-HTTP 401, 403, or 404 suspends a destination and produces
-`destination_suspended`. Correct or replace its webhook. A changed webhook URL
-clears suspension and its destination cooldown on the next poll; pending
-deliveries retain their retry times. If permissions were repaired without
-changing the URL, resume that destination with this SQL against the appropriate
-database, replacing `updates` with its name:
-
-```sql
-UPDATE relay_destinations
-SET suspended = 0, cooldown_until_ms = 0
-WHERE destination = 'updates';
-
-UPDATE relay_deliveries
-SET next_attempt_ms = 0
-WHERE destination = 'updates' AND state = 'pending';
-```
-
-Do not delete baseline or sent identity rows to retry a delivery: forgetting
-those identities can cause old entries to be sent again. Pending deliveries
-already retain the content needed to retry.
-
-## References
-
-- [Cloudflare deployment and secrets files](https://developers.cloudflare.com/cf/projects/#deploy)
-- [D1 transactional batches](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch)
-- [Workers limits and CPU metrics](https://developers.cloudflare.com/workers/platform/limits/)
+D1 retains entry identities indefinitely and clears pending payloads after
+successful delivery. Monitor database growth for busy feeds. See
+[relay behavior](BEHAVIOR.md) for identity and retry semantics.

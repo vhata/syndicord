@@ -7,7 +7,7 @@
 <p align="center"><strong>Your feeds. In the conversation.</strong><br>RSS and Atom updates, delivered to Discord.</p>
 
 <p align="center">
-  <a href="docs/OPERATIONS.md">Set up syndicord</a> ·
+  <a href="docs/SETUP.md">Set up syndicord</a> ·
   <a href="docs/BEHAVIOR.md">How delivery works</a> ·
   <a href="docs/DEVELOPMENT.md">Development</a>
 </p>
@@ -30,9 +30,10 @@ is stored in D1, so destinations can retry independently. Each scheduled run
 checks one feed and sends a bounded batch of pending entries.
 
 Configure feeds in `feeds.json` and keep Discord webhook URLs in the
-`WEBHOOKS` secret. See [configuration and operations](docs/OPERATIONS.md)
-for setup and deployment, and [relay behavior](docs/BEHAVIOR.md) for delivery
-semantics.
+`WEBHOOKS` secret. Start with [setup](docs/SETUP.md), then see
+[feeds and webhooks](docs/OPERATIONS.md) for routine changes and
+[automatic deployment](docs/DEPLOYMENT.md) for GitHub Actions. See
+[relay behavior](docs/BEHAVIOR.md) for delivery semantics.
 
 ## Development
 

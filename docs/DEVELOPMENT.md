@@ -115,7 +115,9 @@ The automated tests create their own databases and do not change this state.
 | `migrations/`          | D1 schema migrations                                    |
 | `cloudflare.config.ts` | Worker, bindings, schedule, and logging                 |
 
-See [operations](OPERATIONS.md) for configuration, deployment, and recovery.
+See [setup](SETUP.md) for the first hosted deployment,
+[operations](OPERATIONS.md) for feeds and webhooks, and
+[automatic deployment](DEPLOYMENT.md) for GitHub Actions.
 
 ## Tooling references
 

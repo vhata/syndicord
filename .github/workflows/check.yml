@@ -57,3 +57,62 @@ jobs:
 
       - name: Run all checks
         run: npm run check
+
+  deploy:
+    name: Deploy production
+    needs: check
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    concurrency:
+      group: syndicord-production
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    env:
+      SYNDICORD_DATABASE_ID: ${{ vars.SYNDICORD_DATABASE_ID }}
+    steps:
+      - name: Check out the checked commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Use the project npm version
+        run: |
+          project_npm="$(node -p 'require("./package.json").packageManager')"
+          if [[ ! "$project_npm" =~ ^npm@[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf '%s\n' 'package.json must pin an npm version in packageManager.' >&2
+            exit 1
+          fi
+          if [ "npm@$(npm --version)" != "$project_npm" ]; then
+            npm install --global "$project_npm" --ignore-scripts --no-audit --no-fund
+          fi
+          test "npm@$(npm --version)" = "$project_npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for the production database
+        run: |
+          : "${SYNDICORD_DATABASE_ID:?Set SYNDICORD_DATABASE_ID in the production environment}"
+          npm run build
+          npx --no-install cf deploy --prebuilt --no-provision --dry-run
+
+      - name: Apply migrations and deploy
+        run: node scripts/deploy.ts
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
