@@ -146,9 +146,12 @@ gh run watch RUN_ID --exit-status
 ```
 
 Confirm that **Check** and **Deploy production** succeed and the run summary
-records the expected commit and active Worker version. Subsequent pushes to `main` run
-the same checks, migrations, and deployment automatically; use the command above
-whenever you need another manual run. For a failed run:
+contains **Deployed commit** and **Worker version** for the expected deployment.
+If it says **Skipped** because `main` has advanced, inspect the newer run instead.
+
+Subsequent pushes to `main` run the same checks, migrations, and deployment
+automatically; use the command above whenever you need another manual run.
+For a failed run:
 
 ```sh
 gh run view RUN_ID --log-failed
