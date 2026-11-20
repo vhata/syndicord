@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { fileURLToPath, URL } from 'node:url';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import feeds from '../feeds.json' with { type: 'json' };
+import { applyTestMigrations } from './helpers/d1.ts';
 
 test('the cf-built Worker handles scheduled events with local D1 and mocked outbound HTTP', async () => {
   const names = [...new Set(feeds.flatMap((feed) => feed.destinations))];
@@ -53,17 +53,7 @@ test('the cf-built Worker handles scheduled events with local D1 and mocked outb
   );
   try {
     const db = await runtime.getD1Database('DB');
-    const migration = await readFile(
-      new URL('../migrations/0001_delivery_ledger.sql', import.meta.url),
-      'utf8',
-    );
-    await db.batch(
-      migration
-        .split(';')
-        .map((sql) => sql.trim())
-        .filter(Boolean)
-        .map((sql) => db.prepare(sql)),
-    );
+    await applyTestMigrations(db as unknown as D1Database);
     const trigger = async () => {
       const response = await runtime.dispatchFetch(
         'http://localhost/cdn-cgi/local/scheduled',

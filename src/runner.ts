@@ -56,6 +56,7 @@ export async function runRelay(
   const owner = options.owner ?? crypto.randomUUID();
   const ledger = new DeliveryLedger(db);
   let acquired = false;
+  let completed = false;
   try {
     const cursor = await ledger.acquire(owner);
     if (cursor === null) {
@@ -64,22 +65,26 @@ export async function runRelay(
       return report;
     }
     acquired = true;
+    const feedIndex = cursor % config.feeds.length;
+    const route = config.feeds[feedIndex]!;
     await ledger.syncDestinations(
       owner,
       await webhookFingerprints(config.webhooks),
+      route.url,
     );
-    const feedIndex = cursor % config.feeds.length;
-    const route = config.feeds[feedIndex]!;
     let parsed;
     try {
       const response = await fetchFeed(route.url, fetcher);
       parsed = await parseFeedDocument(response.text, response.url);
     } catch (error) {
       report.feedErrors++;
+      const reason =
+        error instanceof FeedFetchError ? error.reason : 'parse_error';
+      await ledger.feedFailed(owner, route.url, reason);
       log({
         event: 'feed_failed',
         feedIndex,
-        reason: error instanceof FeedFetchError ? error.reason : 'parse_error',
+        reason,
       });
     }
     if (parsed) {
@@ -160,7 +165,7 @@ export async function runRelay(
         }
       }
     }
-    log({ event: 'relay_complete', count: report.sent });
+    completed = true;
     return report;
   } catch (error) {
     if (error instanceof LostLeaseError) {
@@ -172,7 +177,10 @@ export async function runRelay(
   } finally {
     if (acquired) {
       try {
-        await ledger.release(owner);
+        await ledger.release(owner, completed);
+        if (completed) {
+          log({ event: 'relay_complete', count: report.sent });
+        }
       } catch {
         // oxlint-disable-next-line no-unsafe-finally -- A failed lease release must reject even a successful run, with a sanitized error.
         throw new Error('Relay lease release failed');

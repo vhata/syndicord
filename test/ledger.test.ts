@@ -58,6 +58,7 @@ beforeEach(async () => {
       'relay_deliveries',
       'relay_routes',
       'relay_destinations',
+      'relay_feed_health',
       'relay_lease',
     ].map((table) => db.prepare(`DELETE FROM ${table}`)),
   );
