@@ -89,8 +89,12 @@ export function buildMessage(
   embeds: DiscordEmbed[];
   allowed_mentions: { parse: string[] };
 } {
-  const sourceUrl = messageLink(feedUrl);
-  const sourceHost = sourceUrl ? new URL(sourceUrl).hostname : '';
+  const configuredFeedUrl = messageLink(feedUrl);
+  const source = configuredFeedUrl ? new URL(configuredFeedUrl) : null;
+  // Feed paths and query strings can grant access. Link to the public origin
+  // without changing the full URL used for polling and delivery identity.
+  const sourceUrl = source ? source.origin + '/' : null;
+  const sourceHost = source?.hostname ?? '';
   const sourceName = displayText(sourceHost, 200, false);
   const feedTitle = displayText(
     entry.feedTitle || sourceHost || 'Feed update',
@@ -106,7 +110,8 @@ export function buildMessage(
   if (sourceUrl) embed.author.url = sourceUrl;
   const description = excerpt(entry);
   if (description) embed.description = description;
-  const url = messageLink(entry.link) ?? sourceUrl;
+  const entryUrl = messageLink(entry.link);
+  const url = entryUrl && entryUrl !== configuredFeedUrl ? entryUrl : sourceUrl;
   if (url) embed.url = url;
   if (entry.publishedAt && Number.isFinite(Date.parse(entry.publishedAt))) {
     embed.timestamp = new Date(entry.publishedAt).toISOString();
