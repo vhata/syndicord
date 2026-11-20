@@ -1,6 +1,6 @@
 [
   {
-    "url": "https://github.com/vhata/syndicord/commits.atom",
-    "destinations": ["updates"]
+    "url": "https://radar.cloudflare.com/zero-wire/feed?format=atom",
+    "destinations": ["insecurity"]
   }
 ]
