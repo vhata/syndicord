@@ -11,6 +11,8 @@ coverage/
 .env*
 !.env.example
 .webhooks.json
+.feeds*.json
+syndicord-*.tgz
 
 *.log
 .DS_Store

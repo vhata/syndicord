@@ -12,7 +12,8 @@ npm ci
 npm run check
 ```
 
-`npm ci` installs the pinned dependencies and Git hooks for this checkout. Run
+`npm ci` installs the pinned dependencies, builds the CLI and Worker, and
+installs Git hooks for this checkout. Run
 it after cloning and after pulling changes to `package.json` or
 `package-lock.json`. Linked worktrees each need their own installation.
 
@@ -57,6 +58,11 @@ TypeScript compiler.
 
 GitHub Actions runs `npm ci` and the full `npm run check` on pull requests and
 pushes to `main`. It can also be started manually from the Actions tab.
+CI also runs `npm run test:package` to verify npm installation with production
+dependencies in a temporary directory and exercise the installed CLI, local D1,
+and deployment dry-runs. This check needs npm registry access but no Cloudflare
+credentials. It does not run in commit hooks.
+
 The workflow uses the Node version in `.node-version` and the npm version in
 `package.json`, with cached npm downloads. Superseded PR runs are cancelled;
 each push to `main` is checked. Hooks are disabled in CI, which runs the
@@ -73,11 +79,13 @@ interrupted run may retain a `lint-staged automatic backup` in `git stash list`.
 cp .dev.vars.example .dev.vars
 ```
 
-Edit `.dev.vars` with the real Discord webhook URLs for the destination names
-in `feeds.json`. Keep that file private. Then:
+Copy `feeds.example.json` to `.feeds.json` and edit the sample routes. Edit
+`.dev.vars` with Discord webhook URLs for those destination names. Keep both
+files private, then load the routes into the local database:
 
 ```sh
 npm run db:migrate:local
+npm run syndicord -- feeds set --local --file .feeds.json
 npm run dev
 ```
 
@@ -101,6 +109,38 @@ Worker's HTTP handler returns 404.
 Local D1 state is under `.cloudflare/state/` and is separate from hosted state.
 The automated tests create their own databases and do not change this state.
 
+## CLI development and installation checks
+
+Run every operational command directly from the checkout:
+
+```sh
+npm run syndicord -- --help
+npm run syndicord -- status
+npm run deploy -- --dry-run
+```
+
+The repository's `.npmrc` sets `loglevel=silent` so npm script banners do not
+pollute JSON output. Commands still write their own output and errors and retain
+their exit status. To see npm's own diagnostics, override the setting for that
+invocation, for example `npm --loglevel=notice ci`.
+
+Deployment builds the current source before touching the hosted installation.
+It does not depend on a previously generated package or a globally installed
+CLI. `npm run status -- --remote` also remains available for existing scripts;
+that wrapper requires an explicit `--remote` or `--local` target.
+
+`npm run package` builds the distributable CLI and Worker under ignored `dist/`.
+The npm prepare lifecycle performs this build when installing from Git. It does
+nothing in a built npm package, which contains no source or development tools.
+The installed CLI uses its bundled Worker; source deployment always rebuilds.
+
+`npm run test:package` checks the installed form in disposable directories and
+cleans up its fixtures afterwards.
+No installation-specific identifiers, live feeds, secrets, or local state are
+included in the npm package. Registry publication is a separate release operation.
+
+See [setup](SETUP.md#optional-npm-installation) for normal npm installation from GitHub.
+
 ## Layout
 
 | Path                   | Purpose                                                 |
@@ -110,6 +150,8 @@ The automated tests create their own databases and do not change this state.
 | `src/discord.ts`       | Message formatting and confirmed webhook delivery       |
 | `src/ledger.ts`        | D1 baselines, pending deliveries, leases, and cooldowns |
 | `src/runner.ts`        | Bounded polling and delivery orchestration              |
+| `src/config-store.ts`  | Installation configuration in D1                        |
+| `cli/`                 | Installed command-line interface                        |
 | `src/index.ts`         | Scheduled Worker entrypoint                             |
 | `test/`                | Unit, D1 integration, and built-Worker tests            |
 | `migrations/`          | D1 schema migrations                                    |

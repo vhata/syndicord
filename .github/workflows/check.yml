@@ -58,6 +58,9 @@ jobs:
       - name: Run all checks
         run: npm run check
 
+      - name: Verify the installed package
+        run: npm run test:package
+
   deploy:
     name: Deploy production
     needs: check
@@ -75,6 +78,7 @@ jobs:
         shell: bash
     env:
       SYNDICORD_DATABASE_ID: ${{ vars.SYNDICORD_DATABASE_ID }}
+      SYNDICORD_WORKER_NAME: ${{ vars.SYNDICORD_WORKER_NAME || 'syndicord' }}
     steps:
       - name: Check out the checked commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -1,5 +1,5 @@
-import feeds from '../feeds.json' with { type: 'json' };
 import { loadConfig } from './config.ts';
+import { ConfigurationError, readFeeds } from './config-store.ts';
 import { runRelay } from './runner.ts';
 
 export interface WorkerEnv {
@@ -10,14 +10,16 @@ export interface WorkerEnv {
 export default {
   scheduled(_event, env, ctx) {
     ctx.waitUntil(
-      Promise.resolve()
-        .then(() => runRelay(loadConfig(feeds, env.WEBHOOKS), env.DB))
-        .catch(() => {
+      readFeeds(env.DB)
+        .then((feeds) => runRelay(loadConfig(feeds, env.WEBHOOKS), env.DB))
+        .catch((error: unknown) => {
           console.error(
             JSON.stringify({
               event: 'relay_failed',
               reason:
-                'Check configuration, database migration, and D1 availability',
+                error instanceof ConfigurationError
+                  ? error.message
+                  : 'Check configuration, database migration, and D1 availability',
             }),
           );
           throw new Error('Scheduled relay failed');

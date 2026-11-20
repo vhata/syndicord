@@ -1,4 +1,5 @@
 import type { FeedRoute } from './types.ts';
+import { parseStoredFeeds } from './config-store.ts';
 
 const NOW_MS = "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)";
 
@@ -8,21 +9,28 @@ export const STATUS_SCHEMA_SQL = `
       WHERE name IN ('last_started_ms', 'last_completed_ms', 'last_outcome')) AS run_columns,
     (SELECT COUNT(*) FROM pragma_table_info('relay_feed_health')
       WHERE name IN ('feed_url', 'last_attempt_ms', 'last_success_ms',
-        'last_failure_ms', 'last_error', 'consecutive_failures', 'entry_count')) AS feed_columns
+        'last_failure_ms', 'last_error', 'consecutive_failures', 'entry_count')) AS feed_columns,
+    (SELECT COUNT(*) FROM pragma_table_info('relay_configuration')
+      WHERE name IN ('id', 'feeds', 'updated_at_ms')) AS config_columns
 `;
 
-// Only aggregate counts and health metadata are selected. Payloads, webhook
-// fingerprints, and webhook URLs never enter the status response.
+// Configuration and health are read in one snapshot. Payloads, webhook
+// fingerprints, and webhook URLs never enter the query. Feed URLs are only
+// used internally to match routes; reports show their hostnames.
 export const STATUS_SQL = `
-  WITH active AS (
-    SELECT json_extract(value, '$.url') AS feed_url,
-      json_extract(value, '$.destination') AS destination
-    FROM json_each(?)
+  WITH configuration AS (
+    SELECT feeds FROM relay_configuration WHERE id = 1
+  ), active AS (
+    SELECT json_extract(route.value, '$.url') AS feed_url,
+      destination.value AS destination
+    FROM configuration, json_each(configuration.feeds) AS route,
+      json_each(json_extract(route.value, '$.destinations')) AS destination
   ), feeds AS (
     SELECT feed_url, COUNT(*) AS destination_count FROM active GROUP BY feed_url
   )
   SELECT json_object(
     'now_ms', ${NOW_MS},
+    'configuration', (SELECT feeds FROM configuration),
     'run', (SELECT json_object(
       'last_started_ms', last_started_ms,
       'last_completed_ms', last_completed_ms,
@@ -61,14 +69,6 @@ export const STATUS_SQL = `
   ) AS snapshot
 `;
 
-export function statusParameters(feeds: readonly FeedRoute[]): string {
-  return JSON.stringify(
-    feeds.flatMap((feed) =>
-      feed.destinations.map((destination) => ({ url: feed.url, destination })),
-    ),
-  );
-}
-
 interface FeedHealth {
   url: string;
   last_attempt_ms: number | null;
@@ -98,6 +98,7 @@ interface DestinationHealth {
 
 export interface StatusSnapshot {
   now_ms: number;
+  configuration: FeedRoute[];
   run: RunHealth | null;
   feeds: FeedHealth[];
   destinations: DestinationHealth[];
@@ -179,14 +180,14 @@ export function parseStatusSnapshot(value: unknown): StatusSnapshot {
     )
       throw new Error('Invalid status response.');
   }
-  return value as unknown as StatusSnapshot;
+  return {
+    ...value,
+    configuration: parseStoredFeeds(value.configuration),
+  } as unknown as StatusSnapshot;
 }
 
-export function summarizeStatus(
-  snapshot: StatusSnapshot,
-  routes: readonly FeedRoute[],
-  intervalMinutes = 1,
-) {
+export function summarizeStatus(snapshot: StatusSnapshot, intervalMinutes = 1) {
+  const routes = snapshot.configuration;
   if (
     !Number.isFinite(intervalMinutes) ||
     intervalMinutes <= 0 ||
@@ -203,7 +204,8 @@ export function summarizeStatus(
     const feed = snapshot.feeds.find(
       (candidate) => candidate.url === route.url,
     );
-    if (!feed) throw new Error('Status response does not match feeds.json.');
+    if (!feed)
+      throw new Error('Status response does not match D1 configuration.');
     let health: Health = 'healthy';
     if (feed.last_success_ms === null || feed.uninitialized > 0)
       health = 'unknown';
@@ -235,7 +237,7 @@ export function summarizeStatus(
       (candidate) => candidate.name === name,
     );
     if (!destination)
-      throw new Error('Status response does not match feeds.json.');
+      throw new Error('Status response does not match D1 configuration.');
     return {
       name,
       state: destination.suspended
@@ -277,7 +279,7 @@ export function summarizeStatus(
   return {
     health,
     observedAt: now,
-    scope: 'feeds.json in this checkout',
+    scope: 'configuration in selected D1 database',
     expectedPollIntervalMinutes: intervalMinutes,
     runStaleAfterMs: runStaleMs,
     feedStaleAfterMs: feedStaleMs,

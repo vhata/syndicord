@@ -1,32 +1,45 @@
 # Feeds and webhooks
 
-[First deployment](SETUP.md) · [Automatic deployment](DEPLOYMENT.md) ·
-[Troubleshooting](RECOVERY.md)
+[First deployment](SETUP.md) · [Status](STATUS.md) ·
+[Automatic deployment](DEPLOYMENT.md) · [Troubleshooting](RECOVERY.md)
 
-## Where configuration lives
+## Select an installation
 
-| Setting                         | Authoritative location                                                            |
-| ------------------------------- | --------------------------------------------------------------------------------- |
-| Feed URLs and destination names | `feeds.json` in Git                                                               |
-| Complete webhook mapping        | Shared password-manager item                                                      |
-| Runtime webhook URLs            | Cloudflare's encrypted `WEBHOOKS` secret                                          |
-| Deployment token                | GitHub `production` secret `CLOUDFLARE_API_TOKEN`                                 |
-| Account and database IDs        | GitHub `production` variables `CLOUDFLARE_ACCOUNT_ID` and `SYNDICORD_DATABASE_ID` |
+Run commands from your checkout. For the [npm-installed CLI](SETUP.md#optional-npm-installation),
+use `npx --no-install syndicord` from its installation directory instead of
+`npm run syndicord --`:
 
-CI preserves the hosted secret. Cloudflare does not return its value, so keep
-all destinations together in the shared password-manager item; another
-operator should be able to replace the mapping without your checkout.
+```sh
+export CLOUDFLARE_ACCOUNT_ID='your-account-id'
+export SYNDICORD_WORKER_NAME='syndicord'
+export SYNDICORD_DATABASE_ID='your-database-uuid'
+```
+
+Each independent installation has its own Worker and D1 database. Switching these
+identifiers selects another installation without changing the codebase.
+
+| Setting                                   | Authoritative location               |
+| ----------------------------------------- | ------------------------------------ |
+| Feed URLs, destination names, and routing | D1 `relay_configuration`             |
+| Destination webhook URLs                  | Worker's encrypted `WEBHOOKS` secret |
+| Baselines, pending deliveries, and health | D1 delivery ledger                   |
+
+Code deployments preserve this configuration. GitHub deployment credentials and
+resource identifiers only control where code is uploaded; GitHub is not required
+for the service to function.
 
 ## Add or change a feed
 
-Edit `feeds.json`. Each feed appears once and lists its destination names:
+Read the current configuration into a temporary file:
+
+```sh
+npm run syndicord -- feeds get > .feeds.json
+```
+
+Edit the file. Each feed appears once and lists its destination names:
 
 ```json
 [
-  {
-    "url": "https://github.com/vhata/syndicord/commits.atom",
-    "destinations": ["updates"]
-  },
   {
     "url": "https://example.com/feed.xml",
     "destinations": ["updates", "security"]
@@ -34,21 +47,34 @@ Edit `feeds.json`. Each feed appears once and lists its destination names:
 ]
 ```
 
-Add any new webhook destinations first, then open a PR with the feed change.
-After checks pass and you merge, CI applies migrations and deploys the routing.
-CI cannot read hosted webhook values: every destination must already exist in
-`WEBHOOKS`.
+Add any new webhook destinations first, then upload the complete feed list:
 
-A new feed/destination pair silently records its current entries, then sends
-new ones. Removing a route stops delivery; restoring the same route resumes
-pending entries. Renaming a destination creates a new baseline. An empty array
-pauses polling and delivery.
+```sh
+npm run syndicord -- feeds set --file .feeds.json
+npm run syndicord -- status
+```
 
-## Manage webhook destinations
+The command validates and atomically replaces D1 configuration. The next scheduled
+run reads it; no commit or deployment is needed. Coordinate edits with other
+operators: replacement uses the last submitted complete list. Delete the temporary
+file afterwards. Feed URLs may contain private query parameters, so treat exported
+configuration accordingly.
+
+New feed/destination pairs silently record their current entries, then send new
+ones. Removing a route stops future delivery attempts; restoring the same route
+resumes pending entries. Renaming a destination creates a new baseline. Store `[]`
+to pause polling and delivery. A run already in progress may finish using the
+configuration it read at its start.
+
+## Update webhooks without deploying
+
+Use this for an existing Worker with migrations applied and feed configuration
+stored in D1. The command updates its encrypted `WEBHOOKS` secret immediately
+without building or uploading code. It checks that the new mapping contains
+every destination used by the stored feeds.
 
 Create or select a Discord webhook under the channel's **Edit Channel →
-Integrations → Webhooks**. Update the complete mapping in the shared password
-manager, then copy it into a temporary `.webhooks.json` file (ignored by Git):
+Integrations → Webhooks**. Put the complete mapping in `.webhooks.json`:
 
 ```json
 {
@@ -57,26 +83,23 @@ manager, then copy it into a temporary `.webhooks.json` file (ignored by Git):
 }
 ```
 
-Replace the example URLs and retain every destination still used by
-`feeds.json`. Upload the secret while no GitHub deployment is running:
+Keep a backup in a shared password manager. Cloudflare does not return secret
+values, so include every destination still in use when replacing the map. Upload
+it while no code deployment is running:
 
 ```sh
-npx cf auth login
-export CLOUDFLARE_ACCOUNT_ID='your-account-id'
-npx cf workers secrets update WEBHOOKS --worker syndicord --type secret_text --text @.webhooks.json
+npm run syndicord -- webhooks set --file .webhooks.json
 ```
 
-The command replaces the entire `WEBHOOKS` value and activates it immediately;
-no code deployment or CI run is needed. Delete the temporary file afterwards.
-This file contains the JSON map itself; the initial deployment uses a dotenv
-file because its secrets-file option accepts several named secrets. For a new
-Worker, use the [initial deployment](SETUP.md) instead.
+This replaces the **entire mapping**, including when adding or rotating a single
+webhook. Delete the temporary file afterwards. For a new Worker,
+use [first deployment](SETUP.md#configure-webhooks-and-deploy).
 
-| Change               | Order                                                                                                                                                            |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Add a destination    | Add it to the shared mapping and hosted secret, then merge the feed change. Unused map entries are allowed.                                                      |
-| Rotate a webhook     | Replace its URL under the same destination name in both places. Pending deliveries keep their identities; the next poll clears suspension caused by the old URL. |
-| Remove a destination | Deploy its removal from `feeds.json`, then remove the mapping entry and retire the Discord webhook.                                                              |
+| Change               | Order                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add a destination    | Add its webhook to the hosted map, then update the feed list.                                                                                     |
+| Rotate a webhook     | Replace its URL under the same destination name. Pending deliveries keep their identities; the next poll clears suspension caused by the old URL. |
+| Remove a destination | Remove its routes from the feed list, allow any current run to finish, then remove the webhook from the map and retire it in Discord.             |
 
 Destination names start with a letter and contain letters, digits, underscores,
 or hyphens. Each needs a distinct webhook URL. A numeric `thread_id` query
