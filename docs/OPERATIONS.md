@@ -66,7 +66,12 @@ resumes pending entries. Renaming a destination creates a new baseline. Store `[
 to pause polling and delivery. A run already in progress may finish using the
 configuration it read at its start.
 
-## Manage webhook destinations
+## Update webhooks without deploying
+
+Use this for an existing Worker with migrations applied and feed configuration
+stored in D1. The command updates its encrypted `WEBHOOKS` secret immediately
+without building or uploading code. It checks that the new mapping contains
+every destination used by the stored feeds.
 
 Create or select a Discord webhook under the channel's **Edit Channel →
 Integrations → Webhooks**. Put the complete mapping in `.webhooks.json`:
@@ -86,8 +91,8 @@ it while no code deployment is running:
 npm run syndicord -- webhooks set --file .webhooks.json
 ```
 
-This replaces the complete hosted secret and activates it immediately. No code
-deployment is required. Delete the temporary file afterwards. For a new Worker,
+This replaces the **entire mapping**, including when adding or rotating a single
+webhook. Delete the temporary file afterwards. For a new Worker,
 use [first deployment](SETUP.md#configure-webhooks-and-deploy).
 
 | Change               | Order                                                                                                                                             |

@@ -96,6 +96,9 @@ never reads it. An explicit `[]` configures an installation with polling disable
 
 ## Configure webhooks and deploy
 
+For an existing Worker, [update webhooks without deploying](OPERATIONS.md#update-webhooks-without-deploying).
+The steps below create the Worker with its initial webhook secret.
+
 Create a webhook in Discord under the channel's **Edit Channel → Integrations →
 Webhooks**. Create `.webhooks.json` with the complete destination mapping:
 

@@ -34,9 +34,10 @@ Worker's encrypted `WEBHOOKS` secret. Run the CLI directly from the repository
 or install it through npm to manage an installation without a checkout. The same code can serve separate
 accounts or Workers, each with its own database and configuration.
 
-Start with [setup](docs/SETUP.md), then see
-[feeds and webhooks](docs/OPERATIONS.md) for routine changes and
-[optional automatic deployment](docs/DEPLOYMENT.md) for GitHub Actions. See
+Start with [setup](docs/SETUP.md). For routine changes,
+[add or change feeds](docs/OPERATIONS.md#add-or-change-a-feed) or
+[update webhooks without deploying](docs/OPERATIONS.md#update-webhooks-without-deploying).
+See [optional automatic deployment](docs/DEPLOYMENT.md) for GitHub Actions and
 [relay behavior](docs/BEHAVIOR.md) for delivery semantics.
 
 Use the [operational status command](docs/STATUS.md) to inspect feed health,
