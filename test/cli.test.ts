@@ -283,6 +283,9 @@ test('deployment migrates, checks hosted config, preserves secrets, and verifies
   const packageRoot = await artifact();
   const calls: string[][] = [];
   let message = '';
+  let historyReads = 0;
+  const waits: number[] = [];
+  const previousVersion = '11111111-4321-4321-4321-cba987654321';
   const cf: Cf = async (args) => {
     calls.push(args);
     if (args[0] === 'd1' && args[1] === 'migrations')
@@ -300,7 +303,10 @@ test('deployment migrates, checks hosted config, preserves secrets, and verifies
           {
             versions: [
               {
-                version_id: '87654321-4321-4321-4321-cba987654321',
+                version_id:
+                  historyReads++ === 0
+                    ? previousVersion
+                    : '87654321-4321-4321-4321-cba987654321',
                 percentage: 100,
               },
             ],
@@ -308,7 +314,12 @@ test('deployment migrates, checks hosted config, preserves secrets, and verifies
         ],
       });
     if (args[1] === 'versions')
-      return JSON.stringify({ annotations: { 'workers/message': message } });
+      return JSON.stringify({
+        annotations: {
+          'workers/message':
+            args[3] === previousVersion ? 'previous deployment' : message,
+        },
+      });
     throw new Error('unexpected command');
   };
   try {
@@ -316,8 +327,18 @@ test('deployment migrates, checks hosted config, preserves secrets, and verifies
       cf,
       packageRoot,
       sourceCheckout: false,
+      wait: async (milliseconds) => {
+        waits.push(milliseconds);
+      },
     });
     assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(waits, [2_000]);
+    assert.equal(calls.filter((args) => args[0] === 'deploy').length, 1);
+    assert.equal(
+      calls.filter((args) => args[1] === 'migrations' && args[2] === 'apply')
+        .length,
+      1,
+    );
     assert.match(result.stdout, /Worker version:/);
     assert.deepEqual(
       calls.slice(0, 3).map((args) => args.slice(0, 3)),
@@ -428,6 +449,7 @@ test('first deployment uploads a validated secret through a private temporary fi
 test('an ambiguous upload result is not retried or reported as a verified deployment', async () => {
   const packageRoot = await artifact();
   let uploads = 0;
+  const waits: number[] = [];
   const cf: Cf = async (args) => {
     if (args[1] === 'migrations') return args[2] === 'list' ? '[]' : '';
     if (args[0] === 'd1') return raw([[JSON.stringify(feeds)]]);
@@ -454,9 +476,13 @@ test('an ambiguous upload result is not retried or reported as a verified deploy
       cf,
       packageRoot,
       sourceCheckout: false,
+      wait: async (milliseconds) => {
+        waits.push(milliseconds);
+      },
     });
     assert.equal(result.code, 2);
     assert.equal(uploads, 1);
+    assert.deepEqual(waits, Array(5).fill(2_000));
     assert.match(result.stderr, /active Worker version could not be verified/);
   } finally {
     await rm(packageRoot, { recursive: true, force: true });

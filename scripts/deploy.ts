@@ -3,6 +3,7 @@ import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseStoredFeeds } from '../src/config-store.ts';
+import { verifyDeployment } from '../cli/verify-deployment.ts';
 
 type Environment = Record<string, string | undefined>;
 type Run = (command: string, args: string[], capture?: boolean) => string;
@@ -100,6 +101,7 @@ export async function deploy(options: {
   run: Run;
   main: () => Promise<string>;
   report: (message: string) => void;
+  wait?: (milliseconds: number) => Promise<void>;
 }): Promise<'deployed' | 'superseded'> {
   const { env, run, main, report } = options;
   const { sha, database, worker } = configuration(env);
@@ -185,35 +187,7 @@ export async function deploy(options: {
   const message = `syndicord commit ${sha}`;
   run(cf, ['deploy', '--prebuilt', '--no-provision', '--message', message]);
 
-  const history = record(
-    json(['workers', 'deployments', 'list', '--worker', worker]),
-  );
-  const latest = Array.isArray(history?.deployments)
-    ? record(history.deployments[0])
-    : null;
-  const versions = latest?.versions;
-  const active =
-    Array.isArray(versions) && versions.length === 1
-      ? record(versions[0])
-      : null;
-  const versionId = active?.version_id;
-  if (
-    active?.percentage !== 100 ||
-    typeof versionId !== 'string' ||
-    !UUID.test(versionId)
-  ) {
-    throw new Error(
-      'Deployment outcome is unknown; inspect Cloudflare before retrying.',
-    );
-  }
-  const version = record(
-    json(['workers', 'versions', 'get', versionId, '--worker', worker]),
-  );
-  if (record(version?.annotations)?.['workers/message'] !== message) {
-    throw new Error(
-      'Active Worker version does not match this commit; inspect Cloudflare before retrying.',
-    );
-  }
+  const versionId = await verifyDeployment(json, worker, message, options.wait);
   report(`Deployed commit ${sha}\n\nWorker version: ${versionId}`);
   return 'deployed';
 }

@@ -39,6 +39,7 @@ interface Dependencies {
   readInput?: (path: string) => Promise<unknown>;
   packageRoot?: string;
   sourceCheckout?: boolean;
+  wait?: (milliseconds: number) => Promise<void>;
 }
 
 async function readInput(path: string): Promise<unknown> {
@@ -172,10 +173,16 @@ export async function runCli(
           await input(fileArgument(remaining, '--webhooks-file')),
         );
       return ok(
-        await deploy(cf, installation, packageRoot, {
-          ...options,
-          sourceCheckout: dependencies.sourceCheckout ?? SOURCE_CHECKOUT,
-        }),
+        await deploy(
+          cf,
+          installation,
+          packageRoot,
+          {
+            ...options,
+            sourceCheckout: dependencies.sourceCheckout ?? SOURCE_CHECKOUT,
+          },
+          dependencies.wait,
+        ),
       );
     }
     throw new Error(USAGE);

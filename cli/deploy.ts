@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { CONFIGURATION_SQL, parseStoredFeeds } from '../src/config-store.ts';
 import { loadConfig } from '../src/config.ts';
 import { query, rows, temporary, type Cf, type Target } from './cloudflare.ts';
+import { verifyDeployment } from './verify-deployment.ts';
 
 export async function storedFeeds(cf: Cf, installation: Target, local = false) {
   const result = rows(
@@ -101,6 +102,7 @@ export async function deploy(
     webhooks?: Record<string, string>;
     sourceCheckout?: boolean;
   },
+  wait?: (milliseconds: number) => Promise<void>,
 ): Promise<string> {
   let artifact = join(packageRoot, 'dist/worker/v1');
   if (options.sourceCheckout) {
@@ -170,46 +172,12 @@ export async function deploy(
     await cf(args, { cwd });
     if (options.dryRun)
       return `Validated ${options.sourceCheckout ? 'source' : 'package'} for Worker ${installation.worker}; no Cloudflare resources changed.`;
-    let versionId: string;
-    try {
-      const history = JSON.parse(
-        await cf(
-          ['workers', 'deployments', 'list', '--worker', installation.worker],
-          { cwd },
-        ),
-      );
-      const active = history.deployments?.[0]?.versions;
-      if (
-        !Array.isArray(active) ||
-        active.length !== 1 ||
-        active[0]?.percentage !== 100 ||
-        typeof active[0]?.version_id !== 'string' ||
-        !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(
-          active[0].version_id,
-        )
-      )
-        throw new Error();
-      versionId = active[0].version_id;
-      const serving = JSON.parse(
-        await cf(
-          [
-            'workers',
-            'versions',
-            'get',
-            versionId,
-            '--worker',
-            installation.worker,
-          ],
-          { cwd },
-        ),
-      );
-      if (serving.annotations?.['workers/message'] !== message)
-        throw new Error();
-    } catch {
-      throw new Error(
-        'Upload finished but the active Worker version could not be verified. Inspect Cloudflare before retrying.',
-      );
-    }
+    const versionId = await verifyDeployment(
+      async (args) => JSON.parse(await cf(args, { cwd })),
+      installation.worker,
+      message,
+      wait,
+    );
     return `Deployed syndicord ${version} to ${installation.worker}. Worker version: ${versionId}`;
   });
 }

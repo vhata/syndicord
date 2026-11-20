@@ -66,12 +66,29 @@ old entries again. Pending records already retain the content needed to retry.
 
 ## Failed deployment
 
+After uploading, both the CLI and CI check the active version up to six times,
+waiting two seconds between checks while Cloudflare's metadata catches up. These
+checks only read metadata; they never repeat the upload or migrations. If
+verification still fails, the error includes the last observed version ID when
+available, without printing remote annotations or secret values.
+
 If an upload or readback was ambiguous, inspect the active deployment before
 retrying; uploading can succeed before a later step fails:
 
 ```sh
 npm run syndicord -- cf workers deployments list --worker "$SYNDICORD_WORKER_NAME"
 ```
+
+Take the `version_id` from the latest deployment, then inspect its annotation:
+
+```sh
+npm run syndicord -- cf workers versions get VERSION_ID --worker "$SYNDICORD_WORKER_NAME"
+```
+
+For CI, `annotations["workers/message"]` should be `syndicord commit` followed
+by the run's full commit SHA. The latest deployment must route 100% of traffic
+to that version. A successful upload followed by failed verification does not
+mean the previous code is still running.
 
 Check the reported error and `npm run syndicord -- feeds get`. Missing
 configuration must be supplied before upload; see [upgrading](UPGRADING.md) for
