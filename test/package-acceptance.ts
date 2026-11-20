@@ -139,6 +139,7 @@ test(
           'utf8',
         ),
       );
+      run('npm', ['run', 'prepare'], packageRoot);
       assert.equal(packaged.env.DB.id, '00000000-0000-4000-8000-000000000001');
       assert.equal(packaged.name, 'syndicord');
       assert.deepEqual(packaged.env.WEBHOOKS, { type: 'secret' });
