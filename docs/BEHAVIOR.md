@@ -4,16 +4,16 @@ Each configured RSS or Atom feed has one or more named Discord destinations.
 Webhook URLs are secrets. Each new entry produces one message per destination,
 containing the original title, link, and a short description.
 
-Messages show the feed name above a linked entry title, with a teal accent
-and a source footer. A missing feed name falls back to the feed's hostname.
-The description preserves paragraph breaks and shows up to three paragraphs
-within a 700-character excerpt. A repeated opening title is removed when it
-forms a complete paragraph; ordinary prose beginning with the same words is
-preserved. Long excerpts end with an ellipsis. The entry's publication time
-appears when the feed provides a valid date.
+Messages show the feed name above a linked entry title, with a teal accent and a
+source footer. A missing feed name falls back to the feed's hostname. The
+description preserves paragraph breaks and shows up to three paragraphs within a
+700-character excerpt. A repeated opening title is removed when it forms a
+complete paragraph; ordinary prose beginning with the same words is preserved.
+Long excerpts end with an ellipsis. The entry's publication time appears when
+the feed provides a valid date.
 
-Feed HTML is reduced to text and message mentions are disabled. Feed names
-are stored with pending entries so retries retain their source attribution.
+Feed HTML is reduced to text and message mentions are disabled. Feed names are
+stored with pending entries so retries retain their source attribution.
 
 The first successful poll of a feed/destination pair records its existing
 entries without sending them. A successful empty feed also establishes this
@@ -22,13 +22,13 @@ destination gets its own baseline.
 
 Entry identity uses the feed's stable ID, then its link, then a deterministic
 fingerprint of its content. Identity is scoped to the full feed URL and the
-destination name. Dates do not determine whether an entry is new. Changes to
-an entry with the same identity do not send another message.
+destination name. Dates do not determine whether an entry is new. Changes to an
+entry with the same identity do not send another message.
 
-Pending deliveries retain their message data even after entries disappear
-from a feed. Destinations succeed and retry independently. Removed feeds and
-destinations stop receiving deliveries; restoring the same configuration
-resumes their pending deliveries. A renamed destination starts a new baseline.
+Pending deliveries retain their message data even after entries disappear from a
+feed. Destinations succeed and retry independently. Removed feeds and
+destinations stop receiving deliveries; restoring the same configuration resumes
+their pending deliveries. A renamed destination starts a new baseline.
 
 Invalid or inaccessible webhooks (HTTP 401, 403, or 404) suspend their
 destination. Replacing its webhook or explicitly resuming it restores delivery;

@@ -5,8 +5,9 @@
 
 ## Select an installation
 
-Run commands from your checkout. For the [npm-installed CLI](SETUP.md#optional-npm-installation),
-use `npx --no-install syndicord` from its installation directory instead of
+Run commands from your checkout. For the
+[npm-installed CLI](SETUP.md#optional-npm-installation), use
+`npx --no-install syndicord` from its installation directory instead of
 `npm run syndicord --`:
 
 ```sh
@@ -15,8 +16,8 @@ export SYNDICORD_WORKER_NAME='syndicord'
 export SYNDICORD_DATABASE_ID='your-database-uuid'
 ```
 
-Each independent installation has its own Worker and D1 database. Switching these
-identifiers selects another installation without changing the codebase.
+Each independent installation has its own Worker and D1 database. Switching
+these identifiers selects another installation without changing the codebase.
 
 | Setting                                   | Authoritative location               |
 | ----------------------------------------- | ------------------------------------ |
@@ -54,17 +55,17 @@ npm run syndicord -- feeds set --file .feeds.json
 npm run syndicord -- status
 ```
 
-The command validates and atomically replaces D1 configuration. The next scheduled
-run reads it; no commit or deployment is needed. Coordinate edits with other
-operators: replacement uses the last submitted complete list. Delete the temporary
-file afterwards. Feed URLs may contain private query parameters, so treat exported
-configuration accordingly.
+The command validates and atomically replaces D1 configuration. The next
+scheduled run reads it; no commit or deployment is needed. Coordinate edits with
+other operators: replacement uses the last submitted complete list. Delete the
+temporary file afterwards. Feed URLs may contain private query parameters, so
+treat exported configuration accordingly.
 
 New feed/destination pairs silently record their current entries, then send new
 ones. Removing a route stops future delivery attempts; restoring the same route
-resumes pending entries. Renaming a destination creates a new baseline. Store `[]`
-to pause polling and delivery. A run already in progress may finish using the
-configuration it read at its start.
+resumes pending entries. Renaming a destination creates a new baseline. Store
+`[]` to pause polling and delivery. A run already in progress may finish using
+the configuration it read at its start.
 
 ## Update webhooks without deploying
 
@@ -92,8 +93,8 @@ npm run syndicord -- webhooks set --file .webhooks.json
 ```
 
 This replaces the **entire mapping**, including when adding or rotating a single
-webhook. Delete the temporary file afterwards. For a new Worker,
-use [first deployment](SETUP.md#configure-webhooks-and-deploy).
+webhook. Delete the temporary file afterwards. For a new Worker, use
+[first deployment](SETUP.md#configure-webhooks-and-deploy).
 
 | Change               | Order                                                                                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |

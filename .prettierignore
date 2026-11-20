@@ -1,2 +1,8 @@
 # Generated dependency metadata.
 package-lock.json
+
+# Vendored Docket files must remain byte-identical to their source.
+docket/
+
+# Private review evidence and scratch fixtures.
+.docket/

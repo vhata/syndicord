@@ -1,5 +1,19 @@
 {
   "singleQuote": true,
   "trailingComma": "all",
-  "proseWrap": "preserve"
+  "proseWrap": "preserve",
+  "overrides": [
+    {
+      "files": ["**/*.md", "**/*.mdx"],
+      "options": {
+        "proseWrap": "always"
+      }
+    },
+    {
+      "files": ["AGENTS.md", "TODO.md", "review/**/*.md"],
+      "options": {
+        "proseWrap": "preserve"
+      }
+    }
+  ]
 }

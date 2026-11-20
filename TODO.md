@@ -1,12 +1,13 @@
 # TODO
 
+Ordinary follow-ups live here; promoted codebase-review findings live in
+[review/BACKLOG.md](review/BACKLOG.md). Follow the
+[queue guide](docket/TODO_GUIDE.md) when adding or claiming work.
+
 ## Needs triage
 
-### Unprioritized
+## Needs proof of concept
 
-- [TOOLING] `complete-docket-setup` — **Finish the repository's Docket setup.**
-  The installed contract references missing `scripts/check.sh`,
-  `scripts/setup.sh`, `docs/QUALITY.md`, and review files; its link check fails
-  on seven references already missing on `main`.
-  - Source: Cloudflare configuration implementation review, 2026-11-20
-  - Starting point: `AGENTS.md`, `docket/CONTRACT.md`, and the existing npm checks.
+## Waiting
+
+## Ready for separate work

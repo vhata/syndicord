@@ -16,23 +16,24 @@ syndicord is an RSS-to-Discord relay that runs on Cloudflare Workers. It polls
 feeds on a schedule and posts new entries to Discord through one or more
 webhooks.
 
-Each feed is mapped to its destinations: send a feed to a single channel,
-share it across several channels, or bring multiple feeds together in one
-channel. syndicord tracks delivered entries for each feed and destination
-to pick up new posts on the next poll.
+Each feed is mapped to its destinations: send a feed to a single channel, share
+it across several channels, or bring multiple feeds together in one channel.
+syndicord tracks delivered entries for each feed and destination to pick up new
+posts on the next poll.
 
-Messages carry titles, links, and descriptions from the feeds themselves,
-so readers can follow updates in Discord and open the original posts for
-the full story.
+Messages carry titles, links, and descriptions from the feeds themselves, so
+readers can follow updates in Discord and open the original posts for the full
+story.
 
-The first poll records a baseline without posting a backlog. Delivery state
-is stored in D1, so destinations can retry independently. Each scheduled run
-checks one feed and sends a bounded batch of pending entries.
+The first poll records a baseline without posting a backlog. Delivery state is
+stored in D1, so destinations can retry independently. Each scheduled run checks
+one feed and sends a bounded batch of pending entries.
 
 Feeds and routing live in Cloudflare D1; Discord webhook URLs live in the
 Worker's encrypted `WEBHOOKS` secret. Run the CLI directly from the repository
-or install it through npm to manage an installation without a checkout. The same code can serve separate
-accounts or Workers, each with its own database and configuration.
+or install it through npm to manage an installation without a checkout. The same
+code can serve separate accounts or Workers, each with its own database and
+configuration.
 
 Start with [setup](docs/SETUP.md). For routine changes,
 [add or change feeds](docs/OPERATIONS.md#add-or-change-a-feed) or

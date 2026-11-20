@@ -69,7 +69,7 @@ until the PR merges or the merge fails.
   `docs/specs/YYYY-MM-DD-<slug>.md`. These override other tools' default
   locations: directory names describe content, never its writing tool.
 - Before claiming anything run `bash docket/scripts/claim-check.sh
-<slug>` (branches, worktrees and available hosted claims), then
+  <slug>` (branches, worktrees and available hosted claims), then
   immediately run `bash docket/scripts/start-work.sh <queue> <slug>`. In
   local mode use local `main` as the base, even if stale remote-tracking
   refs remain.
@@ -137,7 +137,7 @@ until the PR merges or the merge fails.
   keep the approval in the state file. Rebase and revalidate if main
   moved; obtain approval for the resulting head before landing. Use
   `land-local.sh <branch> --title <title> --body <file> --approved-head
-<full-sha>` from a clean main checkout. It creates one squash commit
+  <full-sha>` from a clean main checkout. It creates one squash commit
   with the title and full description, never a merge commit. Its
   approval argument records a decision already given by the user, not
   permission for the agent to approve itself. If main lacks the helper

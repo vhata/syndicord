@@ -108,7 +108,7 @@ Triage runs when the user asks, when Needs triage holds more than about a dozen 
    [CONTRACT.md](CONTRACT.md#review-mode) specifies. With a non-PR
    remote use `--local` on claim/start helpers; no remote selects local
    mode automatically. Validate local markers with `--body <file> --base
-main --head HEAD --strict`.
+   main --head HEAD --strict`.
 5. In a sidecar the managed PR carries no marker: once it is open, add
    `PR: <repo>#<number>` to the entry in a direct commit to the
    sidecar's `main`, and push it (`start-work.sh` prints the line for
