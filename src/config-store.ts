@@ -21,10 +21,20 @@ export function parseStoredFeeds(value: unknown): FeedRoute[] {
   }
   try {
     if (typeof value !== 'string') throw new Error();
-    return loadFeeds(JSON.parse(value));
+    const raw: unknown = JSON.parse(value);
+    const feeds = loadFeeds(raw);
+    // Health queries join stored URLs to ledger identities in one SQL snapshot.
+    // Writers normalize before storing; reject direct edits that violate that
+    // invariant rather than letting polling and status use different identities.
+    if (
+      feeds.some((feed, index) => feed.url !== (raw as FeedRoute[])[index]?.url)
+    ) {
+      throw new Error();
+    }
+    return feeds;
   } catch {
     throw new ConfigurationError(
-      'Feed configuration in the selected D1 database is invalid.',
+      'Feed configuration in the selected D1 database is invalid. Save it again with syndicord feeds set.',
     );
   }
 }

@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fileURLToPath, URL } from 'node:url';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
-import feeds from '../feeds.json' with { type: 'json' };
+import { WRITE_CONFIGURATION_SQL } from '../src/config-store.ts';
+
+const feeds = [
+  { url: 'https://first.example/feed', destinations: ['updates'] },
+];
 import { applyTestMigrations } from './helpers/d1.ts';
 
 test('the cf-built Worker handles scheduled events with local D1 and mocked outbound HTTP', async () => {
@@ -13,7 +17,13 @@ test('the cf-built Worker handles scheduled events with local D1 and mocked outb
       `https://discord.com/api/webhooks/${1000 + index}/test-token`,
     ]),
   );
-  const feedUrls = new Set(feeds.map((feed) => feed.url));
+  webhooks.other = 'https://discord.com/api/webhooks/2000/other-token';
+  const next = [
+    { url: 'https://second.example/feed', destinations: ['other'] },
+  ];
+  const feedUrls = new Set([...feeds, ...next].map((feed) => feed.url));
+  const polled: string[] = [];
+  let newest = false;
   const expected = feeds.reduce(
     (total, feed) => total + feed.destinations.length,
     0,
@@ -36,8 +46,9 @@ test('the cf-built Worker handles scheduled events with local D1 and mocked outb
       bindings: { WEBHOOKS: JSON.stringify(webhooks) },
       outboundService: async (request) => {
         if (feedUrls.has(request.url)) {
+          polled.push(request.url);
           return new Response(
-            `<rss version="2.0"><channel><title>Test</title><item><guid>old</guid><title>Old</title></item>${updated ? '<item><guid>new</guid><title>New</title></item>' : ''}</channel></rss>`,
+            `<rss version="2.0"><channel><title>Test</title><item><guid>old</guid><title>Old</title></item>${updated ? '<item><guid>new</guid><title>New</title></item>' : ''}${newest ? '<item><guid>newest</guid><title>Newest</title></item>' : ''}</channel></rss>`,
           );
         }
         assert.ok(
@@ -54,6 +65,7 @@ test('the cf-built Worker handles scheduled events with local D1 and mocked outb
   try {
     const db = await runtime.getD1Database('DB');
     await applyTestMigrations(db as unknown as D1Database);
+    await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(feeds)).run();
     const trigger = async () => {
       const response = await runtime.dispatchFetch(
         'http://localhost/cdn-cgi/local/scheduled',
@@ -69,6 +81,41 @@ test('the cf-built Worker handles scheduled events with local D1 and mocked outb
     assert.equal(sent.length, expected);
     for (const _feed of feeds) await trigger();
     assert.equal(sent.length, expected);
+    await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(next)).run();
+    await trigger();
+    assert.equal(polled.at(-1), next[0]!.url);
+    assert.equal(
+      sent.length,
+      expected,
+      'a newly configured route gets a silent baseline',
+    );
+    newest = true;
+    await trigger();
+    assert.equal(
+      sent.length,
+      expected + 1,
+      'new configuration applies without rebuilding the Worker',
+    );
+    await db.prepare(WRITE_CONFIGURATION_SQL).bind('[]').run();
+    const pollCount = polled.length;
+    await trigger();
+    assert.equal(
+      polled.length,
+      pollCount,
+      'empty configuration pauses polling',
+    );
+    assert.equal(
+      sent.length,
+      expected + 1,
+      'empty configuration pauses delivery',
+    );
+    await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(next)).run();
+    await trigger();
+    assert.equal(
+      sent.length,
+      expected + 1,
+      'restoring a route preserves delivery history',
+    );
   } finally {
     await runtime.dispose();
   }

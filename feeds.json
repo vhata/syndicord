@@ -1,6 +1,0 @@
-[
-  {
-    "url": "https://radar.cloudflare.com/zero-wire/feed?format=atom",
-    "destinations": ["insecurity"]
-  }
-]
