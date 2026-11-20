@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+  cp,
+  lstat,
   mkdtemp,
   mkdir,
   readFile,
@@ -10,7 +12,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath, URL } from 'node:url';
+import { fileURLToPath, pathToFileURL, URL } from 'node:url';
 import test from 'node:test';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -52,6 +54,7 @@ test(
         timeout: 90_000,
         maxBuffer: 4 * 1024 * 1024,
       });
+
       assert.equal(
         result.status,
         options.status ?? 0,
@@ -253,6 +256,126 @@ test(
           ),
         ),
         routes[0],
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'normal npm Git installation builds the CLI and runs without a retained checkout',
+  { timeout: 240_000 },
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'syndicord git install '));
+    const environment = {
+      ...process.env,
+      CI: 'true',
+      HUSKY: '0',
+      CF_SEND_TELEMETRY: 'false',
+      WRANGLER_SEND_METRICS: 'false',
+      WRANGLER_LOG_PATH: join(directory, 'logs'),
+      CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32),
+      CLOUDFLARE_API_TOKEN: 'not-a-real-token-git-test',
+      SYNDICORD_DATABASE_ID: '12345678-1234-4234-8234-123456789abc',
+      SYNDICORD_WORKER_NAME: 'git-package-test',
+    };
+    const run = (
+      command: string,
+      args: string[],
+      cwd: string,
+      env: NodeJS.ProcessEnv = environment,
+    ) => {
+      const result = spawnSync(command, args, {
+        cwd,
+        env,
+        encoding: 'utf8',
+        timeout: 180_000,
+        maxBuffer: 8 * 1024 * 1024,
+      });
+      assert.equal(
+        result.status,
+        0,
+        `${command} ${args.join(' ')}\n${result.stdout}\n${result.stderr}`,
+      );
+      return result.stdout;
+    };
+    try {
+      const fixture = join(directory, 'git source');
+      const prefix = join(directory, 'installation');
+      await mkdir(fixture);
+      await mkdir(prefix);
+      for (const path of [
+        'src',
+        'cli',
+        'scripts',
+        'migrations',
+        '.husky',
+        '.gitignore',
+        'package.json',
+        'package-lock.json',
+        'tsconfig.json',
+        'cloudflare.config.ts',
+      ])
+        await cp(join(root, path), join(fixture, path), {
+          recursive: true,
+        });
+      run('git', ['init', '--initial-branch=main'], fixture);
+      run('git', ['add', '--all'], fixture);
+      run(
+        'git',
+        [
+          '-c',
+          'user.name=Package Test',
+          '-c',
+          'user.email=package-test@example.com',
+          'commit',
+          '-m',
+          'Package installation fixture',
+        ],
+        fixture,
+      );
+      const commit = run('git', ['rev-parse', 'HEAD'], fixture).trim();
+      run(
+        'npm',
+        [
+          'install',
+          '--no-audit',
+          '--no-fund',
+          `git+${pathToFileURL(fixture).href}#${commit}`,
+        ],
+        prefix,
+      );
+      const installed = join(prefix, 'node_modules/syndicord');
+      assert.equal((await lstat(installed)).isSymbolicLink(), false);
+      for (const path of ['src/index.ts', 'cli/index.ts', 'feeds.json'])
+        await assert.rejects(readFile(join(installed, path)));
+      for (const dependency of ['husky', 'typescript', 'esbuild', 'wrangler'])
+        for (const base of [prefix, installed])
+          await assert.rejects(
+            readFile(join(base, `node_modules/${dependency}/package.json`)),
+          );
+      await readFile(join(installed, 'dist/cli.js'));
+      await readFile(
+        join(installed, 'dist/worker/v1/workers/default/bundle/index.js'),
+      );
+      await rm(fixture, { recursive: true, force: true });
+      assert.match(
+        run('npx', ['--no-install', 'syndicord', '--help'], prefix),
+        /Usage: syndicord/,
+      );
+      const runtimeBin = join(directory, 'runtime-bin');
+      await mkdir(runtimeBin);
+      await symlink(process.execPath, join(runtimeBin, 'node'));
+      const runtimeEnvironment = { ...environment, PATH: runtimeBin };
+      const executable = join(prefix, 'node_modules/.bin/syndicord');
+      assert.match(
+        run(executable, ['--help'], directory, runtimeEnvironment),
+        /Usage: syndicord/,
+      );
+      assert.match(
+        run(executable, ['deploy', '--dry-run'], directory, runtimeEnvironment),
+        /Validated package for Worker git-package-test/,
       );
     } finally {
       await rm(directory, { recursive: true, force: true });

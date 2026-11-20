@@ -18,7 +18,7 @@
     "format:check": "prettier --check \"**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,mdx,yaml,yml}\"",
     "lint": "oxlint --deny-warnings .",
     "lint:fix": "oxlint --fix --deny-warnings .",
-    "prepare": "test ! -e .git || husky",
+    "prepare": "node scripts/prepare.mjs",
     "status": "node scripts/status.ts",
     "types": "cf workers types",
     "build": "cf build",
@@ -28,7 +28,6 @@
     "test": "npm run build && node --test --test-concurrency=2 test/*.test.ts",
     "syndicord": "node cli/index.ts",
     "package": "npm run build && node scripts/build-package.ts",
-    "prepack": "npm run package",
     "test:package": "npm run package && node --test test/package-acceptance.ts"
   },
   "devDependencies": {
@@ -59,6 +58,7 @@
   },
   "files": [
     "dist/",
+    "scripts/prepare.mjs",
     "migrations/",
     "feeds.example.json",
     "docs/",
