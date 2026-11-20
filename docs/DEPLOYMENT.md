@@ -35,18 +35,37 @@ private repositories. [GitHub environment reference](https://docs.github.com/en/
 
 ## Create the Cloudflare token
 
-The pinned `cf` CLI can create an account-owned API token using your Cloudflare
-login. Your account membership needs **API Token Provisioning** (or Super
-Administrator), and your login must permit token creation and the permissions
-being granted. [Cloudflare token provisioning](https://developers.cloudflare.com/changelog/post/2026-10-01-account-api-token-provisioning/)
+Your account membership needs **API Token Provisioning** (or Super
+Administrator), with the product permissions you want to grant. Choose one path:
+
+| Creation method  | Worker permission         | Scope of Worker access                                          |
+| ---------------- | ------------------------- | --------------------------------------------------------------- |
+| Dashboard        | **Workers Editor**        | Update and deploy existing Workers.                             |
+| CLI recipe below | **Workers Scripts Write** | Manage Worker scripts, including creating and deleting Workers. |
+
+For **Workers Editor**, open **Manage account → Account API tokens → Create
+Token**, select Workers **Editor** and D1 **Edit**, and limit the token to the
+deployment account. Save it with `gh secret set CLOUDFLARE_API_TOKEN --env production`,
+then continue to [run deployment](#run-and-inspect-deployment).
+
+The pinned `cf` 1.0.0-rc.1 can create tokens with **Workers Scripts Write**.
+It cannot request `workers-scripts.edit`, the OAuth scope needed to grant
+**Workers Editor**. These are different permissions; another login does not
+make the Editor policy work with this CLI version.
+[Workers permission reference](https://developers.cloudflare.com/workers/authorization/workers/)
+
+### Create through the CLI
 
 Check the saved login before creating the token:
 
 ```sh
 npx cf auth scopes --filter account_api_tokens
+npx cf auth scopes --filter workers-scripts.write
+npx cf auth scopes --filter d1.write
 ```
 
-It must include `account_api_tokens:create`. If it is missing, run
+These must show `account_api_tokens:create`, `workers-scripts.write`, and
+`d1.write`. If a grant is missing, run
 `npx cf auth login --force`. On the browser authorization page, open
 **Additional access → Sensitive scopes** and enable **Account API Token
 Provisioning**. **API Tokens Write** manages user-owned tokens and can remain
@@ -56,7 +75,7 @@ access enabled, complete authorization, then check the scopes again.
 This login consent is separate from your account role. An existing login can
 deploy Workers yet lack token-creation consent, even for a Super Administrator.
 
-Create `ci-token-policy.json` with the permission IDs for **Workers Editor**
+Create `ci-token-policy.json` with the permission IDs for **Workers Scripts Write**
 and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account ID:
 
 ```json
@@ -64,7 +83,7 @@ and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account I
   {
     "effect": "allow",
     "permission_groups": [
-      { "id": "d7ba8d4dce414197a3efab21b2f87eb8" },
+      { "id": "e086da7e2179491d91ee5f35b3ca210a" },
       { "id": "09b2857d1c31407795e75e3fed8617a1" }
     ],
     "resources": {
@@ -74,11 +93,10 @@ and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare account I
 ]
 ```
 
-This grants Worker updates and D1 migration access across that account; no zone
-permissions are needed. The dashboard calls the Workers role **Editor**, and
-D1 write access **Edit**. To look up permission IDs yourself, run
-`npx cf user tokens permission-groups list`.
-[Workers permission reference](https://developers.cloudflare.com/workers/authorization/workers/)
+This grants Worker script management and D1 migration access across that account;
+no zone permissions are needed. The policy uses the supported legacy Workers
+permission that matches the CLI's `workers-scripts.write` OAuth grant. To inspect
+permission IDs, run `npx cf user tokens permission-groups list`.
 
 Create the token and save it as the GitHub environment secret:
 
@@ -98,6 +116,11 @@ login. Confirm the selected account has the required role and product access;
 an administrator can grant missing permissions. Tokens can also be created at
 **Manage account → Account API tokens → Create Token** in the selected account.
 [Account token reference](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
+
+Error 1001 naming **Workers Editor** means the policy asks for a permission that
+this CLI cannot obtain through OAuth. Use the **Workers Scripts Write** policy
+above if its broader access is acceptable, or create the Editor token through
+the dashboard. Enabling **API Tokens Write** does not resolve this mismatch.
 
 ## Run and inspect deployment
 
