@@ -1,0 +1,77 @@
+[
+  {
+    "html": "Before<!-- hidden <p> -->after",
+    "description": "Beforeafter",
+    "id": "sha256:c6e48610a876996271090db05ac2237b1563871edc815e308e1db0ec29ae517a"
+  },
+  {
+    "html": "one<!-- unfinished <!-- more",
+    "description": "one<!-- unfinished <!-- more",
+    "id": "sha256:e9ff5d6137d9670224783c7e8bdda2ad580ee0b364d6dadd11a64aaf0c7fbe06"
+  },
+  {
+    "html": "<p>one<p title=\"<span>\">two</p>three",
+    "description": "one\n\n\">two\n\nthree",
+    "id": "sha256:ce322edf42907b2f173e26d88822f60db439c541112374749dad8ecfd066398e"
+  },
+  {
+    "html": "<span <p>one</p>>two",
+    "description": "two",
+    "id": "sha256:ed58054c5208b7dea181fa3aec173225b073b788c4c26501f23787b169bc86d2"
+  },
+  {
+    "html": "<script>hidden</script>Visible<style>hidden</style>",
+    "description": "Visible",
+    "id": "sha256:8baa5c6e65b4b76cb225c16f5ce7f4c26e714edf529525eb1dbf2707994bccdc"
+  },
+  {
+    "html": "<script>kept <style>hidden</style> visible",
+    "description": "kept visible",
+    "id": "sha256:7b71a225b79b6d85c9369f53fb751757f33f14c357d6cea2168b9b4ebf3c8ab8"
+  },
+  {
+    "html": "<script a<script b>hidden</script>tail",
+    "description": "tail",
+    "id": "sha256:33d3aacdc314b87fbf580a06fe6eac5a2e1be95ded25fa6ff799b0d96c360781"
+  },
+  {
+    "html": "<script <style>hidden</style>tail",
+    "description": "<script tail",
+    "id": "sha256:c4c5a2c6ee0936733daac0615c4c88e211519a1a5da047bb7f0f59e2b878932e"
+  },
+  {
+    "html": "<style>kept <script>hidden</script> visible",
+    "description": "kept visible",
+    "id": "sha256:7b71a225b79b6d85c9369f53fb751757f33f14c357d6cea2168b9b4ebf3c8ab8"
+  },
+  {
+    "html": "a<SCRIPT type=\"x\">hidden</sCrIpT  >b<STYLE>hidden</STYLE\n>c",
+    "description": "a b c",
+    "id": "sha256:3d68127e915c38cf40e6ef9620d9e09b8fe08c350ce3dd8a13062aa82ddf89f3"
+  },
+  {
+    "html": "a<scripture>text</scripture>b<style-name>hidden</style>c",
+    "description": "atextb c",
+    "id": "sha256:3e3dfd59b23f3944d1d078dd4601d1dfb2be7725ac9f38e2c457a4fc4c736664"
+  },
+  {
+    "html": "x<1>y</?>z<!thing>q<?pi>k<>r",
+    "description": "x<1>y</?>z<!thing>q<?pi>k<>r",
+    "id": "sha256:a0beaf7385032cf44fd25bd0ea155700960c2e416c52c1bb8a26d96d6c0e59e9"
+  },
+  {
+    "html": "before<!-- <script> --><script>hidden<!-- </script> --></script>after",
+    "description": "before after",
+    "id": "sha256:9a56a1f2ad3ad02f8beecc608a7c8d704cb0d600a99ab743c664de334471b277"
+  },
+  {
+    "html": "&lt;script&gt;literal&lt;/script&gt;<br />&copy;&#x1f680;",
+    "description": "<script>literal</script>\n\n©🚀",
+    "id": "sha256:c588b852b0a2ee4315aface0a813aca54e4b74dd277359c47ec244cd4724bd8d"
+  },
+  {
+    "html": "<a<a<a<a<a<a<a<a<a<a",
+    "description": "<a<a<a<a<a<a<a<a<a<a",
+    "id": "sha256:26e7d2f5d3904249363814fffcc981b436961bd8aae864228bda2c688501dbb2"
+  }
+]

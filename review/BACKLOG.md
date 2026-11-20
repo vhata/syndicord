@@ -16,11 +16,6 @@ they cover. Each finding maps to at most one entry. Follow the
 
 ## Unprioritized
 
-- [RELAY] `bound-feed-html-cleanup` — **Make feed HTML cleanup linear in input size.** Repeated unterminated tags consume quadratic CPU inside the existing feed-size bound.
-  - Source: [Full review, 2026-11-20](2026-11-20-1045-full.md), 2026-11-20
-  - Starting point: `src/feed.ts` (`text`) and `test/feed.test.ts`; use adversarial scaling cases while preserving stored fallback identities.
-  - Findings: `quadratic-feed-html-cleanup`
-
 - [RELAY] `normalize-atom-html-mime-content` — **Normalize Atom HTML content expressed with MIME types.** Valid content currently displays literal markup in Discord excerpts.
   - Source: [Full review, 2026-11-20](2026-11-20-1045-full.md), 2026-11-20
   - Starting point: `src/feed.ts` and `test/feed.test.ts`; cover `text/html`, `application/xhtml+xml`, and plain text while preserving existing fallback identities.

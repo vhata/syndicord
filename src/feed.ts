@@ -10,6 +10,69 @@ const MAX_LINK_LENGTH = 2_048;
 const MAX_TITLE_LENGTH = 512;
 const MAX_DESCRIPTION_LENGTH = 4_000;
 
+function stripComments(value: string): string {
+  const parts: string[] = [];
+  let cursor = 0;
+  for (let start = value.indexOf('<!--'); start !== -1;) {
+    const end = value.indexOf('-->', start + 4);
+    // Later openings cannot close either; retain the unfinished suffix.
+    if (end === -1) break;
+    parts.push(value.slice(cursor, start), ' ');
+    cursor = end + 3;
+    start = value.indexOf('<!--', cursor);
+  }
+  return parts.join('') + value.slice(cursor);
+}
+
+function stripScriptsAndStyles(value: string): string {
+  const parts: string[] = [];
+  const opening = /<(script|style)\b/gi;
+  // Each closing-tag search moves forward only. An unmatched opening must
+  // not cause the remainder to be searched again at every later opening.
+  const closing = (pattern: RegExp) => {
+    let next = pattern.exec(value);
+    return (after: number): number | null => {
+      while (next && next.index < after) next = pattern.exec(value);
+      return next ? next.index + next[0].length : null;
+    };
+  };
+  const scriptEnd = closing(/<\/script\s*>/gi);
+  const styleEnd = closing(/<\/style\s*>/gi);
+  let cursor = 0;
+  let tagEnd = -1;
+  for (let match = opening.exec(value); match; match = opening.exec(value)) {
+    // Several overlapping openings can share one '>'. Cache that search too.
+    if (tagEnd < opening.lastIndex)
+      tagEnd = value.indexOf('>', opening.lastIndex);
+    if (tagEnd === -1) break;
+    const end = (match[1]!.toLowerCase() === 'script' ? scriptEnd : styleEnd)(
+      tagEnd + 1,
+    );
+    if (end === null) continue;
+    parts.push(value.slice(cursor, match.index), ' ');
+    cursor = end;
+    opening.lastIndex = end;
+  }
+  return parts.join('') + value.slice(cursor);
+}
+
+function replaceTags(
+  value: string,
+  opening: RegExp,
+  replacement: string,
+): string {
+  const parts: string[] = [];
+  let cursor = 0;
+  for (let match = opening.exec(value); match; match = opening.exec(value)) {
+    const end = value.indexOf('>', opening.lastIndex);
+    if (end === -1) break;
+    parts.push(value.slice(cursor, match.index), replacement);
+    cursor = end + 1;
+    opening.lastIndex = cursor;
+  }
+  return parts.join('') + value.slice(cursor);
+}
+
 function text(
   value: string | undefined,
   html = true,
@@ -17,14 +80,15 @@ function text(
 ): string {
   let result = value ?? '';
   if (html) {
-    result = result
-      .replace(/<!--[\s\S]*?-->/g, ' ')
-      .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
-      .replace(
-        /<\/?(?:p|div|li|ul|ol|blockquote|br|hr|h[1-6]|tr|td)\b[^>]*>/gi,
-        paragraphs ? '\n\n' : ' ',
-      )
-      .replace(/<\/?[a-z][^>]*>/gi, '');
+    // Preserve the replacement order, including malformed markup: this text
+    // also contributes to stored fallback identities for entries without IDs.
+    result = stripScriptsAndStyles(stripComments(result));
+    result = replaceTags(
+      result,
+      /<\/?(?:p|div|li|ul|ol|blockquote|br|hr|h[1-6]|tr|td)\b/gi,
+      paragraphs ? '\n\n' : ' ',
+    );
+    result = replaceTags(result, /<\/?[a-z]/gi, '');
   }
   result = (html ? decodeHTMLStrict(result) : result)
     // oxlint-disable-next-line no-control-regex -- Strip non-printing controls from untrusted feed text.
