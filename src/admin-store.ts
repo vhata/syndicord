@@ -10,7 +10,6 @@ import type { FeedRoute } from './types.ts';
 
 export interface ConfigurationEnv {
   DB: D1Database;
-  WEBHOOKS?: string;
   CONFIG_ENCRYPTION_KEY?: string;
 }
 
@@ -104,25 +103,11 @@ async function open(value: string, key: CryptoKey) {
   }
 }
 
-function legacyWebhooks(secret: string | undefined): Record<string, string> {
-  try {
-    return validateWebhooks(secret === undefined ? {} : JSON.parse(secret));
-  } catch {
-    throw new ConfigurationError(
-      'WEBHOOKS must contain a valid mapping of destination names to Discord webhook URLs.',
-    );
-  }
-}
-
-async function revision(row: ConfigurationRow | null, fallback?: string) {
+async function revision(row: ConfigurationRow | null) {
   const digest = await crypto.subtle.digest(
     'SHA-256',
     encoder.encode(
-      JSON.stringify([
-        row?.feeds ?? null,
-        row?.encrypted_webhooks ?? null,
-        fallback ?? null,
-      ]),
+      JSON.stringify([row?.feeds ?? null, row?.encrypted_webhooks ?? null]),
     ),
   );
   return base64(new Uint8Array(digest));
@@ -138,15 +123,12 @@ async function snapshot(
   const webhooks =
     row?.encrypted_webhooks !== null && row?.encrypted_webhooks !== undefined
       ? await open(row.encrypted_webhooks, key)
-      : legacyWebhooks(env.WEBHOOKS);
+      : Object.create(null);
   return {
     row,
     feeds,
     webhooks,
-    revision: await revision(
-      row,
-      row?.encrypted_webhooks == null ? env.WEBHOOKS : undefined,
-    ),
+    revision: await revision(row),
   };
 }
 
@@ -208,7 +190,7 @@ export async function saveAdminConfiguration(
         );
     }
     webhooks = validateWebhooks(merged);
-    loadConfig(feeds, JSON.stringify(webhooks));
+    loadConfig(feeds, webhooks);
   } catch (error) {
     // These validators return fixed messages or already validated destination names.
     throw new AdminError(
@@ -262,11 +244,12 @@ export async function readRelayConfiguration(
   // One row read keeps routes and encrypted destinations from the same save.
   const row =
     await env.DB.prepare(READ_CONFIGURATION).first<ConfigurationRow>();
-  const feeds = parseStoredFeeds(row?.feeds);
-  if (row?.encrypted_webhooks === null) return loadConfig(feeds, env.WEBHOOKS);
+  if (row === null) return { feeds: [], webhooks: Object.create(null) };
+  const feeds = parseStoredFeeds(row.feeds);
+  if (row.encrypted_webhooks === null) return loadConfig(feeds, {});
   const webhooks = await open(
-    row!.encrypted_webhooks!,
+    row.encrypted_webhooks,
     await configurationKey(env.CONFIG_ENCRYPTION_KEY),
   );
-  return loadConfig(feeds, JSON.stringify(webhooks));
+  return loadConfig(feeds, webhooks);
 }

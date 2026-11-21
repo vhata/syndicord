@@ -5,7 +5,6 @@ import { runRelay } from './runner.ts';
 
 export interface WorkerEnv {
   DB: D1Database;
-  WEBHOOKS?: string;
   ADMIN_PASSWORD?: string;
   CONFIG_ENCRYPTION_KEY?: string;
 }

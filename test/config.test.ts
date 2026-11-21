@@ -28,11 +28,11 @@ test('whole webhook maps validate every destination without needing feed configu
   }
 });
 
-test('configuration normalizes URLs, supports threads, and ignores unused secrets', () => {
-  const config = loadConfig(
-    feeds,
-    JSON.stringify({ updates: `${hook}?thread_id=123`, retired: 'unused' }),
-  );
+test('configuration normalizes URLs, supports threads, and selects referenced webhooks', () => {
+  const config = loadConfig(feeds, {
+    updates: `${hook}?thread_id=123`,
+    retired: 'unused',
+  });
   assert.equal(config.feeds[0]?.url, 'https://example.com/feed');
   assert.equal(config.webhooks.updates, `${hook}?thread_id=123`);
   assert.equal(config.webhooks.retired, undefined);
@@ -50,17 +50,17 @@ test('configuration rejects missing, duplicate and malformed routing without rev
     [{ ...feeds[0], destinations: [] }],
     [{ ...feeds[0], typo: true }],
   ]) {
-    assert.throws(() => loadConfig(input, JSON.stringify({ updates: hook })));
+    assert.throws(() => loadConfig(input, { updates: hook }));
   }
   for (const secret of [
     undefined,
     'not-json',
-    '[]',
-    '{}',
-    JSON.stringify({
+    [],
+    {},
+    {
       updates: 'https://user:secret@discord.com/api/webhooks/1/token',
-    }),
-    JSON.stringify({ updates: 'https://evil.example/token' }),
+    },
+    { updates: 'https://evil.example/token' },
     JSON.stringify({ updates: `${hook}?thread_id=x` }),
     JSON.stringify({ updates: `${hook}?wait=false` }),
   ]) {
@@ -73,10 +73,10 @@ test('configuration rejects missing, duplicate and malformed routing without rev
     );
   }
   assert.throws(() =>
-    loadConfig(
-      [{ ...feeds[0], destinations: ['one', 'two'] }],
-      JSON.stringify({ one: hook, two: hook }),
-    ),
+    loadConfig([{ ...feeds[0], destinations: ['one', 'two'] }], {
+      one: hook,
+      two: hook,
+    }),
   );
   assert.throws(() =>
     loadConfig(
@@ -86,7 +86,7 @@ test('configuration rejects missing, duplicate and malformed routing without rev
           destinations: Array.from({ length: 21 }, (_, i) => `d${i}`),
         },
       ],
-      '{}',
+      {},
     ),
   );
 });
@@ -110,7 +110,7 @@ test('feed URL bounds apply after percent encoding', () => {
           destinations: ['updates'],
         },
       ],
-      JSON.stringify({ updates: hook }),
+      { updates: hook },
     ),
   );
 });

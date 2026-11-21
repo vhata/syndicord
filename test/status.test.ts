@@ -19,10 +19,9 @@ const routes = [
     destinations: ['updates'],
   },
 ];
-const config = loadConfig(
-  routes,
-  '{"updates":"https://discord.com/api/webhooks/123/webhook-token"}',
-);
+const config = loadConfig(routes, {
+  updates: 'https://discord.com/api/webhooks/123/webhook-token',
+});
 const emptyRss =
   '<rss version="2.0"><channel><title>News</title></channel></rss>';
 const quiet = () => {};

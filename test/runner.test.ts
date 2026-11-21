@@ -10,10 +10,10 @@ import { createTestDatabase } from './helpers/d1.ts';
 const feed = 'https://feeds.example/news';
 const hookA = 'https://discord.com/api/webhooks/123/token-a';
 const hookB = 'https://discord.com/api/webhooks/456/token-b';
-const config = loadConfig(
-  [{ url: feed, destinations: ['alpha', 'beta'] }],
-  JSON.stringify({ alpha: hookA, beta: hookB }),
-);
+const config = loadConfig([{ url: feed, destinations: ['alpha', 'beta'] }], {
+  alpha: hookA,
+  beta: hookB,
+});
 const rss = (ids: string[]) =>
   `<rss version="2.0"><channel><title>News</title>${ids.map((id) => `<item><guid isPermaLink="false">${id}</guid><title>${id}</title><link>https://example.com/${id}</link></item>`).join('')}</channel></rss>`;
 const quiet = () => {};
@@ -187,10 +187,10 @@ test('invalid webhooks are suspended until replacement and global rate limits bl
     posts.length = 0;
     await runRelay(config, db, { fetcher, log: quiet });
     assert.equal(posts.length, 0);
-    const changed = loadConfig(
-      config.feeds,
-      JSON.stringify({ alpha: `${hookA}replacement`, beta: hookB }),
-    );
+    const changed = loadConfig(config.feeds, {
+      alpha: `${hookA}replacement`,
+      beta: hookB,
+    });
     mode = 'global';
     await runRelay(changed, db, { fetcher, log: quiet });
     assert.equal(posts.length, 1);
@@ -261,7 +261,7 @@ test('feed rotation survives failures, invalid first polls do not baseline, and 
         { url: feed, destinations: ['alpha'] },
         { url: `${feed}/second`, destinations: ['alpha'] },
       ],
-      JSON.stringify({ alpha: hookA }),
+      { alpha: hookA },
     );
     const seen: string[] = [];
     let ids: string[] = [];

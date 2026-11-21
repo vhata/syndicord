@@ -188,14 +188,13 @@ test('configuration migration and bootstrap preserve existing baselines, sent hi
   }
 });
 
-test('scheduled handlers fail explicitly before polling when configuration is missing or invalid', async () => {
+test('scheduled handlers fail explicitly before polling when stored configuration is invalid', async () => {
   const { db, dispose } = await createTestDatabase();
   const logs: unknown[] = [];
   const original = console.error;
   console.error = (...values) => logs.push(...values);
   try {
     for (const stored of [
-      null,
       '[{"url":"https://private.example/?secret=hidden","destinations":[]}]',
       '[{"url":"https://EXAMPLE.com","destinations":["updates"]}]',
     ]) {
@@ -218,7 +217,6 @@ test('scheduled handlers fail explicitly before polling when configuration is mi
         0,
       );
     }
-    assert.match(JSON.stringify(logs), /configuration is missing/);
     assert.match(JSON.stringify(logs), /configuration.*invalid/);
     assert.ok(!JSON.stringify(logs).includes('secret=hidden'));
   } finally {

@@ -3,6 +3,11 @@ import test from 'node:test';
 import { fileURLToPath, URL } from 'node:url';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { WRITE_CONFIGURATION_SQL } from '../src/config-store.ts';
+import {
+  configurationKey,
+  readAdminConfiguration,
+  saveAdminConfiguration,
+} from '../src/admin-store.ts';
 
 const feeds = [
   { url: 'https://first.example/feed', destinations: ['updates'] },
@@ -43,7 +48,9 @@ test('the cf-built Worker handles scheduled events with local D1 and mocked outb
       cf: false,
       unsafeTriggerHandlers: true,
       d1Databases: { DB: 'syndicord-worker-test' },
-      bindings: { WEBHOOKS: JSON.stringify(webhooks) },
+      bindings: {
+        CONFIG_ENCRYPTION_KEY: Buffer.alloc(32, 6).toString('base64'),
+      },
       outboundService: async (request) => {
         if (feedUrls.has(request.url)) {
           polled.push(request.url);
@@ -65,7 +72,17 @@ test('the cf-built Worker handles scheduled events with local D1 and mocked outb
   try {
     const db = await runtime.getD1Database('DB');
     await applyTestMigrations(db as unknown as D1Database);
-    await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(feeds)).run();
+    const env = {
+      DB: db as unknown as D1Database,
+      CONFIG_ENCRYPTION_KEY: Buffer.alloc(32, 6).toString('base64'),
+    };
+    const cryptoKey = await configurationKey(env.CONFIG_ENCRYPTION_KEY);
+    const current = await readAdminConfiguration(env, cryptoKey);
+    await saveAdminConfiguration(env, cryptoKey, {
+      revision: current.revision,
+      feeds,
+      webhooks,
+    });
     const trigger = async () => {
       const response = await runtime.dispatchFetch(
         'http://localhost/cdn-cgi/local/scheduled',
@@ -143,9 +160,6 @@ test('the built web interface persists routes and encrypted webhooks used by the
       bindings: {
         ADMIN_PASSWORD: 'runtime-password',
         CONFIG_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString('base64'),
-        WEBHOOKS: JSON.stringify({
-          unused: 'https://discord.com/api/webhooks/8000/old-secret-token',
-        }),
       },
       outboundService: async (request) => {
         if (request.url === feedUrl)
@@ -190,18 +204,12 @@ test('the built web interface persists routes and encrypted webhooks used by the
       }),
     });
     assert.equal(saved.status, 200, await saved.clone().text());
-    assert.doesNotMatch(
-      await saved.text(),
-      /web-created-token|old-secret-token/,
-    );
+    assert.doesNotMatch(await saved.text(), /web-created-token/);
     const stored = await db
       .prepare('SELECT encrypted_webhooks FROM relay_configuration')
       .first<{ encrypted_webhooks: string }>();
     assert.match(stored!.encrypted_webhooks, /^v1\./);
-    assert.doesNotMatch(
-      stored!.encrypted_webhooks,
-      /web-created-token|old-secret-token/,
-    );
+    assert.doesNotMatch(stored!.encrypted_webhooks, /web-created-token/);
     const trigger = async () => {
       const response = await runtime.dispatchFetch(
         'http://localhost/cdn-cgi/local/scheduled',
@@ -234,7 +242,7 @@ test('the built web interface persists routes and encrypted webhooks used by the
     assert.deepEqual(configuration.feeds, [
       { url: feedUrl, destinations: ['news'] },
     ]);
-    assert.deepEqual(configuration.destinations, ['news', 'unused']);
+    assert.deepEqual(configuration.destinations, ['news']);
   } finally {
     await runtime.dispose();
   }

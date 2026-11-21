@@ -43,7 +43,6 @@ async function fixture() {
       DB: database.db,
       ADMIN_PASSWORD: password,
       CONFIG_ENCRYPTION_KEY: key,
-      WEBHOOKS: JSON.stringify({ updates: secret }),
     },
   };
 }
@@ -101,7 +100,7 @@ test('administration is disabled without a password and every page and API requi
   }
 });
 
-test('the first web save encrypts existing and new destinations atomically with feeds and leaves the ledger intact', async () => {
+test('an empty installation accepts encrypted configuration and leaves the ledger intact', async () => {
   const { env, db, dispose } = await fixture();
   try {
     const initial = (await (await handleAdmin(request(), env))!.json()) as {
@@ -110,7 +109,8 @@ test('the first web save encrypts existing and new destinations atomically with 
       destinations: string[];
     };
     assert.deepEqual(initial.feeds, []);
-    assert.deepEqual(initial.destinations, ['updates']);
+    assert.deepEqual(initial.destinations, []);
+    assert.deepEqual((await readRelayConfiguration({ DB: db })).feeds, []);
     assert.doesNotMatch(
       JSON.stringify(initial),
       /private-webhook-token|discord.com/,
@@ -122,7 +122,11 @@ test('the first web save encrypts existing and new destinations atomically with 
       .bind(feeds[0]!.url)
       .run();
     const response = (await handleAdmin(
-      put({ revision: initial.revision, feeds, webhooks: { other } }),
+      put({
+        revision: initial.revision,
+        feeds,
+        webhooks: { updates: secret, other },
+      }),
       env,
     ))!;
     assert.equal(response.status, 200, await response.clone().text());
@@ -154,7 +158,6 @@ test('the first web save encrypts existing and new destinations atomically with 
     assert.equal((await readRelayConfiguration(env)).webhooks.updates, secret);
     const changedEnvironment = {
       ...env,
-      WEBHOOKS: JSON.stringify({ updates: other }),
       ADMIN_PASSWORD: 'rotated-password',
     };
     assert.equal(
@@ -192,7 +195,7 @@ test('webhook rotation, destination removal, and route edits preserve unedited s
     current = await saveAdminConfiguration(env, cryptoKey, {
       revision: current.revision,
       feeds,
-      webhooks: { unused: other },
+      webhooks: { updates: secret, unused: other },
     });
     for (const invalid of [
       { feeds, webhooks: { updates: null } },
@@ -246,7 +249,7 @@ test('webhook rotation, destination removal, and route edits preserve unedited s
   }
 });
 
-test('stale tabs, CLI feed edits, and concurrent first writes cannot overwrite newer configuration', async () => {
+test('stale tabs, direct database edits, and concurrent first writes cannot overwrite newer configuration', async () => {
   const { env, db, dispose } = await fixture();
   try {
     const cryptoKey = await configurationKey(key);
@@ -257,7 +260,7 @@ test('stale tabs, CLI feed edits, and concurrent first writes cannot overwrite n
           put({
             revision: initial.revision,
             feeds,
-            webhooks: { added: value },
+            webhooks: { updates: secret, added: value },
           }),
           env,
         ),
@@ -298,28 +301,6 @@ test('stale tabs, CLI feed edits, and concurrent first writes cannot overwrite n
     assert.deepEqual(
       concurrent.map((response) => response!.status).sort(),
       [200, 409],
-    );
-  } finally {
-    await dispose();
-  }
-});
-
-test('a Worker secret change invalidates a pre-adoption browser revision', async () => {
-  const { env, db, dispose } = await fixture();
-  try {
-    await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(feeds)).run();
-    const cryptoKey = await configurationKey(key);
-    const initial = await readAdminConfiguration(env, cryptoKey);
-    const response = (await handleAdmin(
-      put({ revision: initial.revision, feeds, webhooks: {} }),
-      { ...env, WEBHOOKS: JSON.stringify({ updates: other }) },
-    ))!;
-    assert.equal(response.status, 409);
-    assert.equal(
-      (await db
-        .prepare('SELECT encrypted_webhooks FROM relay_configuration')
-        .first<{ encrypted_webhooks: string | null }>())!.encrypted_webhooks,
-      null,
     );
   } finally {
     await dispose();
@@ -383,7 +364,7 @@ test('mutations require a same-origin JSON request and enforce the body limit be
   }
 });
 
-test('corrupt encrypted configuration fails closed without reverting to the Worker secret', async () => {
+test('corrupt encrypted configuration fails closed without exposing the stored value', async () => {
   const { env, db, dispose } = await fixture();
   try {
     await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(feeds)).run();
@@ -406,7 +387,7 @@ test('corrupt encrypted configuration fails closed without reverting to the Work
   }
 });
 
-test('a CLI write during a web save is detected by the database compare-and-swap', async () => {
+test('a database write during a configuration save is detected by the database compare-and-swap', async () => {
   const { env, db, dispose } = await fixture();
   try {
     await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(feeds)).run();
@@ -435,7 +416,11 @@ test('a CLI write during a web save is detected by the database compare-and-swap
       },
     } as D1Database;
     const response = (await handleAdmin(
-      put({ revision: initial.revision, feeds, webhooks: { other } }),
+      put({
+        revision: initial.revision,
+        feeds,
+        webhooks: { updates: secret, other },
+      }),
       { ...env, DB: racingDb },
     ))!;
     assert.ok(injected);
