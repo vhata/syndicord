@@ -964,3 +964,139 @@ test('the authentication migration preserves saved feeds, encrypted webhooks, re
     await dispose();
   }
 });
+
+test('CLI form pages preserve same-origin POST Origin while OAuth redirects suppress referrers', async () => {
+  const { env, dispose } = await fixture();
+  try {
+    const started = (await handleAuth(post('/admin/auth/cli/start', {}), env))!;
+    const pending = (await started.json()) as {
+      requestId: string;
+      verificationUri: string;
+    };
+    const signedOut = (await handleAuth(
+      new Request(pending.verificationUri),
+      env,
+    ))!;
+    assert.equal(signedOut.headers.get('referrer-policy'), 'same-origin');
+    const login = await begin(env);
+    assert.equal(login.response.headers.get('referrer-policy'), 'no-referrer');
+    const { cookie, response } = await browserLogin(env);
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    const approval = (await handleAuth(
+      new Request(pending.verificationUri, { headers: { Cookie: cookie } }),
+      env,
+      discordFixture(),
+    ))!;
+    assert.equal(approval.headers.get('referrer-policy'), 'same-origin');
+    assert.match(await approval.text(), /method="post"/);
+  } finally {
+    await dispose();
+  }
+});
+
+test('CLI approval POST handles role removal, session expiry and Discord failures without a JSON dead end or forged denial', async () => {
+  const { env, db, dispose } = await fixture();
+  const options = {
+    roles: [TEST_ROLE_ID],
+    status: 200,
+    calls: [] as Request[],
+  };
+  const fetcher = discordFixture(options);
+  try {
+    for (const failure of ['role', 'expired', 'revoked', 'provider', 'rate']) {
+      options.roles = [TEST_ROLE_ID];
+      options.status = 200;
+      const pending = (await (await handleAuth(
+        post('/admin/auth/cli/start', {}),
+        env,
+        fetcher,
+      ))!.json()) as {
+        requestId: string;
+        secret: string;
+        verificationUri: string;
+      };
+      const { cookie } = await browserLogin(env, fetcher);
+      const page = (await handleAuth(
+        new Request(pending.verificationUri, { headers: { Cookie: cookie } }),
+        env,
+        fetcher,
+      ))!;
+      const approval = /name="approval" value="([A-Za-z0-9_-]+)"/.exec(
+        await page.text(),
+      )![1]!;
+      if (failure === 'role') options.roles = [];
+      if (failure === 'expired')
+        await db.prepare('UPDATE admin_sessions SET expires_at_ms = 0').run();
+      if (failure === 'revoked') options.status = 401;
+      if (failure === 'provider') options.status = 500;
+      if (failure === 'rate') options.status = 429;
+      const form = (nonce: string) =>
+        req('/admin/auth/cli/approve', {
+          method: 'POST',
+          headers: {
+            Origin: origin,
+            Cookie: cookie,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            requestId: pending.requestId,
+            approval: nonce,
+            decision: 'approve',
+          }),
+        });
+      const before = options.calls.length;
+      assert.equal(
+        (await handleAuth(form(oauth.generateRandomState()), env, fetcher))!
+          .status,
+        410,
+      );
+      assert.equal(
+        options.calls.length,
+        before,
+        'a forged form must not query Discord or cancel a terminal request',
+      );
+      assert.equal(
+        await db
+          .prepare('SELECT status FROM admin_cli_requests WHERE request_id = ?')
+          .bind(pending.requestId)
+          .first('status'),
+        'pending',
+      );
+      const result = (await handleAuth(form(approval), env, fetcher))!;
+      const expected =
+        failure === 'role'
+          ? 403
+          : failure === 'provider'
+            ? 503
+            : failure === 'rate'
+              ? 429
+              : 401;
+      assert.equal(result.status, expected);
+      assert.match(result.headers.get('content-type')!, /text\/html/);
+      assert.equal(result.headers.get('referrer-policy'), 'same-origin');
+      const html = await result.text();
+      assert.match(html, /Sign out/);
+      assert.match(
+        html,
+        failure === 'provider' || failure === 'rate'
+          ? /Try again/
+          : /Try another Discord account/,
+      );
+      assert.doesNotMatch(html, /private-discord/);
+      const poll = (await handleAuth(
+        post('/admin/auth/cli/poll', {
+          requestId: pending.requestId,
+          secret: pending.secret,
+        }),
+        env,
+        fetcher,
+      ))!;
+      assert.equal(
+        poll.status,
+        failure === 'provider' || failure === 'rate' ? 202 : 403,
+      );
+    }
+  } finally {
+    await dispose();
+  }
+});

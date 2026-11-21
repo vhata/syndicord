@@ -224,7 +224,8 @@ function response(
 ) {
   const result = new Response(body, { status, headers });
   result.headers.set('Cache-Control', 'no-store');
-  result.headers.set('Referrer-Policy', 'no-referrer');
+  if (!result.headers.has('Referrer-Policy'))
+    result.headers.set('Referrer-Policy', 'no-referrer');
   result.headers.set('X-Content-Type-Options', 'nosniff');
   return result;
 }
@@ -845,10 +846,40 @@ function cliPage(title: string, content: string, status = 200) {
     status,
     {
       'Content-Type': 'text/html; charset=utf-8',
+      // Native same-origin POST forms need a non-null Origin header. This
+      // still omits referrers when navigating from here to Discord.
+      'Referrer-Policy': 'same-origin',
       'Content-Security-Policy':
         "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     },
   );
+}
+
+async function cliAccessFailure(
+  error: unknown,
+  session: Session | null,
+  requestId: string,
+  env: AuthEnv,
+) {
+  if (!(error instanceof AuthError)) throw error;
+  const failed = error.status === 401 || error.status === 403;
+  if (failed)
+    await env.DB.prepare(
+      "UPDATE admin_cli_requests SET status = 'denied' WHERE request_id = ? AND status = 'pending'",
+    )
+      .bind(requestId)
+      .run();
+  const identity = session
+    ? `<p>Signed in as <strong>${escape(session.user_name)}</strong> (${escape(session.user_id)}).</p>`
+    : '';
+  const page = cliPage(
+    'CLI access unavailable',
+    `${identity}<p>${escape(error.message)}</p>${failed ? '<p>Run <code>syndicord login</code> again to start a new terminal request.</p><p><a href="/admin/auth/login">Try another Discord account</a></p>' : `<p><a href="/admin/auth/cli?request=${requestId}">Try again</a></p>`}<form action="/admin/auth/logout" method="post"><button>Sign out</button></form>`,
+    error.status,
+  );
+  if (error.retryAfter)
+    page.headers.set('Retry-After', String(error.retryAfter));
+  return page;
 }
 
 async function approveCliPage(
@@ -880,22 +911,7 @@ async function approveCliPage(
   try {
     await checkSession(session, env, config, fetcher);
   } catch (error) {
-    if (!(error instanceof AuthError)) throw error;
-    const failed = error.status === 401 || error.status === 403;
-    if (failed)
-      await env.DB.prepare(
-        "UPDATE admin_cli_requests SET status = 'denied' WHERE request_id = ? AND status = 'pending'",
-      )
-        .bind(requestId)
-        .run();
-    const page = cliPage(
-      'CLI access unavailable',
-      `<p>Signed in as <strong>${escape(session.user_name)}</strong> (${escape(session.user_id)}).</p><p>${escape(error.message)}</p>${failed ? '<p>Run <code>syndicord login</code> again to start a new terminal request.</p><p><a href="/admin/auth/login">Try another Discord account</a></p>' : `<p><a href="/admin/auth/cli?request=${requestId}">Try again</a></p>`}<form action="/admin/auth/logout" method="post"><button>Sign out</button></form>`,
-      error.status,
-    );
-    if (error.retryAfter)
-      page.headers.set('Retry-After', String(error.retryAfter));
-    return page;
+    return cliAccessFailure(error, session, requestId, env);
   }
   const approval = random();
   await env.DB.prepare(
@@ -937,10 +953,36 @@ async function approveCli(
     !['approve', 'deny'].includes(decision!)
   )
     throw new AuthError('Invalid CLI approval. Start again.', 400);
-  const session = await readSession(request, env, config);
-  if (session.kind !== 'browser')
+  const auth = credential(request, config);
+  if (auth?.kind !== 'browser')
     throw new AuthError('Approve CLI access in your browser.', 403);
-  await checkSession(session, env, config, fetcher);
+  const sessionHash = await digest(auth.token);
+  const approvalHash = await digest(approval);
+  // Validate the browser-bound form before a failed access check may deny a
+  // terminal request. A forged POST must not cancel someone else's login.
+  const validForm = await env.DB.prepare(
+    "SELECT request_id FROM admin_cli_requests WHERE request_id = ? AND approval_hash = ? AND approval_session_hash = ? AND status = 'pending' AND expires_at_ms > ? AND config_hash = ?",
+  )
+    .bind(
+      requestId,
+      approvalHash,
+      sessionHash,
+      Date.now(),
+      await configurationHash(config),
+    )
+    .first();
+  if (!validForm)
+    throw new AuthError(
+      'This CLI approval expired or was already used. Start again.',
+      410,
+    );
+  let session: Session | null = null;
+  try {
+    session = await readSession(request, env, config);
+    await checkSession(session, env, config, fetcher);
+  } catch (error) {
+    return cliAccessFailure(error, session, requestId, env);
+  }
   const result = await env.DB.prepare(
     "UPDATE admin_cli_requests SET status = ?, session_hash = ?, approval_hash = NULL WHERE request_id = ? AND approval_hash = ? AND approval_session_hash = ? AND status = 'pending' AND expires_at_ms > ? AND config_hash = ?",
   )
@@ -948,7 +990,7 @@ async function approveCli(
       decision === 'approve' ? 'approved' : 'denied',
       session.token_hash,
       requestId,
-      await digest(approval),
+      approvalHash,
       session.token_hash,
       Date.now(),
       await configurationHash(config),
