@@ -126,6 +126,7 @@ test('administration requires configured Discord OAuth and signed-out pages show
       const response = (await handleAdmin(new Request(origin + path)))!;
       assert.equal(response.status, 200);
       assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('referrer-policy'), 'same-origin');
       assert.equal(response.headers.get('www-authenticate'), null);
       const page = await response.text();
       assert.match(page, /Sign in with Discord/);
@@ -162,6 +163,7 @@ test('administration requires configured Discord OAuth and signed-out pages show
       ))!;
       assert.equal(response.status, 401);
       assert.match(response.headers.get('content-type')!, /application\/json/);
+      assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
       assert.doesNotMatch(
         await response.text(),
         /private-|test-client-secret|test-discord-access-token/,
@@ -184,8 +186,10 @@ test('administration requires configured Discord OAuth and signed-out pages show
     const redirect = (await handleAdmin(request('/')))!;
     assert.equal(redirect.status, 302);
     assert.equal(redirect.headers.get('location'), '/admin');
+    assert.equal(redirect.headers.get('referrer-policy'), 'no-referrer');
     const page = (await handleAdmin(request('/admin')))!;
     assert.equal(page.status, 200);
+    assert.equal(page.headers.get('referrer-policy'), 'same-origin');
     assert.match(
       page.headers.get('content-security-policy')!,
       /frame-ancestors 'none'/,
@@ -527,6 +531,69 @@ test('mutations require a same-origin JSON request and enforce the body limit be
     await dispose();
   }
 });
+
+test(
+  'configuration writes recheck access after a delayed body finishes',
+  { timeout: 10_000 },
+  async () => {
+    for (const revoked of ['role', 'session']) {
+      const { env, db, dispose, handleAdmin, request, setRoles } =
+        await fixture();
+      const reading = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      let pending: Promise<Response | null> | undefined;
+      try {
+        const cryptoKey = await configurationKey(key);
+        const before = await readAdminConfiguration(env, cryptoKey);
+        const bytes = new TextEncoder().encode(
+          JSON.stringify({
+            revision: before.revision,
+            feeds: [],
+            webhooks: { updates: secret },
+          }),
+        );
+        const stream = new ReadableStream<Uint8Array>(
+          {
+            async pull(controller) {
+              reading.resolve();
+              await release.promise;
+              controller.enqueue(bytes);
+              controller.close();
+            },
+          },
+          { highWaterMark: 0 },
+        );
+        const init = {
+          method: 'PUT',
+          headers: { Origin: origin, 'Content-Type': 'application/json' },
+          body: stream,
+          duplex: 'half',
+        };
+        pending = handleAdmin(request('/admin/api/config', init));
+        await Promise.race([
+          reading.promise,
+          pending.then(() => {
+            throw new Error('Request finished before reading its body');
+          }),
+        ]);
+        if (revoked === 'role') setRoles([]);
+        else
+          await db.prepare('UPDATE admin_sessions SET expires_at_ms = 0').run();
+        release.resolve();
+        const response = (await pending)!;
+        assert.equal(response.status, revoked === 'role' ? 403 : 401);
+        assert.equal(
+          (await readAdminConfiguration(env, cryptoKey)).revision,
+          before.revision,
+        );
+      } finally {
+        release.resolve();
+        await pending;
+        await dispose();
+      }
+    }
+  },
+);
 
 test('corrupt encrypted configuration fails closed without exposing the stored value', async () => {
   const { env, db, dispose, handleAdmin, request } = await fixture();

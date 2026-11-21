@@ -110,6 +110,8 @@ function html(
   );
   return response(render(nonce), status, {
     'Content-Type': 'text/html; charset=utf-8',
+    // Native same-origin form POSTs must retain their Origin for CSRF checks.
+    'Referrer-Policy': 'same-origin',
     'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
     ...extra,
   });
@@ -188,9 +190,10 @@ export async function handleAdmin(
           'Use application/json for configuration changes.',
           415,
         );
-      return json(
-        await saveAdminConfiguration(env, key, await readBody(request)),
-      );
+      const input = await readBody(request);
+      // Reading a streamed body can outlive the session or its Discord role.
+      await requireAdmin(request, env, fetcher);
+      return json(await saveAdminConfiguration(env, key, input));
     }
     return html((nonce) => renderAdminPage(nonce, user), 200);
   } catch (error) {
