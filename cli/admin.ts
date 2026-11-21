@@ -1,6 +1,7 @@
 import { loadFeeds } from '../src/config.ts';
 import type { FeedRoute } from '../src/types.ts';
 import type { Environment } from './cloudflare.ts';
+import { adminEndpoint, readAdminResponse, readSession } from './auth.ts';
 
 export type AdminFetch = (url: string, init: RequestInit) => Promise<Response>;
 export interface AdminSnapshot {
@@ -13,30 +14,6 @@ const MAX_BYTES = 128 * 1024;
 const TIMEOUT_MS = 10_000;
 const INVALID_RESPONSE =
   'The administration API returned an invalid response. Check SYNDICORD_ADMIN_URL and the Worker configuration.';
-
-function endpoint(env: Environment) {
-  const value = env.SYNDICORD_ADMIN_URL?.trim() ?? '';
-  try {
-    const url = new URL(value);
-    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-    if (
-      !/^https?:\/\/[^/?#]+\/?$/i.test(value) ||
-      value.includes('\\') ||
-      (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) ||
-      url.username ||
-      url.password ||
-      url.pathname !== '/' ||
-      url.search ||
-      url.hash
-    )
-      throw new Error();
-    return { origin: url.origin, url: new URL('/admin/api/config', url).href };
-  } catch {
-    throw new Error(
-      'SYNDICORD_ADMIN_URL must be an HTTPS origin without credentials, path, query, or fragment. HTTP is allowed for localhost, 127.0.0.1, or [::1]. See docs/WEB.md.',
-    );
-  }
-}
 
 function snapshot(value: unknown): AdminSnapshot {
   try {
@@ -66,59 +43,8 @@ function snapshot(value: unknown): AdminSnapshot {
   }
 }
 
-async function readResponse(
-  response: Response,
-  signal: AbortSignal,
-): Promise<unknown> {
-  if (
-    Number(response.headers.get('content-length')) > MAX_BYTES ||
-    !response.body
-  )
-    throw new Error(INVALID_RESPONSE);
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  const abort = () => {
-    void reader.cancel().catch(() => {});
-  };
-  signal.addEventListener('abort', abort, { once: true });
-  try {
-    while (true) {
-      if (signal.aborted) throw new Error(INVALID_RESPONSE);
-      const part = await reader.read();
-      if (signal.aborted) throw new Error(INVALID_RESPONSE);
-      if (part.done) break;
-      size += part.value.byteLength;
-      if (size > MAX_BYTES) throw new Error(INVALID_RESPONSE);
-      chunks.push(part.value);
-    }
-  } finally {
-    signal.removeEventListener('abort', abort);
-    await reader.cancel().catch(() => {});
-    reader.releaseLock();
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    return JSON.parse(
-      new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes),
-    );
-  } catch {
-    throw new Error(INVALID_RESPONSE);
-  }
-}
-
 export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
-  const destination = endpoint(env);
-  if (!env.SYNDICORD_ADMIN_PASSWORD)
-    throw new Error(
-      'Set SYNDICORD_ADMIN_PASSWORD to the web interface password. See docs/WEB.md for CLI configuration.',
-    );
-  const authorization = `Basic ${Buffer.from(`admin:${env.SYNDICORD_ADMIN_PASSWORD}`, 'utf8').toString('base64')}`;
+  const destination = adminEndpoint(env);
 
   async function request(
     method: 'GET' | 'PUT',
@@ -129,6 +55,8 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
       throw new Error(
         'Configuration exceeds the administration API limit of 128 KiB. No changes were sent.',
       );
+    const session = await readSession(env);
+    const authorization = `Bearer ${session.token}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     let response: Response | undefined;
@@ -159,7 +87,15 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
       }
       if (response.status === 401)
         throw new Error(
-          'Administration authentication failed. Check SYNDICORD_ADMIN_PASSWORD.',
+          'Your administration session expired or was revoked. Run syndicord login again. See docs/WEB.md.',
+        );
+      if (response.status === 403)
+        throw new Error(
+          'Your Discord account no longer has the required server membership and role. Ask the server administrator for access, or run syndicord login with another account.',
+        );
+      if (response.status === 429)
+        throw new Error(
+          'Discord is rate limiting access checks. Wait before trying again; no save was authorized.',
         );
       if (response.status === 409)
         throw new Error(
@@ -168,7 +104,7 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
       if (response.status === 400) {
         let message: unknown;
         try {
-          const value = await readResponse(response, controller.signal);
+          const value = await readAdminResponse(response, controller.signal);
           if (
             typeof value === 'object' &&
             value !== null &&
@@ -194,7 +130,7 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
             : `The administration API is unavailable (HTTP ${response.status}). Check that web administration is enabled at SYNDICORD_ADMIN_URL.`,
         );
       try {
-        return snapshot(await readResponse(response, controller.signal));
+        return snapshot(await readAdminResponse(response, controller.signal));
       } catch {
         throw new Error(
           method === 'PUT'

@@ -4,6 +4,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { loadFeeds, validateWebhooks } from '../src/config.ts';
 import { runStatus } from '../src/status-command.ts';
 import { adminClient, type AdminFetch } from './admin.ts';
+import { login, logout, type LoginDependencies } from './auth.ts';
 import {
   cloudflare,
   query,
@@ -17,6 +18,8 @@ const PACKAGE_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SOURCE_CHECKOUT = import.meta.url.endsWith('/cli/index.ts');
 export const USAGE = `Usage: syndicord <command>
 
+  login [--no-browser]            Sign in with Discord in your browser
+  logout                          Invalidate this installation’s CLI session
   feeds get                       Read the installation's feed routes
   feeds set --file FILE|-          Replace feed routes from JSON (or stdin)
   webhooks list                   List destination names without webhook URLs
@@ -27,19 +30,21 @@ export const USAGE = `Usage: syndicord <command>
   deploy [--dry-run]               Deploy code without changing configuration
   cf <arguments...>                Run the bundled Cloudflare CLI
 
-Set SYNDICORD_ADMIN_URL and SYNDICORD_ADMIN_PASSWORD to manage feeds and webhooks
+Set SYNDICORD_ADMIN_URL and run 'syndicord login' to manage feeds and webhooks
 through the same API as the web interface. See docs/WEB.md for configuration.
 Use a loopback URL for local configuration; configuration commands do not use
 --local. Saved webhook URLs are encrypted in D1 and never returned by the API.
 
 Status, migration, and deployment use CLOUDFLARE_ACCOUNT_ID and
 SYNDICORD_DATABASE_ID. SYNDICORD_WORKER_NAME defaults to syndicord.
-Configuration writes do not rebuild or deploy code. Use 'cf auth login' to sign in.
+Configuration writes do not rebuild or deploy code. 'cf auth login' signs in to
+Cloudflare for infrastructure operations.
 Cloudflare resources and API operations may be billable under your account plan.`;
 
 interface Dependencies {
   cf?: Cf;
   adminFetch?: AdminFetch;
+  auth?: Omit<LoginDependencies, 'fetcher'>;
   readInput?: (path: string) => Promise<unknown>;
   packageRoot?: string;
   sourceCheckout?: boolean;
@@ -95,6 +100,31 @@ export async function runCli(
   const packageRoot = dependencies.packageRoot ?? PACKAGE_ROOT;
   try {
     const [command, ...rest] = args;
+    if (command === 'login' || command === 'logout') {
+      if (
+        command === 'logout'
+          ? rest.length !== 0
+          : rest.length > 1 || (rest.length === 1 && rest[0] !== '--no-browser')
+      )
+        throw new Error(
+          command === 'login'
+            ? 'Expected syndicord login [--no-browser].'
+            : 'Expected syndicord logout with no arguments.',
+        );
+      return ok(
+        command === 'login'
+          ? await login(env, {
+              ...dependencies.auth,
+              ...(rest[0] === '--no-browser'
+                ? { openBrowser: async () => {} }
+                : {}),
+              ...(dependencies.adminFetch
+                ? { fetcher: dependencies.adminFetch }
+                : {}),
+            })
+          : await logout(env, dependencies.adminFetch),
+      );
+    }
     if (['feeds', 'webhooks'].includes(command!)) {
       if (rest.includes('--local'))
         throw new Error(
