@@ -96,10 +96,11 @@ npm run syndicord -- login
 ```
 
 The CLI opens a browser and prints a verification URL and code. If opening the
-browser fails, open that URL yourself. Sign in with Discord, check that the code
-matches the terminal, and approve the CLI request. Approve only a request you
-started. The CLI receives its own syndicord session; Discord tokens and the
-client secret stay on the Worker. Copying browser cookies is unnecessary.
+browser fails, open that URL yourself. Use `login --no-browser` to print the URL
+without opening a browser. Sign in with Discord, check that the code matches the
+terminal, and approve the CLI request. Approve only a request you started. The
+CLI receives its own syndicord session; Discord tokens and the client secret
+stay on the Worker. Copying browser cookies is unnecessary.
 
 Sessions are saved privately under `$XDG_CONFIG_HOME/syndicord`, or
 `~/.config/syndicord`, and separated by Worker origin. Configuration commands
@@ -210,6 +211,9 @@ scopes and flow. These references were checked on 2026-11-21.
 Syndicord owns revocable D1 sessions with opaque tokens, bounded lifetimes, and
 Secure HttpOnly SameSite cookies in production. Discord access tokens are
 encrypted in D1, never returned to the browser or CLI, and never logged by the
-application. Browser writes require the same origin; CLI writes authenticate
-with the CLI's separate bearer session. Server-side authorization covers both
-the editor and the shared configuration API.
+application. The deployment enables Cloudflare query-string redaction for
+request logs and traces so callback codes are omitted from those URLs. Verify
+this setting in the hosted installation and keep external proxies from logging
+callback queries. Browser writes require the same origin; CLI writes
+authenticate with the CLI's separate bearer session. Server-side authorization
+covers both the editor and the shared configuration API.

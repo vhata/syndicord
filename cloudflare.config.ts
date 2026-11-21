@@ -19,7 +19,8 @@ export default defineConfig({
       // which would prevent installations without web administration from running.
     },
     triggers: [triggers.scheduled({ schedule: '* * * * *' })],
-    observability: { enabled: true },
+    // OAuth callbacks contain one-time codes; keep them out of request logs.
+    observability: { enabled: true, redactQueryString: true },
     workersDev: true,
     previewUrls: false,
   },
