@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { handleAdmin } from '../src/admin.ts';
+import { handleAdmin as handleAdminRequest } from '../src/admin.ts';
+import type { AdminEnv } from '../src/admin.ts';
 import {
   configurationKey,
   readAdminConfiguration,
@@ -11,7 +12,6 @@ import { WRITE_CONFIGURATION_SQL } from '../src/config-store.ts';
 import { createTestDatabase } from './helpers/d1.ts';
 
 const origin = 'https://syndicord.example';
-const password = 'test-password:with-colon';
 const key = Buffer.alloc(32, 7).toString('base64');
 const secret = 'https://discord.com/api/webhooks/123/private-webhook-token';
 const other = 'https://discord.com/api/webhooks/456/other-private-token';
@@ -21,71 +21,186 @@ const feeds = [
     destinations: ['updates'],
   },
 ];
-const credentials = `Basic ${Buffer.from(`admin:${password}`).toString('base64')}`;
-function request(path = '/admin/api/config', init: RequestInit = {}) {
-  return new Request(origin + path, {
-    ...init,
-    headers: { Authorization: credentials, ...init.headers },
-  });
-}
-function put(body: unknown, extra: Record<string, string> = {}) {
-  return request('/admin/api/config', {
-    method: 'PUT',
-    headers: { Origin: origin, 'Content-Type': 'application/json', ...extra },
-    body: JSON.stringify(body),
-  });
-}
 async function fixture() {
   const database = await createTestDatabase();
+  const env: AdminEnv = {
+    DB: database.db,
+    CONFIG_ENCRYPTION_KEY: key,
+    DISCORD_CLIENT_ID: '100000000000000001',
+    DISCORD_CLIENT_SECRET: 'test-client-secret',
+    DISCORD_REDIRECT_URI: origin + '/admin/auth/callback',
+    DISCORD_GUILD_ID: '100000000000000002',
+    DISCORD_ROLE_ID: '100000000000000003',
+  };
+  let roles = [env.DISCORD_ROLE_ID!];
+  let providerStatus = 200;
+  const fetcher: typeof fetch = async (input, init) => {
+    const outbound = new Request(input, init);
+    if (outbound.url === 'https://discord.com/api/oauth2/token')
+      return Response.json({
+        access_token: 'test-discord-access-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'identify guilds.members.read',
+      });
+    if (outbound.url === 'https://discord.com/api/v10/users/@me')
+      return Response.json({
+        id: '100000000000000004',
+        username: 'test-admin',
+        global_name: 'Test admin',
+      });
+    if (
+      outbound.url ===
+      `https://discord.com/api/v10/users/@me/guilds/${env.DISCORD_GUILD_ID}/member`
+    ) {
+      if (providerStatus !== 200)
+        return Response.json(
+          { error: 'private-provider-error' },
+          { status: providerStatus, headers: { 'Retry-After': '12' } },
+        );
+      return Response.json({ roles, user: { id: '100000000000000004' } });
+    }
+    throw new Error('Unexpected Discord request');
+  };
+  const handleAdmin = (request: Request, target = env) =>
+    handleAdminRequest(request, target, fetcher);
+  const start = (await handleAdmin(new Request(origin + '/admin/auth/login')))!;
+  assert.equal(start.status, 303);
+  const state = new URL(start.headers.get('location')!).searchParams.get(
+    'state',
+  )!;
+  const stateCookie = start.headers
+    .getSetCookie()
+    .map((value) => value.split(';', 1)[0])
+    .join('; ');
+  const callback = new URL(origin + '/admin/auth/callback');
+  callback.searchParams.set('code', 'test-authorization-code');
+  callback.searchParams.set('state', state);
+  callback.searchParams.set('iss', 'https://discord.com');
+  const finished = (await handleAdmin(
+    new Request(callback, { headers: { Cookie: stateCookie } }),
+  ))!;
+  assert.equal(finished.status, 303, await finished.clone().text());
+  assert.equal(finished.headers.get('location'), '/admin');
+  const cookie = finished.headers
+    .getSetCookie()
+    .map((value) => value.split(';', 1)[0])
+    .join('; ');
+  const request = (path = '/admin/api/config', init: RequestInit = {}) =>
+    new Request(origin + path, {
+      ...init,
+      headers: { Cookie: cookie, ...init.headers },
+    });
+  const put = (body: unknown, extra: Record<string, string> = {}) =>
+    request('/admin/api/config', {
+      method: 'PUT',
+      headers: { Origin: origin, 'Content-Type': 'application/json', ...extra },
+      body: JSON.stringify(body),
+    });
   return {
     ...database,
-    env: {
-      DB: database.db,
-      ADMIN_PASSWORD: password,
-      CONFIG_ENCRYPTION_KEY: key,
+    env,
+    handleAdmin,
+    request,
+    put,
+    setRoles: (value: string[]) => {
+      roles = value;
+    },
+    setProviderStatus: (value: number) => {
+      providerStatus = value;
     },
   };
 }
 
-test('administration is disabled without a password and every page and API requires valid credentials', async () => {
-  const { env, dispose } = await fixture();
+test('administration requires configured Discord OAuth and signed-out pages show sign-in without exposing the editor', async () => {
+  const { env, dispose, handleAdmin, request } = await fixture();
   try {
     for (const path of ['/', '/admin', '/admin/', '/admin/api/config']) {
       assert.equal(
-        (await handleAdmin(request(path), { ...env, ADMIN_PASSWORD: '' }))!
+        (await handleAdmin(request(path), { ...env, DISCORD_CLIENT_ID: '' }))!
           .status,
-        404,
+        503,
       );
-      for (const authorization of [
-        '',
-        'Bearer secret',
-        'Basic $$$',
-        `Basic ${Buffer.from('admin:wrong').toString('base64')}`,
-        `Basic ${Buffer.from(`other:${password}`).toString('base64')}`,
-      ]) {
-        const response = (await handleAdmin(
-          request(path, { headers: { Authorization: authorization } }),
-          env,
-        ))!;
-        assert.equal(response.status, 401);
-        assert.match(response.headers.get('www-authenticate')!, /^Basic /);
-        assert.equal(response.headers.get('cache-control'), 'no-store');
-        assert.doesNotMatch(await response.text(), /private-|test-password/);
-      }
     }
-    const redirect = (await handleAdmin(request('/'), env))!;
+    for (const path of ['/admin', '/admin/']) {
+      const response = (await handleAdmin(new Request(origin + path)))!;
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('referrer-policy'), 'same-origin');
+      assert.equal(response.headers.get('www-authenticate'), null);
+      const page = await response.text();
+      assert.match(page, /Sign in with Discord/);
+      assert.doesNotMatch(
+        page,
+        /id="feed-form"|id="webhook-form"|test-client-secret|test-discord-access-token/,
+      );
+    }
+    for (const code of [
+      'cancelled',
+      'invalid',
+      'toString',
+      '<script>alert(1)</script>',
+    ]) {
+      const response = (await handleAdmin(
+        new Request(origin + '/admin?auth=' + encodeURIComponent(code)),
+      ))!;
+      assert.equal(response.status, 200);
+      const text = await response.text();
+      assert.doesNotMatch(text, /<script>alert|function toString/);
+      if (code === 'cancelled') assert.match(text, /sign-in was cancelled/);
+      if (code === 'invalid') assert.match(text, /already used/);
+    }
+    for (const authorization of [
+      '',
+      'Bearer secret',
+      'Basic $$$',
+      `Basic ${Buffer.from('admin:old-password').toString('base64')}`,
+    ]) {
+      const response = (await handleAdmin(
+        new Request(origin + '/admin/api/config', {
+          headers: { Authorization: authorization },
+        }),
+      ))!;
+      assert.equal(response.status, 401);
+      assert.match(response.headers.get('content-type')!, /application\/json/);
+      assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+      assert.doesNotMatch(
+        await response.text(),
+        /private-|test-client-secret|test-discord-access-token/,
+      );
+    }
+    for (const code of [
+      'cancelled',
+      'invalid',
+      'unavailable',
+      'rate_limited',
+    ]) {
+      const response = (await handleAdmin(request('/admin?auth=' + code)))!;
+      assert.equal(response.status, 200);
+      const text = await response.text();
+      assert.match(text, /Discord sign-in was not completed/);
+      assert.match(text, /Test admin/);
+      assert.match(text, /account shown is still signed in/);
+      assert.doesNotMatch(text, /id="feed-form"|id="webhook-form"/);
+    }
+    const redirect = (await handleAdmin(request('/')))!;
     assert.equal(redirect.status, 302);
     assert.equal(redirect.headers.get('location'), '/admin');
-    const page = (await handleAdmin(request('/admin'), env))!;
+    assert.equal(redirect.headers.get('referrer-policy'), 'no-referrer');
+    const page = (await handleAdmin(request('/admin')))!;
     assert.equal(page.status, 200);
+    assert.equal(page.headers.get('referrer-policy'), 'same-origin');
     assert.match(
       page.headers.get('content-security-policy')!,
       /frame-ancestors 'none'/,
     );
-    assert.match(await page.text(), /syndicord/i);
-    assert.equal(await handleAdmin(request('/unknown'), env), null);
+    const html = await page.text();
+    assert.match(html, /Signed in as <strong>Test admin/);
+    assert.match(html, /action="\/admin\/auth\/logout" method="post"/);
+    assert.match(html, /id="feed-form"/);
+    assert.equal(await handleAdmin(request('/unknown')), null);
     assert.equal(
-      (await handleAdmin(request('/admin', { method: 'POST' }), env))!.status,
+      (await handleAdmin(request('/admin', { method: 'POST' })))!.status,
       405,
     );
     assert.equal(
@@ -100,8 +215,61 @@ test('administration is disabled without a password and every page and API requi
   }
 });
 
+test('role removal blocks editor, direct reads, and writes; Discord failures never authorize configuration', async () => {
+  const {
+    env,
+    dispose,
+    handleAdmin,
+    request,
+    put,
+    setRoles,
+    setProviderStatus,
+  } = await fixture();
+  try {
+    const initial = await readAdminConfiguration(
+      env,
+      await configurationKey(key),
+    );
+    setRoles([]);
+    for (const denied of [
+      request('/admin'),
+      request(),
+      put({ revision: initial.revision, feeds: [], webhooks: {} }),
+    ]) {
+      const response = (await handleAdmin(denied))!;
+      assert.equal(response.status, 403);
+      const text = await response.text();
+      assert.doesNotMatch(
+        text,
+        /id="feed-form"|id="webhook-form"|test-discord-access-token|private-provider-error/,
+      );
+      if (denied.url.endsWith('/admin')) {
+        assert.match(text, /Test admin/);
+        assert.match(text, /Sign out/);
+        assert.match(text, /sign-in again/);
+      }
+    }
+    setRoles([env.DISCORD_ROLE_ID!]);
+    for (const code of [500, 429]) {
+      setProviderStatus(code);
+      const response = (await handleAdmin(
+        put({ revision: initial.revision, feeds: [], webhooks: {} }),
+      ))!;
+      assert.ok([429, 503].includes(response.status));
+      assert.doesNotMatch(await response.text(), /private-provider-error/);
+      assert.equal(
+        (await readAdminConfiguration(env, await configurationKey(key)))
+          .revision,
+        initial.revision,
+      );
+    }
+  } finally {
+    await dispose();
+  }
+});
+
 test('an empty installation accepts encrypted configuration and leaves the ledger intact', async () => {
-  const { env, db, dispose } = await fixture();
+  const { env, db, dispose, handleAdmin, request, put } = await fixture();
   try {
     const initial = (await (await handleAdmin(request(), env))!.json()) as {
       revision: string;
@@ -158,7 +326,7 @@ test('an empty installation accepts encrypted configuration and leaves the ledge
     assert.equal((await readRelayConfiguration(env)).webhooks.updates, secret);
     const changedEnvironment = {
       ...env,
-      ADMIN_PASSWORD: 'rotated-password',
+      DISCORD_CLIENT_SECRET: 'rotated-secret',
     };
     assert.equal(
       (await readRelayConfiguration(changedEnvironment)).webhooks.updates,
@@ -187,7 +355,7 @@ test('an empty installation accepts encrypted configuration and leaves the ledge
 });
 
 test('webhook rotation, destination removal, and route edits preserve unedited secrets and validate every reference', async () => {
-  const { env, db, dispose } = await fixture();
+  const { env, db, dispose, handleAdmin, put } = await fixture();
   try {
     await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(feeds)).run();
     const cryptoKey = await configurationKey(key);
@@ -250,7 +418,7 @@ test('webhook rotation, destination removal, and route edits preserve unedited s
 });
 
 test('stale tabs, direct database edits, and concurrent first writes cannot overwrite newer configuration', async () => {
-  const { env, db, dispose } = await fixture();
+  const { env, db, dispose, handleAdmin, put } = await fixture();
   try {
     const cryptoKey = await configurationKey(key);
     const initial = await readAdminConfiguration(env, cryptoKey);
@@ -308,7 +476,7 @@ test('stale tabs, direct database edits, and concurrent first writes cannot over
 });
 
 test('mutations require a same-origin JSON request and enforce the body limit before parsing', async () => {
-  const { env, dispose } = await fixture();
+  const { env, dispose, handleAdmin, request, put } = await fixture();
   try {
     const current = await readAdminConfiguration(
       env,
@@ -364,8 +532,71 @@ test('mutations require a same-origin JSON request and enforce the body limit be
   }
 });
 
+test(
+  'configuration writes recheck access after a delayed body finishes',
+  { timeout: 10_000 },
+  async () => {
+    for (const revoked of ['role', 'session']) {
+      const { env, db, dispose, handleAdmin, request, setRoles } =
+        await fixture();
+      const reading = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      let pending: Promise<Response | null> | undefined;
+      try {
+        const cryptoKey = await configurationKey(key);
+        const before = await readAdminConfiguration(env, cryptoKey);
+        const bytes = new TextEncoder().encode(
+          JSON.stringify({
+            revision: before.revision,
+            feeds: [],
+            webhooks: { updates: secret },
+          }),
+        );
+        const stream = new ReadableStream<Uint8Array>(
+          {
+            async pull(controller) {
+              reading.resolve();
+              await release.promise;
+              controller.enqueue(bytes);
+              controller.close();
+            },
+          },
+          { highWaterMark: 0 },
+        );
+        const init = {
+          method: 'PUT',
+          headers: { Origin: origin, 'Content-Type': 'application/json' },
+          body: stream,
+          duplex: 'half',
+        };
+        pending = handleAdmin(request('/admin/api/config', init));
+        await Promise.race([
+          reading.promise,
+          pending.then(() => {
+            throw new Error('Request finished before reading its body');
+          }),
+        ]);
+        if (revoked === 'role') setRoles([]);
+        else
+          await db.prepare('UPDATE admin_sessions SET expires_at_ms = 0').run();
+        release.resolve();
+        const response = (await pending)!;
+        assert.equal(response.status, revoked === 'role' ? 403 : 401);
+        assert.equal(
+          (await readAdminConfiguration(env, cryptoKey)).revision,
+          before.revision,
+        );
+      } finally {
+        release.resolve();
+        await pending;
+        await dispose();
+      }
+    }
+  },
+);
+
 test('corrupt encrypted configuration fails closed without exposing the stored value', async () => {
-  const { env, db, dispose } = await fixture();
+  const { env, db, dispose, handleAdmin, request } = await fixture();
   try {
     await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(feeds)).run();
     await db
@@ -388,7 +619,7 @@ test('corrupt encrypted configuration fails closed without exposing the stored v
 });
 
 test('a database write during a configuration save is detected by the database compare-and-swap', async () => {
-  const { env, db, dispose } = await fixture();
+  const { env, db, dispose, handleAdmin, put } = await fixture();
   try {
     await db.prepare(WRITE_CONFIGURATION_SQL).bind(JSON.stringify(feeds)).run();
     const initial = await readAdminConfiguration(
@@ -400,7 +631,10 @@ test('a database write during a configuration save is detected by the database c
       prepare(sql: string) {
         return new Proxy(db.prepare(sql), {
           get(statement, property) {
-            if (property === 'first')
+            if (
+              property === 'first' &&
+              sql.includes('FROM relay_configuration')
+            )
               return async () => {
                 const before = await statement.first();
                 if (!injected) {

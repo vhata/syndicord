@@ -1,13 +1,10 @@
 import { handleAdmin } from './admin.ts';
+import type { AuthEnv } from './admin-auth.ts';
 import { readRelayConfiguration } from './admin-store.ts';
 import { ConfigurationError } from './config-store.ts';
 import { runRelay } from './runner.ts';
 
-export interface WorkerEnv {
-  DB: D1Database;
-  ADMIN_PASSWORD?: string;
-  CONFIG_ENCRYPTION_KEY?: string;
-}
+export type WorkerEnv = AuthEnv;
 
 export default {
   scheduled(_event, env, ctx) {

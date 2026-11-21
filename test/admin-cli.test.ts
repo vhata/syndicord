@@ -1,14 +1,26 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test, { beforeEach, afterEach } from 'node:test';
 import { adminClient, type AdminFetch } from '../cli/admin.ts';
 import { runCli } from '../cli/index.ts';
+import { login } from '../cli/auth.ts';
+import {
+  authEnv,
+  browserLogin,
+  cliLogin,
+  discordFixture,
+  TEST_ROLE_ID,
+  type DiscordFixtureOptions,
+} from './helpers/auth.ts';
 import { handleAdmin } from '../src/admin.ts';
 import { readRelayConfiguration } from '../src/admin-store.ts';
 import { createTestDatabase } from './helpers/d1.ts';
 
 const environment = {
   SYNDICORD_ADMIN_URL: 'https://relay.example/',
-  SYNDICORD_ADMIN_PASSWORD: 'shared-test-password',
+  XDG_CONFIG_HOME: '',
 };
 const feeds = [
   {
@@ -28,28 +40,110 @@ const noCloudflare = async () => {
   throw new Error('must not invoke Cloudflare');
 };
 
+const testToken = 'private-session-token-'.padEnd(43, 't');
+async function saveProfile(
+  env = environment,
+  token = testToken,
+  expiresAt = Date.now() + 60_000,
+) {
+  const origin = new URL(env.SYNDICORD_ADMIN_URL).origin;
+  const requestId = 'r'.repeat(43);
+  await login(env, {
+    openBrowser: async () => {},
+    progress: () => {},
+    wait: async () => {},
+    fetcher: async (url) =>
+      Response.json(
+        url.endsWith('/start')
+          ? {
+              requestId,
+              secret: 's'.repeat(43),
+              userCode: 'ABCD-1234',
+              verificationUri: `${origin}/admin/auth/cli?request=${requestId}`,
+              expiresIn: 600,
+              interval: 2,
+            }
+          : {
+              token,
+              expiresAt,
+              user: { id: '123456789012345678', name: 'Administrator' },
+            },
+      ),
+  });
+}
+beforeEach(async () => {
+  environment.XDG_CONFIG_HOME = await mkdtemp(
+    join(tmpdir(), 'syndicord-admin-cli-'),
+  );
+  await saveProfile();
+});
+afterEach(async () => {
+  await rm(environment.XDG_CONFIG_HOME, { recursive: true, force: true });
+});
+
 function expectedAuth() {
-  return `Basic ${Buffer.from(`admin:${environment.SYNDICORD_ADMIN_PASSWORD}`).toString('base64')}`;
+  return `Bearer ${testToken}`;
 }
 
-async function fixture() {
+async function fixture(options: DiscordFixtureOptions = {}) {
   const database = await createTestDatabase();
-  const workerEnv = {
-    DB: database.db,
-    ADMIN_PASSWORD: environment.SYNDICORD_ADMIN_PASSWORD,
-    CONFIG_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString('base64'),
-  };
+  const workerEnv = authEnv(
+    database.db,
+    new URL(environment.SYNDICORD_ADMIN_URL).origin,
+  );
+  const discord = discordFixture(options);
+  const browserSession = await browserLogin(workerEnv, discord);
+  const cliSession = await cliLogin(workerEnv, discord);
+  await saveProfile(environment, cliSession.token, cliSession.expiresAt);
   const fetcher: AdminFetch = async (url, init) => {
-    const response = await handleAdmin(new Request(url, init), workerEnv);
+    const response = await handleAdmin(
+      new Request(url, init),
+      workerEnv,
+      discord,
+    );
     assert.ok(response);
     return response;
   };
-  return {
-    ...database,
-    workerEnv,
-    fetcher,
-    browser: adminClient(environment, fetcher),
+  const browser = {
+    async read() {
+      const response = await fetcher(
+        new URL('/admin/api/config', environment.SYNDICORD_ADMIN_URL).href,
+        {
+          headers: { Cookie: browserSession.cookie },
+        },
+      );
+      assert.equal(response.status, 200, await response.clone().text());
+      return (await response.json()) as {
+        feeds: typeof feeds;
+        destinations: string[];
+        revision: string;
+      };
+    },
+    async write(
+      current: { revision: string },
+      routes: typeof feeds,
+      webhooks: Record<string, string | null>,
+    ) {
+      const response = await fetcher(
+        new URL('/admin/api/config', environment.SYNDICORD_ADMIN_URL).href,
+        {
+          method: 'PUT',
+          headers: {
+            Cookie: browserSession.cookie,
+            Origin: new URL(environment.SYNDICORD_ADMIN_URL).origin,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            revision: current.revision,
+            feeds: routes,
+            webhooks,
+          }),
+        },
+      );
+      assert.equal(response.status, 200, await response.clone().text());
+    },
   };
+  return { ...database, workerEnv, fetcher, browser };
 }
 
 test('administration mode needs no Cloudflare target and sends credentials only in headers', async () => {
@@ -60,7 +154,7 @@ test('administration mode needs no Cloudflare target and sends credentials only 
     assert.ok(init.signal);
     const headers = new Headers(init.headers);
     assert.equal(headers.get('authorization'), expectedAuth());
-    assert.doesNotMatch(url, /shared-test-password|private-webhook-token/);
+    assert.doesNotMatch(url, /private-session-token|private-webhook-token/);
     if (init.method === 'PUT') {
       assert.equal(headers.get('origin'), 'https://relay.example');
       assert.equal(headers.get('content-type'), 'application/json');
@@ -88,7 +182,7 @@ test('administration mode needs no Cloudflare target and sends credentials only 
   assert.equal(set.code, 0, set.stderr);
   assert.doesNotMatch(
     JSON.stringify(set),
-    /shared-test-password|private-feed-token|private-webhook-token/,
+    /private-session-token|private-feed-token|private-webhook-token/,
   );
   assert.deepEqual(
     calls.map((call) => call.method),
@@ -365,7 +459,7 @@ test('a lost response after a successful CLI save is ambiguous and is never retr
       methods.push(init.method!);
       const response = await fetcher(url, init);
       if (init.method === 'PUT')
-        throw new Error('private-webhook-token shared-test-password');
+        throw new Error('private-webhook-token private-session-token');
       return response;
     };
     const result = await runCli(['feeds', 'set', '--file', '-'], environment, {
@@ -377,7 +471,7 @@ test('a lost response after a successful CLI save is ambiguous and is never retr
     assert.match(result.stderr, /could not be confirmed.*not retried/);
     assert.doesNotMatch(
       JSON.stringify(result),
-      /private-webhook-token|shared-test-password/,
+      /private-webhook-token|private-session-token/,
     );
     assert.deepEqual(methods, ['GET', 'PUT']);
     assert.deepEqual(
@@ -390,7 +484,7 @@ test('a lost response after a successful CLI save is ambiguous and is never retr
   }
 });
 
-test('invalid admin targets, missing passwords, and --local fail before any network or Cloudflare call', async () => {
+test('invalid admin targets, missing sessions, and --local fail before any network or Cloudflare call', async () => {
   let calls = 0;
   const dependencies = {
     cf: async () => {
@@ -427,11 +521,11 @@ test('invalid admin targets, missing passwords, and --local fail before any netw
   }
   const missing = await runCli(
     ['feeds', 'get'],
-    { SYNDICORD_ADMIN_URL: environment.SYNDICORD_ADMIN_URL },
+    { ...environment, SYNDICORD_ADMIN_URL: 'https://signed-out.example' },
     dependencies,
   );
   assert.equal(missing.code, 2);
-  assert.match(missing.stderr, /SYNDICORD_ADMIN_PASSWORD.*docs\/WEB.md/);
+  assert.match(missing.stderr, /Run syndicord login.*docs\/WEB.md/);
   for (const args of [
     ['feeds', 'get', '--local'],
     ['feeds', 'set', '--local', '--file', '-'],
@@ -465,6 +559,7 @@ test('explicit loopback HTTP targets work without --local', async () => {
     'http://127.0.0.1:8787/',
     'http://[::1]:8787',
   ]) {
+    await saveProfile({ ...environment, SYNDICORD_ADMIN_URL: origin });
     let requested = '';
     const result = await runCli(
       ['feeds', 'get'],
@@ -483,9 +578,11 @@ test('explicit loopback HTTP targets work without --local', async () => {
 });
 
 test('API errors, redirects, invalid responses, and overlarge responses never expose response bodies', async () => {
-  const sensitive = 'private-webhook-token shared-test-password';
+  const sensitive = 'private-webhook-token private-session-token';
   for (const response of [
     new Response(sensitive, { status: 401 }),
+    new Response(sensitive, { status: 403 }),
+    new Response(sensitive, { status: 429 }),
     new Response(sensitive, { status: 400 }),
     new Response(sensitive, { status: 503 }),
     new Response(sensitive, {
@@ -519,7 +616,7 @@ test('API errors, redirects, invalid responses, and overlarge responses never ex
     assert.equal(result.code, 2);
     assert.doesNotMatch(
       JSON.stringify(result),
-      /private-webhook-token|shared-test-password|other.example/,
+      /private-webhook-token|private-session-token|other.example/,
     );
     assert.equal(calls, 1);
   }
@@ -551,8 +648,13 @@ test('request size is checked before PUT and malformed write acknowledgements st
 test('the request deadline aborts stalled network requests without retrying writes', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   let calls = 0;
+  let fetched!: () => void;
+  const fetching = new Promise<void>((resolve) => {
+    fetched = resolve;
+  });
   const client = adminClient(environment, async (_url, init) => {
     calls++;
+    fetched();
     return new Promise((_resolve, reject) => {
       init.signal!.addEventListener(
         'abort',
@@ -566,6 +668,7 @@ test('the request deadline aborts stalled network requests without retrying writ
     saving,
     /could not be confirmed.*not retried/,
   );
+  await fetching;
   t.mock.timers.tick(10_000);
   await rejected;
   assert.equal(calls, 1);
@@ -574,19 +677,23 @@ test('the request deadline aborts stalled network requests without retrying writ
 test('a stalled response body is also covered by the request deadline', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   let cancelled = false;
-  const client = adminClient(
-    environment,
-    async () =>
-      new Response(
-        new ReadableStream({
-          cancel() {
-            cancelled = true;
-          },
-        }),
-      ),
-  );
+  let fetched!: () => void;
+  const fetching = new Promise<void>((resolve) => {
+    fetched = resolve;
+  });
+  const client = adminClient(environment, async () => {
+    fetched();
+    return new Response(
+      new ReadableStream({
+        cancel() {
+          cancelled = true;
+        },
+      }),
+    );
+  });
   const reading = client.read();
   const rejected = assert.rejects(reading, /invalid response/);
+  await fetching;
   // Let the fulfilled fetch promise install the response-body abort listener.
   await Promise.resolve();
   t.mock.timers.tick(10_000);
@@ -606,4 +713,42 @@ test('status keeps Cloudflare targeting even when administration variables are c
   assert.equal(result.code, 2);
   assert.match(result.stderr, /CLOUDFLARE_ACCOUNT_ID/);
   assert.equal(fetched, false);
+});
+
+test('removing the Discord role between CLI read and write blocks saving while logout remains available', async () => {
+  const options = { roles: [TEST_ROLE_ID] };
+  const { browser, fetcher, workerEnv, dispose } = await fixture(options);
+  try {
+    await browser.write(await browser.read(), feeds, { updates: webhook });
+    const calls: string[] = [];
+    const result = await runCli(['feeds', 'set', '--file', '-'], environment, {
+      cf: noCloudflare,
+      readInput: async () => [],
+      adminFetch: async (url, init) => {
+        calls.push(init.method!);
+        const response = await fetcher(url, init);
+        if (init.method === 'GET') options.roles = [];
+        return response;
+      },
+    });
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, /no longer has.*role/);
+    assert.deepEqual(calls, ['GET', 'PUT']);
+    assert.deepEqual((await readRelayConfiguration(workerEnv)).feeds, feeds);
+    const out = await runCli(['logout'], environment, {
+      cf: noCloudflare,
+      adminFetch: fetcher,
+    });
+    assert.equal(out.code, 0, out.stderr);
+    const after = await runCli(['feeds', 'get'], environment, {
+      cf: noCloudflare,
+      adminFetch: async () => {
+        throw new Error('must not fetch');
+      },
+    });
+    assert.equal(after.code, 2);
+    assert.match(after.stderr, /Run syndicord login/);
+  } finally {
+    await dispose();
+  }
 });

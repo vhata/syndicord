@@ -50,6 +50,128 @@ function runAdminCli(
   });
 }
 
+// Drive the real browser/Worker protocol while the installed CLI polls. Discord
+// HTTP is mocked by Miniflare; no credential fixture bypasses application auth.
+async function approveCliLogin(verificationUri: string) {
+  const origin = new URL(verificationUri).origin;
+  const cookies = new Map<string, string>();
+  const browser = async (path: string, init: RequestInit = {}) => {
+    const target = new URL(path, origin);
+    assert.equal(target.origin, origin);
+    const result = await fetch(target, {
+      ...init,
+      redirect: 'manual',
+      headers: {
+        Cookie: [...cookies]
+          .map(([name, value]) => `${name}=${value}`)
+          .join('; '),
+        ...init.headers,
+      },
+    });
+    for (const value of result.headers.getSetCookie()) {
+      const pair = value.split(';', 1)[0]!;
+      const split = pair.indexOf('=');
+      const name = pair.slice(0, split);
+      if (value.includes('Max-Age=0')) cookies.delete(name);
+      else cookies.set(name, pair.slice(split + 1));
+    }
+    return result;
+  };
+  const requestId = new URL(verificationUri).searchParams.get('request')!;
+  const landing = await browser(verificationUri);
+  assert.equal(landing.status, 200);
+  assert.match(await landing.text(), /Sign in with Discord/);
+  const start = await browser(`/admin/auth/login?request=${requestId}`);
+  assert.equal(start.status, 303);
+  const authorization = new URL(start.headers.get('location')!);
+  assert.equal(authorization.origin, 'https://discord.com');
+  assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256');
+  assert.equal(
+    authorization.searchParams.get('scope'),
+    'identify guilds.members.read',
+  );
+  const callback = new URL('/admin/auth/callback', origin);
+  callback.searchParams.set('state', authorization.searchParams.get('state')!);
+  callback.searchParams.set('code', 'package-authorization-code');
+  callback.searchParams.set('iss', 'https://discord.com');
+  const signedIn = await browser(callback.href);
+  assert.equal(signedIn.status, 303);
+  assert.equal(
+    signedIn.headers.get('location'),
+    `/admin/auth/cli?request=${requestId}`,
+  );
+  const consent = await browser(verificationUri);
+  assert.equal(consent.status, 200);
+  const html = await consent.text();
+  const approval = /name="approval" value="([^"]+)"/.exec(html)?.[1];
+  assert.ok(
+    approval,
+    'the browser must explicitly approve the terminal request',
+  );
+  const approved = await browser('/admin/auth/cli/approve', {
+    method: 'POST',
+    headers: {
+      Origin: origin,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({ requestId, approval, decision: 'approve' }),
+  });
+  assert.equal(approved.status, 200, await approved.clone().text());
+  assert.doesNotMatch(await approved.text(), /discord-package-private-token/);
+  return async (path: string, init: RequestInit = {}) => browser(path, init);
+}
+
+async function installedLogin(
+  executable: string,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+) {
+  let approval: ReturnType<typeof approveCliLogin> | undefined;
+  let stderr = '';
+  const result = await new Promise<{ stdout: string; stderr: string }>(
+    (resolve, reject) => {
+      const child = execFile(
+        executable,
+        ['login', '--no-browser'],
+        {
+          cwd,
+          env,
+          encoding: 'utf8',
+          timeout: 30_000,
+          maxBuffer: 1024 * 1024,
+        },
+        (error, stdout, output) => {
+          if (error)
+            reject(new Error(`Installed login failed: ${stdout} ${output}`));
+          else resolve({ stdout, stderr: output });
+        },
+      );
+      child.stderr!.on('data', (chunk: string) => {
+        stderr += chunk;
+        const match =
+          /^Open (http:\/\/127\.0\.0\.1:\d+\/admin\/auth\/cli\?request=[A-Za-z0-9_-]+)$/m.exec(
+            stderr,
+          );
+        if (!approval && match) {
+          approval = approveCliLogin(match[1]!);
+          approval.catch((error: unknown) => {
+            child.kill();
+            reject(error);
+          });
+        }
+      });
+      child.stdin!.end();
+    },
+  );
+  assert.ok(approval, 'installed login printed a browser verification URL');
+  assert.match(result.stdout, /Signed in as/);
+  assert.doesNotMatch(
+    result.stdout + result.stderr,
+    /discord-package-private-token|package-client-secret/,
+  );
+  return approval;
+}
+
 test(
   'production tarball runs without a checkout, preserves installation isolation, and needs no dev dependencies',
   { timeout: 180_000 },
@@ -116,6 +238,7 @@ test(
       assert.ok(files.includes('dist/cli.js'));
       assert.ok(files.includes('migrations/0003_runtime_configuration.sql'));
       assert.ok(files.includes('migrations/0004_web_admin.sql'));
+      assert.ok(files.includes('migrations/0005_discord_auth.sql'));
       assert.ok(
         !files.some(
           (path) =>
@@ -180,6 +303,7 @@ test(
       run('npm', ['run', 'prepare'], packageRoot);
       assert.equal(packaged.env.DB.id, '00000000-0000-4000-8000-000000000001');
       assert.equal(packaged.name, 'syndicord');
+      assert.equal(packaged.observability.redactQueryString, true);
       assert.deepEqual(Object.keys(packaged.env), ['DB']);
       assert.equal(
         JSON.parse(
@@ -244,8 +368,16 @@ test(
       const adminEnvironments: NodeJS.ProcessEnv[] = [];
       let outboundRequests = 0;
       for (const [index, feeds] of routes.entries()) {
-        const password = `package-admin-password-${index}`;
-        const runtime = new Miniflare(
+        const authBindings = {
+          DISCORD_CLIENT_ID: '100000000000000001',
+          DISCORD_CLIENT_SECRET: 'package-client-secret',
+          DISCORD_REDIRECT_URI: 'http://127.0.0.1/admin/auth/callback',
+          DISCORD_GUILD_ID: '100000000000000002',
+          DISCORD_ROLE_ID: '100000000000000003',
+          CONFIG_ENCRYPTION_KEY: Buffer.alloc(32, index + 1).toString('base64'),
+        };
+        let hasRole = true;
+        const runtimeOptions = (redirectUri: string) =>
           convertV4MiniflareOptions({
             modules: true,
             // Keep module names relative to the bundle, including when the npm
@@ -263,24 +395,48 @@ test(
             host: '127.0.0.1',
             port: 0,
             d1Databases: { DB: `package-admin-${index}` },
-            bindings: {
-              ADMIN_PASSWORD: password,
-              CONFIG_ENCRYPTION_KEY: Buffer.alloc(32, index + 1).toString(
-                'base64',
-              ),
-            },
-            outboundService: async () => {
+            bindings: { ...authBindings, DISCORD_REDIRECT_URI: redirectUri },
+            outboundService: async (request) => {
+              if (request.url === 'https://discord.com/api/oauth2/token') {
+                const body = new URLSearchParams(await request.text());
+                assert.equal(body.get('code'), 'package-authorization-code');
+                assert.ok(body.get('code_verifier'));
+                return Response.json({
+                  access_token: 'discord-package-private-token',
+                  token_type: 'Bearer',
+                  expires_in: 3600,
+                  scope: 'identify guilds.members.read',
+                });
+              }
+              if (request.url === 'https://discord.com/api/v10/users/@me')
+                return Response.json({
+                  id: '100000000000000004',
+                  username: 'package-user',
+                  global_name: 'Package User',
+                });
+              if (
+                request.url ===
+                `https://discord.com/api/v10/users/@me/guilds/${authBindings.DISCORD_GUILD_ID}/member`
+              )
+                return Response.json({
+                  roles: hasRole ? [authBindings.DISCORD_ROLE_ID] : [],
+                });
               outboundRequests++;
               return new Response(
-                'Outbound HTTP is disabled in package tests',
-                {
-                  status: 503,
-                },
+                'Unexpected outbound HTTP is disabled in package tests',
+                { status: 503 },
               );
             },
-          }),
+          });
+        const runtime = new Miniflare(
+          runtimeOptions(authBindings.DISCORD_REDIRECT_URI),
         );
         runtimes.push(runtime);
+        const adminOrigin = (await runtime.ready).origin;
+        await runtime.setOptions({
+          ...runtimeOptions(`${adminOrigin}/admin/auth/callback`),
+          port: Number(new URL(adminOrigin).port),
+        });
         const db = await runtime.getD1Database('DB');
         // Read migrations from the installed tarball, never from the checkout.
         for (const name of (await readdir(join(packageRoot, 'migrations')))
@@ -300,10 +456,15 @@ test(
         }
         const apiEnvironment = {
           ...localEnvironment,
-          SYNDICORD_ADMIN_URL: (await runtime.ready).origin,
-          SYNDICORD_ADMIN_PASSWORD: password,
+          SYNDICORD_ADMIN_URL: adminOrigin,
+          XDG_CONFIG_HOME: join(directory, 'private cli sessions'),
         };
         adminEnvironments.push(apiEnvironment);
+        const browser = await installedLogin(
+          executable,
+          hostile,
+          apiEnvironment,
+        );
         const admin = (
           args: string[],
           options: { input?: string; status?: number } = {},
@@ -364,6 +525,28 @@ test(
           stored!.encrypted_webhooks,
           /test-token|discord\.com/,
         );
+        // The browser sees exactly the installed CLI's current configuration.
+        const snapshot = await browser('/admin/api/config');
+        assert.equal(snapshot.status, 200);
+        const current = (await snapshot.json()) as {
+          feeds: unknown;
+          revision: string;
+        };
+        assert.deepEqual(current.feeds, feeds);
+        hasRole = false;
+        const rejected = await admin(['feeds', 'get'], { status: 2 });
+        assert.match(rejected.stderr, /Access.*denied|role|server/i);
+        const denied = await browser('/admin/api/config', {
+          method: 'PUT',
+          headers: { Origin: adminOrigin, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            revision: current.revision,
+            feeds: [],
+            webhooks: {},
+          }),
+        });
+        assert.equal(denied.status, 403);
+        hasRole = true;
       }
       assert.deepEqual(
         JSON.parse(
@@ -382,17 +565,42 @@ test(
         executable,
         ['feeds', 'get'],
         hostile,
-        { ...adminEnvironments[0], SYNDICORD_ADMIN_PASSWORD: 'wrong-password' },
+        {
+          ...adminEnvironments[0],
+          XDG_CONFIG_HOME: join(directory, 'signed out'),
+        },
         { status: 2 },
       );
       assert.doesNotMatch(
         unauthenticated.stderr,
-        /package-admin-password|wrong-password/,
+        /discord-package-private-token|package-client-secret/,
       );
       assert.equal(
         outboundRequests,
         0,
-        'configuration never fetches feeds or sends webhooks',
+        'authentication and configuration never fetch feeds or send webhooks',
+      );
+      await runAdminCli(executable, ['logout'], hostile, adminEnvironments[1]!);
+      const signedOut = await runAdminCli(
+        executable,
+        ['feeds', 'get'],
+        hostile,
+        adminEnvironments[1]!,
+        { status: 2 },
+      );
+      assert.match(signedOut.stderr, /login/);
+      assert.deepEqual(
+        JSON.parse(
+          (
+            await runAdminCli(
+              executable,
+              ['feeds', 'get'],
+              hostile,
+              adminEnvironments[0]!,
+            )
+          ).stdout,
+        ),
+        routes[0],
       );
       for (const runtime of runtimes.splice(0)) await runtime.dispose();
 

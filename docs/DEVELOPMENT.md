@@ -105,10 +105,12 @@ retain a `lint-staged automatic backup` in `git stash list`.
 cp .dev.vars.example .dev.vars
 ```
 
-Set `ADMIN_PASSWORD` and a base64-encoded 32-byte `CONFIG_ENCRYPTION_KEY` in
-`.dev.vars`; [administration setup](WEB.md#enable-administration) includes the
-key-generation command. Keep that file private, then start with an empty local
-database:
+Set the Discord OAuth settings and a base64-encoded 32-byte
+`CONFIG_ENCRYPTION_KEY` in `.dev.vars`;
+[administration setup](WEB.md#enable-administration) explains application setup
+and key generation. Register the local callback separately as described in
+[local preview](WEB.md#local-preview). Keep that file private, then start with
+an empty local database:
 
 ```sh
 npm run db:migrate:local
@@ -121,9 +123,9 @@ local placeholder when that variable is absent. Export that variable in the
 shell when changing it, rather than putting it in a dotenv file.
 
 The local server normally listens on port 8787. Open
-`http://localhost:8787/admin` with username `admin`, or use a second terminal
-with `SYNDICORD_ADMIN_URL=http://localhost:8787` and `SYNDICORD_ADMIN_PASSWORD`
-set to the value in `.dev.vars`. Follow
+`http://localhost:8787/admin` and sign in with Discord, or use a second terminal
+with `SYNDICORD_ADMIN_URL=http://localhost:8787` and run
+`npm run syndicord -- login`. Follow
 [the CLI configuration commands](OPERATIONS.md) to add webhooks and feeds. Both
 clients update this local server's database.
 
@@ -136,7 +138,7 @@ curl -fsS 'http://localhost:8787/cdn-cgi/local/scheduled'
 This local poll uses the configured feeds and **real Discord webhooks**. The
 first successful poll establishes a silent baseline. Later polls send new
 entries. The scheduled-event route belongs to the local runtime; the deployed
-Worker serves the password-protected editor at `/admin`.
+Worker serves the Discord-authenticated editor at `/admin`.
 
 Local D1 state is under `.cloudflare/state/` and is separate from hosted state.
 The automated tests create their own databases and do not change this state.
@@ -184,7 +186,8 @@ GitHub.
 | `src/ledger.ts`        | D1 baselines, pending deliveries, leases, and cooldowns |
 | `src/runner.ts`        | Bounded polling and delivery orchestration              |
 | `src/config-store.ts`  | Installation configuration in D1                        |
-| `src/admin.ts`         | Password-protected configuration HTTP endpoints         |
+| `src/admin.ts`         | Authorized configuration HTTP endpoints                 |
+| `src/admin-auth.ts`    | Discord OAuth, role checks, and application sessions    |
 | `src/admin-store.ts`   | Encrypted webhook configuration and atomic API saves    |
 | `src/admin-page.ts`    | Feed, webhook, and routing web interface                |
 | `cli/`                 | Installed command-line interface                        |

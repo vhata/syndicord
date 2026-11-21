@@ -1,52 +1,147 @@
-# Web interface
+# Discord sign-in and administration
 
-Open **`/admin`** on your Worker's HTTPS address to manage feeds, Discord
-webhooks, and routing. Sign in with username **`admin`** and your shared
-password. The [syndicord CLI](OPERATIONS.md) edits the same configuration
-through the same API. Changes from either client apply on the next scheduled
-poll.
+Open **`/admin`** on your Worker's HTTPS address and choose **Sign in with
+Discord** to manage feeds, webhooks, and routing. Access requires membership in
+one configured Discord server and its configured administrator role. The
+[syndicord CLI](OPERATIONS.md) signs in through the browser and edits the same
+configuration through the same API. Changes apply on the next scheduled poll.
 
 ## Enable administration
 
 [Select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation),
 then deploy code and migrations with `npm run deploy` or your
-[deployment workflow](DEPLOYMENT.md). A fresh installation starts empty, with
-polling paused. The Worker enables its `workers.dev` address; preview URLs stay
-disabled. Administration stays closed until its secrets are configured.
+[deployment workflow](DEPLOYMENT.md). Administration remains disabled until all
+settings below are present. Missing OAuth settings do not prevent deployment or
+scheduled relay operation. A fresh installation starts empty, with polling
+paused.
 
-Generate a key once, and save it in your password manager:
+### Register a Discord application
+
+1. Open the
+   [Discord Developer Portal](https://discord.com/developers/applications) and
+   choose **New Application**, or select the application for this installation.
+2. Under **OAuth2**, copy the **Client ID**, then reset/copy the **Client
+   Secret** into your password manager. Only the Worker receives the client
+   secret.
+3. Under **OAuth2 → Redirects**, register the exact callback URL:
+   `https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev/admin/auth/callback`. Use your
+   custom HTTPS origin instead if that is where you administer the Worker. Save
+   changes. The registered URL and `DISCORD_REDIRECT_URI` must match exactly,
+   including scheme, host, port, and path.
+4. In Discord, enable **User Settings → Advanced → Developer Mode**. Right-click
+   the server and choose **Copy Server ID**. Under **Server Settings → Roles**,
+   create or select the role allowed to administer syndicord and copy its role
+   ID from the role's context menu. Use the numeric IDs, not names.
+
+There is no Discord CLI setup command in this project; use these dashboard
+steps. No bot installation or privileged member intent is needed. Sign-in asks
+only for `identify` and `guilds.members.read`. It does not invite anyone, join a
+server, or assign a role. Invitations and role assignment remain separate
+server-administration actions.
+
+### Configure the Worker
+
+Generate an encryption key once, and save it in your password manager. Reuse an
+installation's existing key if it already has saved webhooks:
 
 ```sh
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-Add these two secrets to your Worker using either method below:
-
-| Secret                  | Value                             |
-| ----------------------- | --------------------------------- |
-| `ADMIN_PASSWORD`        | Your chosen shared login password |
-| `CONFIG_ENCRYPTION_KEY` | The key you just generated        |
+| Setting                 | Value                                                                    |
+| ----------------------- | ------------------------------------------------------------------------ |
+| `CONFIG_ENCRYPTION_KEY` | Base64-encoded 32-byte key for saved webhooks and Discord session tokens |
+| `DISCORD_CLIENT_ID`     | Application's numeric client ID                                          |
+| `DISCORD_CLIENT_SECRET` | Application's client secret                                              |
+| `DISCORD_REDIRECT_URI`  | Exact registered `/admin/auth/callback` URL                              |
+| `DISCORD_GUILD_ID`      | Numeric server ID                                                        |
+| `DISCORD_ROLE_ID`       | Numeric required role ID in that server                                  |
 
 - **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
-  Variables and Secrets**. Add each value as a **Secret** with the name above.
-- **CLI:** Run each command below. The CLI prompts for the value without
-  displaying it. Paste the generated key at the first prompt and your chosen
-  password at the second.
+  Variables and Secrets**. Add each setting as a **Secret** using the names
+  above, then deploy the changes. IDs and the callback URL are not confidential,
+  but storing them as secrets preserves them alongside the other runtime
+  settings during code deployment.
+- **CLI:** Run these commands. Each uses the CLI's hidden value prompt; paste
+  the corresponding value rather than putting credentials in shell history.
 
   ```sh
   npm run syndicord -- cf workers secrets update CONFIG_ENCRYPTION_KEY \
     --worker "$SYNDICORD_WORKER_NAME" --type secret_text
-
-  npm run syndicord -- cf workers secrets update ADMIN_PASSWORD \
+  npm run syndicord -- cf workers secrets update DISCORD_CLIENT_ID \
+    --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+  npm run syndicord -- cf workers secrets update DISCORD_CLIENT_SECRET \
+    --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+  npm run syndicord -- cf workers secrets update DISCORD_REDIRECT_URI \
+    --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+  npm run syndicord -- cf workers secrets update DISCORD_GUILD_ID \
+    --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+  npm run syndicord -- cf workers secrets update DISCORD_ROLE_ID \
     --worker "$SYNDICORD_WORKER_NAME" --type secret_text
   ```
 
 For the [npm-installed CLI](SETUP.md#optional-npm-installation), substitute
 `npx --no-install syndicord` for `npm run syndicord --`.
 
-Visit `https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev/admin`. The Cloudflare
-Worker overview shows the address. Sign in as `admin` with the password you just
-set.
+Visit the Worker's `/admin` address and sign in. Its Cloudflare overview shows
+its HTTPS address. An authorized account sees its Discord identity, a **Sign
+out** control, and the editor. An account without the configured membership or
+role receives an explanation and can sign out or try another Discord account.
+
+## CLI login
+
+```sh
+export SYNDICORD_ADMIN_URL='https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev'
+npm run syndicord -- login
+```
+
+The CLI opens a browser and prints a verification URL and code. If opening the
+browser fails, open that URL yourself. Use `login --no-browser` to print the URL
+without opening a browser. Sign in with Discord, check that the code matches the
+terminal, and approve the CLI request. Approve only a request you started. The
+CLI receives its own syndicord session; Discord tokens and the client secret
+stay on the Worker. Copying browser cookies is unnecessary.
+
+Sessions are saved privately under `$XDG_CONFIG_HOME/syndicord`, or
+`~/.config/syndicord`, and separated by Worker origin. Configuration commands
+need no Cloudflare credentials. When a session expires, run `login` again. Sign
+out of the selected installation with:
+
+```sh
+npm run syndicord -- logout
+```
+
+## Grant and revoke access
+
+- **Grant:** Invite the person to the configured server separately, then assign
+  the configured role in **Server Settings → Members**. Have them sign in.
+- **Revoke:** Remove that role, or remove the person from the server. Both the
+  editor and configuration API check Discord membership and role; every
+  configuration write requires a fresh check. Already loaded pages may remain
+  visible, but further saves are refused. A write already authorized may finish.
+- **Sign out:** Browser sign-out and CLI logout invalidate their respective
+  application sessions. They do not sign the person out of Discord itself.
+- **Change accounts:** Use **Try Discord sign-in again** on the access page, or
+  sign out and choose **Sign in with Discord**. Select/switch the account in
+  Discord's authorization screen. A private browser window can also select a
+  different Discord login.
+
+Sessions last at most eight hours and never outlive the Discord access token.
+Expired or revoked credentials require another login. Discord outages and rate
+limits block access until the check can succeed; no alternative login is used.
+
+To disable administration without stopping the relay, delete
+`DISCORD_CLIENT_SECRET` in **Variables and Secrets**, or run:
+
+```sh
+npm run syndicord -- cf workers secrets delete DISCORD_CLIENT_SECRET \
+  --worker "$SYNDICORD_WORKER_NAME"
+```
+
+This closes both the editor and configuration CLI. Keep `CONFIG_ENCRYPTION_KEY`
+stable and backed up: changing or losing it makes saved webhooks unreadable and
+stops delivery until the correct key is restored. Back up D1 and the key
+together for recovery.
 
 ## Add feeds and routing
 
@@ -55,11 +150,8 @@ set.
 2. In syndicord, add that webhook with a short destination name.
 3. Add a feed URL, choose its destinations, and save.
 
-For the same operations from the terminal, use
-[`webhooks set` and `feeds set`](OPERATIONS.md). You can switch between the CLI
-and web interface at any time.
-
-A feed can send to several destinations, and a destination can receive several
+For terminal equivalents, use [`webhooks set` and `feeds set`](OPERATIONS.md). A
+feed can send to several destinations, and a destination can receive several
 feeds. At most 20 feed/destination pairs are supported. Each feed needs at least
 one destination. Remove a feed to stop its routes; remove all feeds to pause
 polling. New routes silently establish a baseline before delivering new posts. A
@@ -69,57 +161,60 @@ Saved webhook URLs stay hidden. To rotate one, replace its URL under the same
 destination name. Remove its routes before deleting the webhook. Deleting it in
 syndicord does not delete it in Discord.
 
-If another client changes the configuration while a browser form is open, the
-editor rejects its stale save. Reload the latest configuration and reapply your
-change. CLI writes also reject changes that race with the command; exported feed
-files still need to be kept current.
+If another client changes configuration while a form is open, the editor rejects
+the stale save. Reload and reapply your change. CLI writes also reject changes
+that race with the command; exported feed files must be kept current. Feeds and
+encrypted webhooks remain in D1's `relay_configuration` record, and saves update
+them atomically. Deployments preserve configuration and secrets.
 
-## Configuration and password changes
+## Troubleshooting and acceptance
 
-Feed routes and encrypted webhook URLs live in D1's `relay_configuration`
-record. Both clients use the Worker's configuration API; a save updates feeds
-and webhooks atomically. Code deployments preserve this data and Worker secrets.
+| Symptom                             | Check                                                                                               |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Administration disabled             | All six Worker settings, numeric IDs, callback origin/path, and applied migrations                  |
+| Discord rejects the callback        | The exact registered redirect matches `DISCORD_REDIRECT_URI` and the origin used in the browser/CLI |
+| Access denied                       | The signed-in account belongs to the configured server and has the exact configured role ID         |
+| Sign-in expired or already used     | Start sign-in again; callbacks and CLI grants are single use                                        |
+| Discord unavailable or rate limited | Wait as directed and retry; configuration has not been authorized                                   |
+| CLI cannot authenticate             | Select the intended origin and run `login` again                                                    |
 
-To change the login password, choose either method:
-
-- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
-  Variables and Secrets** and edit `ADMIN_PASSWORD`.
-- **CLI:** Run the following command and enter the new password at its prompt:
-
-  ```sh
-  npm run syndicord -- cf workers secrets update ADMIN_PASSWORD \
-    --worker "$SYNDICORD_WORKER_NAME" --type secret_text
-  ```
-
-Browsers may cache HTTP Basic credentials; close the browser session or use a
-fresh private window to sign in again.
-
-To disable administration without stopping the relay:
-
-- **Cloudflare Dashboard:** Delete `ADMIN_PASSWORD` from the same **Variables
-  and Secrets** page.
-- **CLI:** Run:
-
-  ```sh
-  npm run syndicord -- cf workers secrets delete ADMIN_PASSWORD \
-    --worker "$SYNDICORD_WORKER_NAME"
-  ```
-
-This disables both the web editor and the configuration CLI.
-
-Keep `CONFIG_ENCRYPTION_KEY` stable and backed up: changing or losing it makes
-saved webhooks unreadable and stops delivery until the correct key is restored.
-It is separate from the login password, so password changes do not require
-reencrypting webhooks. Back up D1 and the key together for recovery.
-
-This version uses a shared password as its temporary authentication gate.
-Discord OAuth is separate follow-up work.
+Automated checks use mocked Discord responses and local D1. Before relying on a
+hosted installation, verify with real accounts: authorized browser and CLI
+login, denied consent, a nonmember, a member without the role, and removal of
+the role while both clients are signed in. Confirm that fresh reads/saves are
+refused, logout invalidates the session, and a new login restores access only
+after membership and role are granted. These checks require your own Discord
+application and Cloudflare deployment.
 
 ## Local preview
 
-Follow [local development setup](DEVELOPMENT.md#run-locally), then visit
-`http://localhost:8787/admin` and sign in as `admin`. For terminal editing, set
-`SYNDICORD_ADMIN_URL=http://localhost:8787` and use the
-[same CLI commands](OPERATIONS.md). Both clients edit only that local Worker's
-D1 database. Saving configuration does not send a Discord message; manually
-triggering a scheduled poll can.
+Follow [local development setup](DEVELOPMENT.md#run-locally). For interactive
+Discord login, register `http://localhost:8787/admin/auth/callback` on a
+development application and configure that callback in `.dev.vars`. Visit
+`http://localhost:8787/admin`; for terminal editing set
+`SYNDICORD_ADMIN_URL=http://localhost:8787` and run `login`. HTTP is permitted
+only for loopback development. Automated tests need no real Discord application.
+
+Both clients edit only that local Worker's D1 database. Saving configuration
+does not send a Discord message; manually triggering a scheduled poll can.
+
+## Authentication design
+
+The Worker uses Discord's authorization-code flow with S256 PKCE, one-time
+browser-bound state, and server-side code exchange. Discord's
+[authorization server metadata](https://discord.com/.well-known/oauth-authorization-server)
+advertises S256 support. It queries
+[the current user's guild membership](https://docs.discord.com/developers/resources/user#get-current-user-guild-member)
+with the user's access token and checks role IDs. See
+[Discord OAuth2](https://docs.discord.com/developers/topics/oauth2) for the
+scopes and flow. These references were checked on 2026-11-21.
+
+Syndicord owns revocable D1 sessions with opaque tokens, bounded lifetimes, and
+Secure HttpOnly SameSite cookies in production. Discord access tokens are
+encrypted in D1, never returned to the browser or CLI, and never logged by the
+application. The deployment enables Cloudflare query-string redaction for
+request logs and traces so callback codes are omitted from those URLs. Verify
+this setting in the hosted installation and keep external proxies from logging
+callback queries. Browser writes require the same origin; CLI writes
+authenticate with the CLI's separate bearer session. Server-side authorization
+covers both the editor and the shared configuration API.

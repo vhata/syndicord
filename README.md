@@ -29,7 +29,7 @@ The first poll records a baseline without posting a backlog. Delivery state is
 stored in D1, so destinations can retry independently. Each scheduled run checks
 one feed and sends a bounded batch of pending entries.
 
-Use the [password-protected web interface](docs/WEB.md) or
+Use the [Discord-authenticated web interface](docs/WEB.md) or
 [CLI](docs/OPERATIONS.md) to add feeds and webhooks and choose where each feed
 goes. Both clients use the same API and can be used interchangeably. Feeds and
 routing live in Cloudflare D1; webhook URLs are encrypted with a separate Worker

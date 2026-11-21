@@ -175,10 +175,9 @@ gh run view RUN_ID --log-failed
 ```
 
 Missing credentials or IDs stop deployment with setup guidance. GitHub stores
-the deployment token; Cloudflare keeps the administration password and
-encryption key. Configuration remains in D1. No local secrets file is used by
-CI. [Change feeds or webhooks](OPERATIONS.md) independently of these
-credentials.
+the deployment token; Cloudflare keeps Discord OAuth settings and the encryption
+key. Configuration remains in D1. No local secrets file is used by CI.
+[Change feeds or webhooks](OPERATIONS.md) independently of these credentials.
 
 ## Deployment and migration behavior
 

@@ -1,4 +1,10 @@
-# Set these to enable /admin. Use a password of your choice and generate a key:
+# Local development only. Register this exact callback in the Discord app.
+# Use numeric Discord IDs. Keep real values in ignored .dev.vars, never Git.
+DISCORD_CLIENT_ID=''
+DISCORD_CLIENT_SECRET=''
+DISCORD_REDIRECT_URI='http://localhost:8787/admin/auth/callback'
+DISCORD_GUILD_ID=''
+DISCORD_ROLE_ID=''
+# Reuse the existing key for an existing database. Generate a new key with:
 # node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
-ADMIN_PASSWORD=''
 CONFIG_ENCRYPTION_KEY=''
