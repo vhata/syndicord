@@ -2,43 +2,70 @@
 
 Open **`/admin`** on your Worker's HTTPS address to manage feeds, Discord
 webhooks, and routing. Sign in with username **`admin`** and your shared
-password. Each change takes effect on the next scheduled poll, without a code
-deployment.
+password. The [syndicord CLI](OPERATIONS.md) edits the same configuration
+through the same API. Changes from either client apply on the next scheduled
+poll.
 
-## Enable the interface
+## Enable administration
 
-For an existing installation, deploy this version through your normal
-[deployment workflow](DEPLOYMENT.md) or `npm run deploy`. Deployment applies the
-D1 migrations and enables the Worker's `workers.dev` address. Preview URLs stay
-disabled. The interface stays closed until its secrets are configured.
+[Select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation),
+then deploy code and migrations with `npm run deploy` or your
+[deployment workflow](DEPLOYMENT.md). A fresh installation starts empty, with
+polling paused. The Worker enables its `workers.dev` address; preview URLs stay
+disabled. Administration stays closed until its secrets are configured.
 
-In Cloudflare, open **Workers & Pages → your Worker → Settings → Variables and
-Secrets** and add these as **Secret** values:
-
-| Secret                  | Value                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------- |
-| `ADMIN_PASSWORD`        | A strong shared password, stored in your password manager                       |
-| `CONFIG_ENCRYPTION_KEY` | A random 32-byte key encoded as base64, also backed up in your password manager |
-
-Generate the encryption key locally:
+Generate a key once, and save it in your password manager:
 
 ```sh
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-Save the secrets, then open the Worker's HTTPS address followed by `/admin`. The
-Worker overview shows its address. Use the existing
-[first installation guide](SETUP.md) if you have not created a Worker yet; `[]`
-is a valid initial feed list and `{}` is a valid initial `WEBHOOKS` map. These
-steps change your hosted installation and use its existing Cloudflare resources
-and plan.
+Set these Worker secrets using the CLI. Run this snippet in Bash; paste the
+saved key at the first hidden prompt and your chosen password at the second:
+
+```bash
+(
+  set -e
+  for secret_name in CONFIG_ENCRYPTION_KEY ADMIN_PASSWORD; do
+    IFS= read -r -s -p "$secret_name: " secret_value
+    printf '\n'
+    test -n "$secret_value"
+    printf '%s' "$secret_value" |
+      npm run syndicord -- cf workers secrets update "$secret_name" \
+        --worker "$SYNDICORD_WORKER_NAME" --type secret_text --text @/dev/stdin
+  done
+)
+```
+
+The commands update the hosted Worker. `printf` sends the exact value without a
+trailing newline; the value stays out of command arguments and shell history.
+For the [npm-installed CLI](SETUP.md#optional-npm-installation), substitute
+`npx --no-install syndicord` for `npm run syndicord --`.
+
+Alternatively, in Cloudflare open **Workers & Pages → your Worker → Settings →
+Variables and Secrets** and add both values as **Secret**:
+
+| Secret                  | Value                                 |
+| ----------------------- | ------------------------------------- |
+| `ADMIN_PASSWORD`        | Your shared login password            |
+| `CONFIG_ENCRYPTION_KEY` | Your saved base64-encoded 32-byte key |
+
+Visit `https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev/admin`. To find the account
+subdomain from the terminal, use the
+[address lookup](API.md#find-the-worker-address); the Cloudflare Worker overview
+also shows the address. For a new installation, start with
+[first deployment](SETUP.md).
 
 ## Add feeds and routing
 
-1. Add a webhook with a short destination name and the URL copied from **Discord
-   → Edit Channel → Integrations → Webhooks**.
-2. Add a feed URL and select the destinations that should receive its posts.
-3. Save. Repeat for other feeds, or edit a feed to change its destinations.
+1. [Create a Discord webhook](API.md#create-a-discord-webhook), using the API or
+   Discord's **Edit Channel → Integrations → Webhooks** page.
+2. In syndicord, add that webhook with a short destination name.
+3. Add a feed URL, choose its destinations, and save.
+
+For the same operations from the terminal, use
+[`webhooks set` and `feeds set`](OPERATIONS.md). You can switch between the CLI
+and web interface at any time.
 
 A feed can send to several destinations, and a destination can receive several
 feeds. At most 20 feed/destination pairs are supported. Each feed needs at least
@@ -46,46 +73,45 @@ one destination. Remove a feed to stop its routes; remove all feeds to pause
 polling. New routes silently establish a baseline before delivering new posts. A
 poll already in progress may finish using its earlier configuration.
 
-Saved webhook URLs are never displayed again. To rotate one, replace its URL
-under the same destination name. Remove its routes before deleting the webhook.
-Deleting it here does not delete the webhook in Discord.
+Saved webhook URLs stay hidden. To rotate one, replace its URL under the same
+destination name. Remove its routes before deleting the webhook. Deleting it in
+syndicord does not delete it in Discord.
 
-If another tab or operator changes the configuration, the editor rejects a stale
-save. Reload the latest configuration and reapply your change. Avoid
-simultaneous CLI secret changes and first-time web saves.
+If another client changes the configuration while a browser form is open, the
+editor rejects its stale save. Reload the latest configuration and reapply your
+change. CLI writes also reject changes that race with the command; exported feed
+files still need to be kept current.
 
 ## Configuration and password changes
 
-Feed routes remain in D1's `relay_configuration` record. On the first web save,
-the Worker copies the current `WEBHOOKS` map, applies your changes, and encrypts
-the complete map in D1 with AES-GCM. Subsequent polls and web edits use that
-map. Webhook URLs are decrypted only inside the Worker and never returned to the
-browser.
+Feed routes and encrypted webhook URLs live in D1's `relay_configuration`
+record. Both clients use the Worker's configuration API; a save updates feeds
+and webhooks atomically. Code deployments preserve this data and Worker secrets.
 
-The old `WEBHOOKS` secret is retained for deployment compatibility but no longer
-controls destinations after the first web save. The CLI rejects `webhooks set`
-and `deploy --webhooks-file` in that state. Use the web interface for webhook
-changes. `feeds get`, `feeds set`, and `status` still use the same D1
-configuration; CLI feed writes must reference existing destinations. Normal code
-deployments preserve the stored map and Worker secrets.
+To change the login password, repeat the CLI secret update above for
+`ADMIN_PASSWORD` only, or edit that secret in the dashboard. Browsers may cache
+HTTP Basic credentials; close the browser session or use a fresh private window
+to sign in again. To disable web and configuration-CLI access without stopping
+the relay:
 
-Change `ADMIN_PASSWORD` to change the shared login. Browsers may cache HTTP
-Basic credentials; close the browser session or use a fresh private window to
-sign in again. Remove `ADMIN_PASSWORD` to disable web access without stopping
-the relay.
+```sh
+npm run syndicord -- cf workers secrets delete ADMIN_PASSWORD \
+  --worker "$SYNDICORD_WORKER_NAME"
+```
 
 Keep `CONFIG_ENCRYPTION_KEY` stable and backed up: changing or losing it makes
 saved webhooks unreadable and stops delivery until the correct key is restored.
 It is separate from the login password, so password changes do not require
 reencrypting webhooks. Back up D1 and the key together for recovery.
 
-This version uses one shared password over HTTPS, with no per-user accounts or
-roles. Broader authentication and security controls are deferred.
+This version uses a shared password as its temporary authentication gate.
+Discord OAuth is separate follow-up work.
 
 ## Local preview
 
-Follow [local development setup](DEVELOPMENT.md#run-locally), and set
-`ADMIN_PASSWORD` and `CONFIG_ENCRYPTION_KEY` in the ignored `.dev.vars` file.
-Then visit `http://localhost:8787/admin` and sign in as `admin`. The same web
-interface edits only the local D1 database. Saving configuration does not send a
-Discord message; manually triggering a scheduled poll can.
+Follow [local development setup](DEVELOPMENT.md#run-locally), then visit
+`http://localhost:8787/admin` and sign in as `admin`. For terminal editing, set
+`SYNDICORD_ADMIN_URL=http://localhost:8787` and use the
+[same CLI commands](OPERATIONS.md). Both clients edit only that local Worker's
+D1 database. Saving configuration does not send a Discord message; manually
+triggering a scheduled poll can.

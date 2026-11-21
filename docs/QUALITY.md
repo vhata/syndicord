@@ -67,10 +67,10 @@ and the operator guides for [setup](SETUP.md), [configuration](OPERATIONS.md),
 
 Focus on these boundaries:
 
-- D1 owns feed/routing configuration, encrypted web-managed webhook URLs, and
-  delivery state. Worker secrets own the encryption key, login password, and
-  initial CLI webhook map. Repository and package artifacts contain none of
-  these installation values. Web responses must never reveal saved webhooks.
+- D1 owns feed/routing configuration, encrypted webhook URLs, and delivery
+  state. The web interface and CLI share one API. Worker secrets own the
+  encryption key and login password. Repository and package artifacts contain
+  none of these installation values. API responses never reveal saved webhooks.
 - First observation establishes a silent baseline. Retry identities, leases,
   destination cooldowns, and configuration changes must preserve the documented
   delivery semantics.

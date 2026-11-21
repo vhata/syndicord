@@ -84,4 +84,5 @@ authentication, query, missing-schema, or configuration errors. The command
 suppresses raw remote error text and never prints a webhook secret.
 
 The command reads D1 when requested; it does not install an alerting service.
-Use Cloudflare's Worker metrics separately for CPU limits and invocation errors.
+Inspect [invocation metrics](SETUP.md#verify-delivery) through the CLI tail or
+Cloudflare dashboard separately for CPU limits and invocation errors.

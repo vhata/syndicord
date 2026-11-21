@@ -1,3 +1,9 @@
+## Documentation
+
+When instructions use a dashboard or settings page, provide a supported CLI
+alternative wherever possible. If an operation requires a browser, say why.
+Verify commands against the project's pinned tools.
+
 <!-- docket:begin -->
 
 ## Docket
