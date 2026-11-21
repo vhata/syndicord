@@ -270,6 +270,19 @@ test('logout invalidates the server session before removing local credentials an
   const f = await fixture();
   try {
     await login(f.env, f.dependencies);
+    const second = { ...f.env, SYNDICORD_ADMIN_URL: 'https://other.example' };
+    await login(second, {
+      ...f.dependencies,
+      fetcher: async (url) =>
+        Response.json(
+          url.endsWith('/start')
+            ? {
+                ...started,
+                verificationUri: `https://other.example/admin/auth/cli?request=${requestId}`,
+              }
+            : { token: 'b'.repeat(43), user, expiresAt: Date.now() + 60_000 },
+        ),
+    });
     let invalidated = false;
     const output = await logout(f.env, async (url, init) => {
       assert.equal(url, `${origin}/admin/auth/logout`);
@@ -286,6 +299,7 @@ test('logout invalidates the server session before removing local credentials an
     });
     assert.ok(invalidated);
     assert.match(output, /Signed out/);
+    assert.equal((await readSession(second)).token, 'b'.repeat(43));
     await assert.rejects(readSession(f.env), /Run syndicord login/);
     assert.match(
       await logout(f.env, async () => {
