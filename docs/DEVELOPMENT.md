@@ -201,3 +201,5 @@ See [setup](SETUP.md) for the first hosted deployment,
 
 - [Cloudflare configuration](https://developers.cloudflare.com/cf/projects/cloudflare-config/)
 - [Cloudflare CLI project commands](https://developers.cloudflare.com/cf/projects/)
+
+For advanced provider operations, see the optional [API recipes](API.md).
