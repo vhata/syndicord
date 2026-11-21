@@ -81,15 +81,16 @@ fresh installation has no feeds, so polling remains idle until configured.
 
 ## Enable configuration access
 
-Follow [administration setup](WEB.md#enable-administration) to set the temporary
-shared password and encryption key. Choose the Cloudflare dashboard steps or CLI
-commands in that guide. Keep the key in your password manager; it is needed to
-read the encrypted webhook URLs in D1.
+Follow [administration setup](WEB.md#enable-administration) to register the
+Discord application, choose the allowed server and role, and configure OAuth and
+the encryption key. Choose the Cloudflare dashboard steps or CLI commands in
+that guide. Keep the key in your password manager; it is needed to read the
+encrypted webhook URLs in D1.
 
 Use either client, or switch between them at any time:
 
-- **Web interface:** open the Worker's `/admin` address, sign in with username
-  `admin`, add webhook destinations and feeds, then save.
+- **Web interface:** open the Worker's `/admin` address, sign in with Discord,
+  add webhook destinations and feeds, then save.
 - **CLI:** [select the installation](OPERATIONS.md#select-an-installation),
   [add webhook destinations](OPERATIONS.md#add-or-change-webhooks), then
   [save the feed list](OPERATIONS.md#add-or-change-a-feed).
@@ -100,7 +101,8 @@ such as your own repository's commit feed.
 
 Save webhook URLs in your password manager before adding them. Both clients show
 destination names but never return stored URLs. Keep the installation
-identifiers, Worker address, password, and encryption key for future use.
+identifiers, Worker address, Discord application credentials, and encryption key
+for future use.
 
 ## Verify delivery
 

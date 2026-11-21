@@ -6,17 +6,22 @@
 ## Select an installation
 
 The CLI and web interface use the same Worker API. Set its origin, without an
-`/admin` suffix, and the password you use to sign in:
+`/admin` suffix, then sign in with Discord:
 
 ```sh
 export SYNDICORD_ADMIN_URL='https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev'
-export SYNDICORD_ADMIN_PASSWORD='your-admin-password'
+npm run syndicord -- login
 ```
 
+Approve the browser request only when its code matches the terminal. Your
+account must belong to the configured server and have its required role. See
+[Discord setup and CLI login](WEB.md#cli-login) for details. Run
+`npm run syndicord -- logout` when finished; expired sessions require `login`
+again.
+
 Configuration commands need no Cloudflare credentials. For local development,
-use `http://localhost:8787` and the password in `.dev.vars`; `--local` is not a
+use `http://localhost:8787` with the local OAuth settings; `--local` is not a
 configuration-command option. HTTPS is required except for loopback addresses.
-Use `unset SYNDICORD_ADMIN_PASSWORD` when finished.
 
 Run commands from your checkout. For the
 [npm-installed CLI](SETUP.md#optional-npm-installation), use
@@ -128,7 +133,7 @@ switching between configuration and infrastructure commands.
 | Setting                                    | Authoritative location   |
 | ------------------------------------------ | ------------------------ |
 | Feed URLs, routing, encrypted webhook URLs | D1 `relay_configuration` |
-| Shared password and encryption key         | Worker secrets           |
+| Discord OAuth settings and encryption key  | Worker secrets           |
 | Baselines, pending deliveries, and health  | D1 delivery ledger       |
 
 ## Polling limits
