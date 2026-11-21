@@ -405,3 +405,65 @@ test('authentication errors and oversized response bodies never leak into output
     await f.dispose();
   }
 });
+
+test('headless login prints the browser approval URL without launching a browser', async () => {
+  const f = await fixture();
+  try {
+    const result = await runCli(['login', '--no-browser'], f.env, {
+      adminFetch: f.dependencies.fetcher,
+      auth: f.dependencies,
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(f.opened, []);
+    assert.ok(f.progress.includes(`Open ${started.verificationUri}`));
+  } finally {
+    await f.dispose();
+  }
+});
+
+test('login network requests and response bodies are bounded by a deadline', async (t) => {
+  const f = await fixture();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const stalled = login(f.env, {
+      ...f.dependencies,
+      fetcher: async (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init.signal!.addEventListener(
+            'abort',
+            () => reject(new Error('private-network-error')),
+            { once: true },
+          );
+        }),
+    });
+    const rejected = assert.rejects(
+      stalled,
+      /Cannot complete administration authentication/,
+    );
+    t.mock.timers.tick(10_000);
+    await rejected;
+    let cancelled = false;
+    const stalledBody = login(f.env, {
+      ...f.dependencies,
+      fetcher: async () =>
+        new Response(
+          new ReadableStream({
+            cancel() {
+              cancelled = true;
+            },
+          }),
+        ),
+    });
+    const rejectedBody = assert.rejects(
+      stalledBody,
+      /Cannot complete administration authentication/,
+    );
+    await Promise.resolve();
+    t.mock.timers.tick(10_000);
+    await rejectedBody;
+    assert.ok(cancelled);
+    await assert.rejects(readSession(f.env), /Run syndicord login/);
+  } finally {
+    await f.dispose();
+  }
+});
