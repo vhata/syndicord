@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { URL as NodeURL } from 'node:url';
 import test from 'node:test';
 import * as oauth from 'oauth4webapi';
 import {
@@ -8,6 +10,12 @@ import {
   requireAdmin,
 } from '../src/admin-auth.ts';
 import type { AuthEnv, DiscordFetch } from '../src/admin-auth.ts';
+import {
+  configurationKey,
+  readAdminConfiguration,
+  readRelayConfiguration,
+  saveAdminConfiguration,
+} from '../src/admin-store.ts';
 import { createTestDatabase } from './helpers/d1.ts';
 import {
   authEnv,
@@ -552,6 +560,7 @@ test('CLI grants require explicit same-origin browser approval and the matching 
     assert.match(html, /Only approve if you started/);
     assert.doesNotMatch(html, new RegExp(pending.secret));
     const approval = /name="approval" value="([A-Za-z0-9_-]+)"/.exec(html)![1]!;
+    const anotherBrowser = await browserLogin(env, fetcher);
     const form = (originValue: string, approvalValue = approval) =>
       req('/admin/auth/cli/approve', {
         method: 'POST',
@@ -589,11 +598,20 @@ test('CLI grants require explicit same-origin browser approval and the matching 
       ))!.status,
       401,
     );
+    const stolenForm = form(origin);
+    stolenForm.headers.set('Cookie', anotherBrowser.cookie);
+    assert.equal((await handleAuth(stolenForm, env, fetcher))!.status, 410);
     assert.equal((await handleAuth(form(origin), env, fetcher))!.status, 200);
     assert.equal((await handleAuth(form(origin), env, fetcher))!.status, 410);
     await db.prepare('UPDATE admin_cli_requests SET poll_after_ms = 0').run();
-    const result = await poll();
-    assert.equal(result!.status, 200);
+    const concurrent = await Promise.all([poll(), poll()]);
+    assert.equal(
+      concurrent.filter((result) => result!.status === 200).length,
+      1,
+    );
+    assert.ok(
+      concurrent.some((result) => [401, 410, 429].includes(result!.status)),
+    );
     assert.equal((await poll())!.status, 410);
   } finally {
     await dispose();
@@ -677,6 +695,271 @@ test('HTTP loopback authentication uses its own HttpOnly cookie names and cannot
       authConfiguration(authEnv(db, 'http://syndicord.example')),
       null,
     );
+  } finally {
+    await dispose();
+  }
+});
+
+test('concurrent callbacks exchange an authorization code only once', async () => {
+  const { env, db, dispose } = await fixture();
+  const calls: Request[] = [];
+  const fetcher = discordFixture({ calls });
+  try {
+    const start = await begin(env, fetcher);
+    const callbacks = await Promise.all(
+      [1, 2].map(() =>
+        handleAuth(
+          new Request(start.url, { headers: { Cookie: start.cookie } }),
+          env,
+          fetcher,
+        ),
+      ),
+    );
+    assert.deepEqual(
+      callbacks.map((result) => result!.headers.get('location')).sort(),
+      ['/admin', '/admin?auth=invalid'],
+    );
+    assert.equal(
+      calls.filter((request) => request.url.endsWith('/oauth2/token')).length,
+      1,
+    );
+    assert.equal(
+      await db
+        .prepare('SELECT COUNT(*) AS count FROM admin_sessions')
+        .first('count'),
+      1,
+    );
+  } finally {
+    await dispose();
+  }
+});
+
+test('failed CLI consent ends its terminal request and a validated failed account switch invalidates the old session', async () => {
+  const { env, db, dispose } = await fixture();
+  const fetcher = discordFixture();
+  try {
+    const original = await browserLogin(env, fetcher);
+    const pending = (await (await handleAuth(
+      post('/admin/auth/cli/start', {}),
+      env,
+      fetcher,
+    ))!.json()) as { requestId: string; secret: string };
+    const started = (await handleAuth(
+      signed(original.cookie, `/admin/auth/login?request=${pending.requestId}`),
+      env,
+      fetcher,
+    ))!;
+    const target = new URL(started.headers.get('location')!);
+    const callback = new URL(env.DISCORD_REDIRECT_URI!);
+    callback.search = new URLSearchParams({
+      state: target.searchParams.get('state')!,
+      error: 'access_denied',
+      iss: 'https://discord.com',
+    }).toString();
+    const cookie = `${responseCookie(started, '__Host-syndicord_oauth')}; ${original.cookie}`;
+    const forged = await handleAuth(new Request(callback), env, fetcher);
+    assert.equal(forged!.headers.get('location'), '/admin?auth=invalid');
+    assert.equal(
+      await db.prepare('SELECT status FROM admin_cli_requests').first('status'),
+      'pending',
+    );
+    await requireAdmin(signed(original.cookie), env, fetcher);
+    const denied = (await handleAuth(
+      new Request(callback, { headers: { Cookie: cookie } }),
+      env,
+      fetcher,
+    ))!;
+    assert.equal(denied.headers.get('location'), '/admin?auth=cancelled');
+    assert.ok(
+      denied.headers
+        .getSetCookie()
+        .some(
+          (part) =>
+            part.startsWith('__Host-syndicord_session=;') &&
+            part.includes('Max-Age=0'),
+        ),
+    );
+    await assert.rejects(
+      requireAdmin(signed(original.cookie), env, fetcher),
+      authError(401),
+    );
+    assert.equal(
+      (await handleAuth(post('/admin/auth/cli/poll', pending), env, fetcher))!
+        .status,
+      403,
+    );
+  } finally {
+    await dispose();
+  }
+});
+
+test('CLI approval denial offers identity, logout and account recovery and stops terminal polling', async () => {
+  const { env, dispose } = await fixture();
+  const options = { roles: [TEST_ROLE_ID] };
+  const fetcher = discordFixture(options);
+  try {
+    const { cookie } = await browserLogin(env, fetcher);
+    const pending = (await (await handleAuth(
+      post('/admin/auth/cli/start', {}),
+      env,
+      fetcher,
+    ))!.json()) as {
+      requestId: string;
+      secret: string;
+      verificationUri: string;
+    };
+    options.roles = [];
+    const page = (await handleAuth(
+      new Request(pending.verificationUri, { headers: { Cookie: cookie } }),
+      env,
+      fetcher,
+    ))!;
+    assert.equal(page.status, 403);
+    assert.match(page.headers.get('content-type')!, /text\/html/);
+    const html = await page.text();
+    assert.match(html, /Fixture User/);
+    assert.match(html, /Sign out/);
+    assert.match(html, /Try another Discord account/);
+    assert.match(html, /syndicord login/);
+    assert.equal(
+      (await handleAuth(post('/admin/auth/cli/poll', pending), env, fetcher))!
+        .status,
+      403,
+    );
+  } finally {
+    await dispose();
+  }
+});
+
+test('Discord redirects and oversized responses fail closed without following or exposing provider content', async () => {
+  const { env, dispose } = await fixture();
+  try {
+    const { cookie } = await browserLogin(env);
+    for (const response of [
+      new Response('', {
+        status: 302,
+        headers: { Location: 'https://evil.example/private-token' },
+      }),
+      new Response('private-token' + 'x'.repeat(64 * 1024)),
+      new Response('private-token', {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ]) {
+      let calls = 0;
+      const fetcher: DiscordFetch = async (_input, init) => {
+        calls++;
+        assert.equal(init?.redirect, 'manual');
+        return response;
+      };
+      await assert.rejects(
+        requireAdmin(signed(cookie), env, fetcher),
+        (error: unknown) =>
+          error instanceof AuthError &&
+          error.status === 503 &&
+          !error.message.includes('private-token'),
+      );
+      assert.equal(calls, 1);
+    }
+  } finally {
+    await dispose();
+  }
+});
+
+test('the Discord timeout cancels a stalled response body and never authorizes access', async (context) => {
+  const { env, dispose } = await fixture();
+  let cancelled = false;
+  try {
+    const { cookie } = await browserLogin(env);
+    let fetched!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      fetched = resolve;
+    });
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    const check = requireAdmin(signed(cookie), env, async () => {
+      fetched();
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{"roles":'));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        }),
+      );
+    });
+    const rejected = assert.rejects(check, authError(503));
+    await ready;
+    context.mock.timers.tick(10_000);
+    await rejected;
+    assert.ok(cancelled);
+  } finally {
+    context.mock.timers.reset();
+    await dispose();
+  }
+});
+
+test('the authentication migration preserves saved feeds, encrypted webhooks, revision and delivery ledger', async () => {
+  const { env, db, dispose } = await fixture();
+  try {
+    await db.batch(
+      ['admin_sessions', 'admin_oauth_requests', 'admin_cli_requests'].map(
+        (table) => db.prepare(`DROP TABLE ${table}`),
+      ),
+    );
+    const key = await configurationKey(env.CONFIG_ENCRYPTION_KEY);
+    const original = await readAdminConfiguration(env, key);
+    const feed = 'https://example.com/feed.xml';
+    const webhook = 'https://discord.com/api/webhooks/123/preserved-webhook';
+    const saved = await saveAdminConfiguration(env, key, {
+      revision: original.revision,
+      feeds: [{ url: feed, destinations: ['updates'] }],
+      webhooks: { updates: webhook },
+    });
+    await db
+      .prepare(
+        "INSERT INTO relay_routes(feed_url,destination,baseline_id,initialized_at_ms) VALUES (?,'updates','baseline',1)",
+      )
+      .bind(feed)
+      .run();
+    await db
+      .prepare(
+        "INSERT INTO relay_deliveries(feed_url,destination,entry_id,state,first_seen_ms,next_attempt_ms) VALUES (?,'updates','entry','sent',2,3)",
+      )
+      .bind(feed)
+      .run();
+    const beforeConfig = await db
+      .prepare('SELECT * FROM relay_configuration')
+      .first();
+    const beforeLedger = await db
+      .prepare('SELECT * FROM relay_deliveries')
+      .first();
+    const migration = await readFile(
+      new NodeURL('../migrations/0005_discord_auth.sql', import.meta.url),
+      'utf8',
+    );
+    await db.batch(
+      migration
+        .split(';')
+        .map((sql) => sql.trim())
+        .filter(Boolean)
+        .map((sql) => db.prepare(sql)),
+    );
+    assert.deepEqual(
+      await db.prepare('SELECT * FROM relay_configuration').first(),
+      beforeConfig,
+    );
+    assert.deepEqual(
+      await db.prepare('SELECT * FROM relay_deliveries').first(),
+      beforeLedger,
+    );
+    assert.equal(
+      (await readAdminConfiguration(env, key)).revision,
+      saved.revision,
+    );
+    assert.equal((await readRelayConfiguration(env)).webhooks.updates, webhook);
+    const { cookie } = await browserLogin(env);
+    await requireAdmin(signed(cookie), env, discordFixture());
   } finally {
     await dispose();
   }
