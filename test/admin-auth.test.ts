@@ -485,6 +485,75 @@ test('Discord rate limits propagate Retry-After and prevent repeated membership 
   }
 });
 
+for (const kind of ['browser', 'cli'] as const)
+  test(`cached Discord cooldown retains its deadline for ${kind} sessions`, async (context) => {
+    const { env, db, dispose } = await fixture();
+    const options = { status: 200, retryAfter: '2', calls: [] as Request[] };
+    const fetcher = discordFixture(options);
+    try {
+      const request =
+        kind === 'browser'
+          ? signed((await browserLogin(env, fetcher)).cookie)
+          : req('/admin', {
+              headers: {
+                Authorization: `Bearer ${(await cliLogin(env, fetcher)).token}`,
+              },
+            });
+      const started = Date.now();
+      let now = started;
+      context.mock.method(Date, 'now', () => now);
+      const deadline = () =>
+        db
+          .prepare('SELECT retry_at_ms FROM admin_sessions WHERE kind = ?')
+          .bind(kind)
+          .first<number>('retry_at_ms');
+      const limited = (seconds: number) => (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.status, 429);
+        assert.equal(error.retryAfter, seconds);
+        assert.deepEqual(error.user, {
+          id: TEST_USER_ID,
+          name: 'Fixture User',
+        });
+        return true;
+      };
+
+      options.status = 429;
+      await assert.rejects(requireAdmin(request, env, fetcher), limited(2));
+      assert.equal(await deadline(), started + 2000);
+      const calls = options.calls.length;
+      options.status = 200;
+      for (const [elapsed, seconds] of [
+        [500, 2],
+        [1000, 1],
+        [1500, 1],
+        [1999, 1],
+      ] as const) {
+        now = started + elapsed;
+        await assert.rejects(
+          requireAdmin(request, env, fetcher),
+          limited(seconds),
+        );
+        assert.equal(await deadline(), started + 2000);
+        assert.equal(options.calls.length, calls);
+      }
+
+      now = started + 2000;
+      assert.equal((await requireAdmin(request, env, fetcher)).kind, kind);
+      assert.equal(options.calls.length, calls + 1);
+
+      now += 100;
+      options.status = 429;
+      options.retryAfter = '3';
+      await assert.rejects(requireAdmin(request, env, fetcher), limited(3));
+      assert.equal(await deadline(), now + 3000);
+      assert.equal(options.calls.length, calls + 2);
+    } finally {
+      context.mock.restoreAll();
+      await dispose();
+    }
+  });
+
 test('CLI browser approval issues a separate opaque application token under the same role checks and logout invalidates it', async () => {
   const { env, dispose } = await fixture();
   const options = { roles: [TEST_ROLE_ID] };
