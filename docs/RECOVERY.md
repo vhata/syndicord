@@ -179,11 +179,13 @@ gh workflow run check.yml --ref main
 ## Restore D1
 
 [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
-retains seven days on Workers Free. A restore overwrites the database. First
-[pause cron triggers](API.md#pause-and-restore-cron-triggers) using the API
-commands or dashboard, prevent concurrent deployments, and allow trigger changes
-to propagate and running invocations to finish. A pause stored as `[]` is
-insufficient: restoring D1 also restores the old feed configuration.
+retains seven days on Workers Free. A restore overwrites the database. First, in
+Cloudflare open **Workers & Pages → your Worker → Settings → Triggers → Cron
+Triggers**. Record the current schedule, then remove it temporarily. Prevent
+concurrent deployments and allow up to 15 minutes for trigger changes to
+propagate, plus time for running invocations to finish. The pinned CLI has no
+direct cron-management command. A pause stored as `[]` is insufficient:
+restoring D1 also restores the old feed configuration.
 
 Record the current bookmark, then look up the intended restore point:
 
@@ -202,9 +204,10 @@ npm run syndicord -- cf d1 time-travel restore "$SYNDICORD_DATABASE_ID" \
 ```
 
 Keep the encryption key matching the restored webhook data. Inspect the restored
-configuration and ledger before restoring the saved cron triggers. Restoring an
-older ledger can forget successful sends and produce duplicate Discord messages.
-Inspect pending deliveries before resuming; practise recovery on an isolated
-database before relying on it. CI never restores or resets D1 automatically.
+configuration and ledger before adding the recorded cron schedule back on the
+Worker's **Cron Triggers** page. Restoring an older ledger can forget successful
+sends and produce duplicate Discord messages. Inspect pending deliveries before
+resuming; practise recovery on an isolated database before relying on it. CI
+never restores or resets D1 automatically.
 
 [Worker rollback reference](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)

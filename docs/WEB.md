@@ -20,46 +20,38 @@ Generate a key once, and save it in your password manager:
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-Set these Worker secrets using the CLI. Run this snippet in Bash; paste the
-saved key at the first hidden prompt and your chosen password at the second:
+Add these two secrets to your Worker using either method below:
 
-```bash
-(
-  set -e
-  for secret_name in CONFIG_ENCRYPTION_KEY ADMIN_PASSWORD; do
-    IFS= read -r -s -p "$secret_name: " secret_value
-    printf '\n'
-    test -n "$secret_value"
-    printf '%s' "$secret_value" |
-      npm run syndicord -- cf workers secrets update "$secret_name" \
-        --worker "$SYNDICORD_WORKER_NAME" --type secret_text --text @/dev/stdin
-  done
-)
-```
+| Secret                  | Value                             |
+| ----------------------- | --------------------------------- |
+| `ADMIN_PASSWORD`        | Your chosen shared login password |
+| `CONFIG_ENCRYPTION_KEY` | The key you just generated        |
 
-The commands update the hosted Worker. `printf` sends the exact value without a
-trailing newline; the value stays out of command arguments and shell history.
+- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
+  Variables and Secrets**. Add each value as a **Secret** with the name above.
+- **CLI:** Run each command below. The CLI prompts for the value without
+  displaying it. Paste the generated key at the first prompt and your chosen
+  password at the second.
+
+  ```sh
+  npm run syndicord -- cf workers secrets update CONFIG_ENCRYPTION_KEY \
+    --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+
+  npm run syndicord -- cf workers secrets update ADMIN_PASSWORD \
+    --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+  ```
+
 For the [npm-installed CLI](SETUP.md#optional-npm-installation), substitute
 `npx --no-install syndicord` for `npm run syndicord --`.
 
-Alternatively, in Cloudflare open **Workers & Pages → your Worker → Settings →
-Variables and Secrets** and add both values as **Secret**:
-
-| Secret                  | Value                                 |
-| ----------------------- | ------------------------------------- |
-| `ADMIN_PASSWORD`        | Your shared login password            |
-| `CONFIG_ENCRYPTION_KEY` | Your saved base64-encoded 32-byte key |
-
-Visit `https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev/admin`. To find the account
-subdomain from the terminal, use the
-[address lookup](API.md#find-the-worker-address); the Cloudflare Worker overview
-also shows the address. For a new installation, start with
-[first deployment](SETUP.md).
+Visit `https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev/admin`. The Cloudflare
+Worker overview shows the address. Sign in as `admin` with the password you just
+set.
 
 ## Add feeds and routing
 
-1. [Create a Discord webhook](API.md#create-a-discord-webhook), using the API or
-   Discord's **Edit Channel → Integrations → Webhooks** page.
+1. In Discord, open the destination channel's **Edit Channel → Integrations →
+   Webhooks**, create a webhook, and copy its URL.
 2. In syndicord, add that webhook with a short destination name.
 3. Add a feed URL, choose its destinations, and save.
 
@@ -88,16 +80,32 @@ Feed routes and encrypted webhook URLs live in D1's `relay_configuration`
 record. Both clients use the Worker's configuration API; a save updates feeds
 and webhooks atomically. Code deployments preserve this data and Worker secrets.
 
-To change the login password, repeat the CLI secret update above for
-`ADMIN_PASSWORD` only, or edit that secret in the dashboard. Browsers may cache
-HTTP Basic credentials; close the browser session or use a fresh private window
-to sign in again. To disable web and configuration-CLI access without stopping
-the relay:
+To change the login password, choose either method:
 
-```sh
-npm run syndicord -- cf workers secrets delete ADMIN_PASSWORD \
-  --worker "$SYNDICORD_WORKER_NAME"
-```
+- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
+  Variables and Secrets** and edit `ADMIN_PASSWORD`.
+- **CLI:** Run the following command and enter the new password at its prompt:
+
+  ```sh
+  npm run syndicord -- cf workers secrets update ADMIN_PASSWORD \
+    --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+  ```
+
+Browsers may cache HTTP Basic credentials; close the browser session or use a
+fresh private window to sign in again.
+
+To disable administration without stopping the relay:
+
+- **Cloudflare Dashboard:** Delete `ADMIN_PASSWORD` from the same **Variables
+  and Secrets** page.
+- **CLI:** Run:
+
+  ```sh
+  npm run syndicord -- cf workers secrets delete ADMIN_PASSWORD \
+    --worker "$SYNDICORD_WORKER_NAME"
+  ```
+
+This disables both the web editor and the configuration CLI.
 
 Keep `CONFIG_ENCRYPTION_KEY` stable and backed up: changing or losing it makes
 saved webhooks unreadable and stops delivery until the correct key is restored.

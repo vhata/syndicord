@@ -6,13 +6,11 @@
 ## Select an installation
 
 The CLI and web interface use the same Worker API. Set its origin, without an
-`/admin` suffix, then enter the shared password at the hidden Bash prompt:
+`/admin` suffix, and the password you use to sign in:
 
-```bash
+```sh
 export SYNDICORD_ADMIN_URL='https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev'
-IFS= read -r -s -p 'Admin password: ' SYNDICORD_ADMIN_PASSWORD
-printf '\n'
-export SYNDICORD_ADMIN_PASSWORD
+export SYNDICORD_ADMIN_PASSWORD='your-admin-password'
 ```
 
 Configuration commands need no Cloudflare credentials. For local development,
@@ -26,23 +24,26 @@ Run commands from your checkout. For the
 
 ## Add or change webhooks
 
-[Create a Discord webhook](API.md#create-a-discord-webhook) using the API or
-Discord's channel settings. Put the destinations you want to add or update in
-`.webhooks.json`:
+Create a webhook in Discord under **Edit Channel → Integrations → Webhooks** and
+copy its URL.
 
-```json
-{
-  "updates": "https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN",
-  "security": "https://discord.com/api/webhooks/OTHER_ID/OTHER_TOKEN"
-}
-```
+- **Web interface:** Choose **Add webhook**, enter a name and URL, and save. To
+  update one, choose **Change URL** beside its name and save the new URL.
+- **CLI:** Put the destinations you want to add or update in `.webhooks.json`:
 
-Save them and list the configured destination names:
+  ```json
+  {
+    "updates": "https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN",
+    "security": "https://discord.com/api/webhooks/OTHER_ID/OTHER_TOKEN"
+  }
+  ```
 
-```sh
-npm run syndicord -- webhooks set --file .webhooks.json
-npm run syndicord -- webhooks list
-```
+  Save them and list the configured destination names:
+
+  ```sh
+  npm run syndicord -- webhooks set --file .webhooks.json
+  npm run syndicord -- webhooks list
+  ```
 
 `webhooks set` adds or updates only the supplied names; other destinations stay
 unchanged. Use the same name with a new URL to rotate a webhook. URLs are stored
@@ -64,28 +65,31 @@ parameter selects an existing thread; forum/media channels require one.
 
 ## Add or change a feed
 
-Read the current routes into a temporary file:
+- **Web interface:** Choose **Add feed**, enter its URL, select its
+  destinations, and save. Use **Edit** on an existing feed to change and save
+  its routing.
+- **CLI:** Read the current routes into a temporary file:
 
-```sh
-npm run syndicord -- feeds get > .feeds.json
-```
+  ```sh
+  npm run syndicord -- feeds get > .feeds.json
+  ```
 
-Edit the file. Each feed appears once and lists its destination names:
+  Edit the file. Each feed appears once and lists its destination names:
 
-```json
-[
-  {
-    "url": "https://example.com/feed.xml",
-    "destinations": ["updates", "security"]
-  }
-]
-```
+  ```json
+  [
+    {
+      "url": "https://example.com/feed.xml",
+      "destinations": ["updates", "security"]
+    }
+  ]
+  ```
 
-Add any new webhook destinations first, then upload the complete feed list:
+  Add any new webhook destinations first, then upload the complete feed list:
 
-```sh
-npm run syndicord -- feeds set --file .feeds.json
-```
+  ```sh
+  npm run syndicord -- feeds set --file .feeds.json
+  ```
 
 The command validates the routes against the configured webhooks and saves
 through the same API as the web interface. The next scheduled run reads the

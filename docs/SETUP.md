@@ -82,9 +82,9 @@ fresh installation has no feeds, so polling remains idle until configured.
 ## Enable configuration access
 
 Follow [administration setup](WEB.md#enable-administration) to set the temporary
-shared password and encryption key. That guide includes CLI commands and the
-optional Cloudflare dashboard steps. Keep the key in your password manager; it
-is needed to read the encrypted webhook URLs in D1.
+shared password and encryption key. Choose the Cloudflare dashboard steps or CLI
+commands in that guide. Keep the key in your password manager; it is needed to
+read the encrypted webhook URLs in D1.
 
 Use either client, or switch between them at any time:
 
@@ -94,10 +94,9 @@ Use either client, or switch between them at any time:
   [add webhook destinations](OPERATIONS.md#add-or-change-webhooks), then
   [save the feed list](OPERATIONS.md#add-or-change-a-feed).
 
-[Create a Discord webhook](API.md#create-a-discord-webhook) through its API if
-you already have a suitable bot, or through the channel's Integrations page. For
-the first-delivery check, choose a feed you can publish to, such as your own
-repository's commit feed.
+Create a webhook in Discord under **Edit Channel → Integrations → Webhooks** and
+copy its URL. For the first-delivery check, choose a feed you can publish to,
+such as your own repository's commit feed.
 
 Save webhook URLs in your password manager before adding them. Both clients show
 destination names but never return stored URLs. Keep the installation
@@ -120,19 +119,15 @@ npm run syndicord -- cf observability tail --worker "$SYNDICORD_WORKER_NAME"
 
 Run `npm run syndicord -- status` to inspect the installation's recorded health
 and backlog. One feed is checked each minute, rotating through the stored list.
-A successful cron invocation alone does not prove delivery. To inspect CPU time
-and invocation outcomes in the terminal, stop the earlier tail and run this
-filtered tail instead (requires `jq`):
+A successful cron invocation alone does not prove delivery. Check invocation
+outcomes and CPU time using either method:
 
-```sh
-npm run syndicord -- cf observability tail --worker "$SYNDICORD_WORKER_NAME" |
-  jq --unbuffered 'select(."$workers".cpuTimeMs != null) | ."$workers" | {cpuTimeMs, wallTimeMs, outcome}'
-```
+- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Metrics**.
+- **CLI:** The live tail above includes invocation events with `outcome`,
+  `cpuTimeMs`, and `wallTimeMs` fields under `$workers`.
 
-These fields appear on invocation events; absent or sampled logs are not proof
-of health. Alternatively, inspect Cloudflare's Worker metrics in the dashboard.
-Local tests do not establish hosted CPU headroom.
-[Invocation event fields](https://developers.cloudflare.com/api/typescript/resources/workers/subresources/observability/)
+Absent or sampled logs are not proof of health. Local tests do not establish
+hosted CPU headroom.
 
 Use [operations](OPERATIONS.md) for configuration changes and
 [recovery](RECOVERY.md) for failures. To update code, pull the desired revision,
