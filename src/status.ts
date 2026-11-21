@@ -182,7 +182,8 @@ export function parseStatusSnapshot(value: unknown): StatusSnapshot {
   }
   return {
     ...value,
-    configuration: parseStoredFeeds(value.configuration),
+    configuration:
+      value.configuration === null ? [] : parseStoredFeeds(value.configuration),
   } as unknown as StatusSnapshot;
 }
 

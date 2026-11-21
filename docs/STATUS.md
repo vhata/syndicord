@@ -19,11 +19,10 @@ from a development checkout for its local D1 state instead. Remote is the
 default for the CLI; the command never changes migrations, releases a lease, or
 resumes a suspended destination.
 
-Apply the migrations with `npm run syndicord -- migrate` and configure feeds
-before deploying. Missing configuration produces a setup error. Until the Worker
-records completed polls, status is `unknown`; older delivery history does not
-establish current health. See [upgrading](UPGRADING.md) for installations that
-still bundle their feed list.
+Deployment applies migrations. A fresh installation has no feeds and reports
+`disabled`. Add configuration through [the web interface](WEB.md) or
+[CLI](OPERATIONS.md). Until the Worker records completed polls, active feeds
+have status `unknown`; older delivery history does not establish current health.
 
 ## Reading the report
 
@@ -39,8 +38,9 @@ Worker code version or test Discord connectivity.
   suspended or cooling-down destinations, or an old pending delivery.
 - `unknown`: no completed health observations yet, an unchecked feed, or a new
   destination that has not established its baseline.
-- `disabled`: the stored feed list is empty. A poll already in progress may
-  still finish; this is not proof that all invocations have stopped.
+- `disabled`: the installation is fresh or the stored feed list is empty. A poll
+  already in progress may still finish; this is not proof that all invocations
+  have stopped.
 
 Feed failure reasons are bounded categories such as `http`, `timeout`, or
 `parse_error`. A successful check clears the current failure count while
