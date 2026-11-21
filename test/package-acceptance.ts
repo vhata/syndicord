@@ -248,6 +248,12 @@ test(
         const runtime = new Miniflare(
           convertV4MiniflareOptions({
             modules: true,
+            // Keep module names relative to the bundle, including when the npm
+            // installation path contains spaces or sits outside this checkout.
+            modulesRoot: join(
+              packageRoot,
+              'dist/worker/v1/workers/default/bundle',
+            ),
             scriptPath: join(
               packageRoot,
               'dist/worker/v1/workers/default/bundle/index.js',
