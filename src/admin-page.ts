@@ -180,7 +180,11 @@ const script = String.raw`
         stale = true;
         throw new Error('Configuration changed in another tab or tool. Your form is still here. Copy any changes you want to keep, then reload before saving.');
       }
-      if (response.status === 401) throw new Error('Your password was not accepted. Reload the page to sign in again.');
+      if (response.status === 401 || response.status === 403) {
+        stale = true;
+        byId('access-link').hidden = false;
+        throw new Error(result && typeof result.error === 'string' ? result.error : 'Your editing access could not be verified. Review your access or sign in again.');
+      }
       throw new Error(result && typeof result.error === 'string' ? result.error : 'Could not save or load configuration. Please try again.');
     }
     if (!result || !Array.isArray(result.feeds) || !Array.isArray(result.destinations) ||
@@ -296,12 +300,22 @@ const script = String.raw`
 })();
 `;
 
-export function renderAdminPage(nonce: string): string {
-  const safeNonce = nonce
+export interface AdminIdentity {
+  id: string;
+  name: string;
+}
+
+function escapeHtml(value: string): string {
+  return value
     .replaceAll('&', '&amp;')
     .replaceAll('"', '&quot;')
     .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
+    .replaceAll('>', '&gt;')
+    .replaceAll("'", '&#39;');
+}
+
+export function renderAdminPage(nonce: string, user: AdminIdentity): string {
+  const safeNonce = escapeHtml(nonce);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -325,6 +339,10 @@ export function renderAdminPage(nonce: string): string {
     .topbar-inner { max-width: 1200px; margin: auto; padding: 19px 36px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     .brand { display: flex; align-items: center; gap: 11px; font-size: 22px; font-weight: 750; letter-spacing: -.8px; }
     .brand svg { width: 34px; height: 34px; }
+    .account { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: flex-end; font-size: 12px; }
+    .account p { overflow-wrap: anywhere; }
+    .account form { margin: 0; }
+    .account button { background: transparent; border: 1px solid #9bb9aa; border-radius: 6px; color: inherit; padding: 6px 10px; }
     .workspace-label { color: #d5e3d8; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
     main { max-width: 1200px; margin: auto; padding: 48px 36px 32px; }
     .eyebrow { color: var(--accent); font-size: 11px; font-weight: 750; letter-spacing: .17em; text-transform: uppercase; }
@@ -403,7 +421,7 @@ export function renderAdminPage(nonce: string): string {
         <svg viewBox="0 0 256 256" aria-hidden="true"><path fill="#77baa0" d="M64 28h128a36 36 0 0 1 36 36v104a36 36 0 0 1-36 36h-28l-44 28v-28H64a36 36 0 0 1-36-36V64a36 36 0 0 1 36-36Z"/><g fill="none" stroke="#233c37" stroke-linecap="round" stroke-width="18"><path d="M80 76a84 84 0 0 1 84 84"/><path d="M80 116a44 44 0 0 1 44 44"/></g><circle cx="80" cy="160" r="12" fill="#233c37"/></svg>
         <span>syndicord</span>
       </div>
-      <span class="workspace-label">Your relay</span>
+      <div class="account"><p>Signed in as <strong>${escapeHtml(user.name)}</strong><br><span>Discord ID ${escapeHtml(user.id)}</span></p><form action="/admin/auth/logout" method="post"><button type="submit">Sign out</button></form></div>
     </div>
   </header>
   <main id="main">
@@ -413,6 +431,7 @@ export function renderAdminPage(nonce: string): string {
     <div class="feedback">
       <p id="notice" class="notice" role="status" aria-live="polite" aria-atomic="true"></p>
       <button id="reload" class="button small secondary" type="button">Reload configuration</button>
+      <a id="access-link" class="button small secondary" href="/admin" hidden>Review access or sign in</a>
     </div>
     <noscript>Enable JavaScript to manage your feeds, webhooks, and routing.</noscript>
     <p id="loading">Loading configuration…</p>
@@ -462,6 +481,59 @@ export function renderAdminPage(nonce: string): string {
     <footer><span>syndicord · Your feeds. In the conversation.</span><span>RSS & Atom → Discord</span></footer>
   </main>
   <script nonce="${safeNonce}">${script}</script>
+</body>
+</html>`;
+}
+
+export function renderAccessPage(
+  nonce: string,
+  options: {
+    title: string;
+    message: string;
+    user?: AdminIdentity | undefined;
+    allowLogin: boolean;
+    showLogout?: boolean;
+    retry?: boolean;
+  },
+): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>${escapeHtml(options.title)} · syndicord</title>
+  <style nonce="${escapeHtml(nonce)}">
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #202c2b; background: #f6f5f0; line-height: 1.55; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { padding: 20px max(24px, calc((100% - 1128px) / 2)); background: #233c37; color: #fffefa; font-size: 23px; font-weight: 750; }
+    main { max-width: 650px; margin: 80px auto; padding: 32px; }
+    h1 { font-size: clamp(27px, 5vw, 36px); letter-spacing: -1px; line-height: 1.2; }
+    p { margin: 18px 0; overflow-wrap: anywhere; }
+    .account { padding: 14px 18px; border: 1px solid #cbd9cb; border-radius: 8px; background: #fffefa; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 26px 0; }
+    form { margin: 0; }
+    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; background: #176d61; color: white; border: 1px solid #176d61; border-radius: 7px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+    .button.secondary { background: transparent; color: #202c2b; border-color: #aab8ad; }
+    .button:hover { background: #11564c; color: white; }
+    :focus-visible { outline: 3px solid #bd8149; outline-offset: 4px; }
+    .help { color: #5e6a67; font-size: 13px; }
+    @media (max-width: 560px) { main { margin: 35px auto; padding: 24px; } }
+  </style>
+</head>
+<body>
+  <header>syndicord</header>
+  <main>
+    <h1>${escapeHtml(options.title)}</h1>
+    ${options.user ? `<p class="account">Signed in as <strong>${escapeHtml(options.user.name)}</strong><br>Discord ID ${escapeHtml(options.user.id)}</p>` : ''}
+    <p role="status">${escapeHtml(options.message)}</p>
+    <div class="actions">
+      ${options.allowLogin ? `<a class="button" href="/admin/auth/login">${options.retry ? 'Try Discord sign-in again' : 'Sign in with Discord'}</a>` : ''}
+      ${options.showLogout ? '<form action="/admin/auth/logout" method="post"><button class="button secondary" type="submit">Sign out</button></form>' : ''}
+    </div>
+    ${options.allowLogin ? '<p class="help">Access requires membership in this installation’s configured Discord server and its required role. Signing in does not join a server or assign roles.</p><p class="help">To use another account, switch accounts in Discord, then try signing in again. Ask your server administrator about invitations and access.</p>' : ''}
+  </main>
 </body>
 </html>`;
 }
