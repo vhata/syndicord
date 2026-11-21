@@ -121,8 +121,9 @@ npm run syndicord -- logout
   visible, but further saves are refused. A write already authorized may finish.
 - **Sign out:** Browser sign-out and CLI logout invalidate their respective
   application sessions. They do not sign the person out of Discord itself.
-- **Change accounts:** Use **Try another account** and select/switch the account
-  in Discord's authorization screen. A private browser window can also select a
+- **Change accounts:** Use **Try Discord sign-in again** on the access page, or
+  sign out and choose **Sign in with Discord**. Select/switch the account in
+  Discord's authorization screen. A private browser window can also select a
   different Discord login.
 
 Sessions last at most eight hours and never outlive the Discord access token.
