@@ -12,6 +12,7 @@ review's baseline; the newest Full row is the cumulative churn baseline.
 
 | Review (UTC)                                | Type | Reviewed commit                            | Open findings at close |
 | ------------------------------------------- | ---- | ------------------------------------------ | ---------------------- |
+| [2026-11-21 12:40](2026-11-21-1240-full.md) | Full | `81a9e9a529407e64bbc104ef773b0eb349c00ef5` | 6                      |
 | [2026-11-20 10:45](2026-11-20-1045-full.md) | Full | `f9833b9836f3881b40717c4d8bccfeba42c82046` | 5                      |
 
 The first snapshot records reviewed branch commit
