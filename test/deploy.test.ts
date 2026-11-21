@@ -39,13 +39,7 @@ function harness(
         if (command === 'git') return options.checkout ?? sha;
         const reply = options.reply?.(args);
         if (reply !== undefined) return reply;
-        if (args[1] === 'secrets')
-          return '[{"name":"WEBHOOKS","type":"secret_text"}]';
         if (args[0] === 'd1' && args[2] === 'list') return '[]';
-        if (args[0] === 'd1' && args[1] === 'raw')
-          return JSON.stringify([
-            { success: true, results: { columns: ['feeds'], rows: [['[]']] } },
-          ]);
         if (args[1] === 'deployments') {
           return JSON.stringify({
             deployments: [
@@ -162,42 +156,24 @@ test('deployment selects the configured Worker and database without replacing li
   for (const call of h.calls.filter((call) => call[1] === 'd1')) {
     assert.ok(call.includes(otherDatabase));
   }
-  const query = h.calls.find((call) => call[1] === 'd1' && call[2] === 'raw');
-  assert.match(query!.at(-1)!, /^SELECT feeds FROM relay_configuration/);
+  assert.ok(
+    h.calls.every((call) => call[1] !== 'd1' || call[2] === 'migrations'),
+  );
 });
 
-test('missing or invalid hosted routing stops upload after additive migrations', async () => {
-  for (const rows of [
-    [],
-    [['not json']],
-    [['{}']],
-    [
-      [
-        JSON.stringify([
-          { url: 'https://EXAMPLE.com', destinations: ['updates'] },
-        ]),
-      ],
-    ],
-    [[JSON.stringify([{ url: 'https://example.com/feed', destinations: [] }])]],
-  ]) {
-    const h = harness({
-      reply: (args) =>
-        args[0] === 'd1' && args[1] === 'raw'
-          ? JSON.stringify([
-              { success: true, results: { columns: ['feeds'], rows } },
-            ])
-          : undefined,
-    });
-    await assert.rejects(
-      h.run(),
-      /Configure feeds in the selected D1 database/,
-    );
-    assert.equal(h.mutations().length, 1);
-    assert.equal(
-      h.calls.some((call) => call[1] === 'deploy'),
-      false,
-    );
-  }
+test('a fresh installation deploys without runtime secrets or feed configuration', async () => {
+  const h = harness({
+    reply: (args) => {
+      if (args[1] === 'secrets' || (args[0] === 'd1' && args[1] === 'raw'))
+        throw new Error('Deployment must not read application configuration');
+    },
+  });
+  assert.equal(await h.run(), 'deployed');
+  assert.equal(h.mutations().length, 2);
+  assert.ok(h.calls.every((call) => !call.includes('secrets')));
+  assert.ok(
+    h.calls.every((call) => call[1] !== 'd1' || call[2] === 'migrations'),
+  );
 });
 
 test('a stale queued run never migrates or deploys and a newly superseded run stops before upload', async () => {
@@ -212,13 +188,7 @@ test('a stale queued run never migrates or deploys and a newly superseded run st
   assert.match(h.reports[0]!, /migrations remain/);
 });
 
-test('missing hosted secrets and failed or incomplete migrations stop deployment', async () => {
-  const missing = harness({
-    reply: (args) => (args[1] === 'secrets' ? '[]' : undefined),
-  });
-  await assert.rejects(missing.run(), /WEBHOOKS/);
-  assert.equal(missing.mutations().length, 0);
-
+test('failed or incomplete migrations stop deployment', async () => {
   for (const incomplete of [false, true]) {
     const h = harness({
       reply: (args) => {
