@@ -4,8 +4,10 @@ See [setup](SETUP.md) for the first-delivery check, [operations](OPERATIONS.md)
 for feeds and webhooks, and [deployment](DEPLOYMENT.md) for CI configuration.
 
 Select the installation as described in
-[operations](OPERATIONS.md#select-an-installation). For optional GitHub
-deployment commands, also select its repository:
+[Cloudflare operations](OPERATIONS.md#select-a-cloudflare-installation). Feed
+and webhook commands also need the
+[configuration API selection](OPERATIONS.md#select-an-installation). For
+optional GitHub deployment commands, select its repository:
 
 ```sh
 export GH_REPO='YOUR_OWNER/YOUR_REPOSITORY'
@@ -38,9 +40,10 @@ Add `--local` to inspect local development state instead.
 
 ## Resume a suspended destination
 
-[Replace its webhook](OPERATIONS.md#update-webhooks-without-deploying) in the
-hosted secret and update its backup. A changed URL clears suspension and its
-destination cooldown on the next poll; pending entries retain their retry times.
+[Replace its webhook](OPERATIONS.md#add-or-change-webhooks) through the web
+editor or the CLI, and update its backup. A changed URL clears suspension and
+its destination cooldown on the next poll; pending entries retain their retry
+times.
 
 If you repaired permissions without changing the URL, save this as `resume.sql`,
 replacing `updates` with the destination name:
@@ -90,19 +93,19 @@ by the run's full commit SHA. The latest deployment must route 100% of traffic
 to that version. A successful upload followed by failed verification does not
 mean the previous code is still running.
 
-Check the reported error and `npm run syndicord -- feeds get`. Missing
-configuration must be supplied before upload; see [upgrading](UPGRADING.md) for
-bundled-feed installations. Applied migrations stay in place after an upload
-failure. Once the cause is resolved, retry from your checkout:
+Check the reported error. Applied migrations stay in place after an upload
+failure, and deployments preserve the stored configuration. Once the cause is
+resolved, retry from your checkout:
 
 ```sh
 npm run deploy
 ```
 
 A conflict with dashboard-managed Worker settings stops deployment. Inspect and
-reconcile it before retrying; do not suppress an unexplained conflict with
-`--force`. Operators using a custom source build keep their intended runtime
-settings in `cloudflare.config.ts`. Hosted feeds and secrets are preserved.
+reconcile it before retrying; `cf workers versions get` above shows the active
+version's configuration. Do not suppress an unexplained conflict with `--force`.
+Operators using a custom source build keep their intended runtime settings in
+`cloudflare.config.ts`. Hosted feeds and secrets are preserved.
 
 For optional GitHub deployment, inspect the failed run instead of uploading a
 local checkout, replacing `FAILED_RUN_ID` with its numeric ID:
@@ -123,8 +126,10 @@ Use the new run's numeric ID to follow it and inspect the deployment summary:
 
 ```sh
 gh run watch NEW_RUN_ID --exit-status
-gh run view NEW_RUN_ID --web
+gh run view NEW_RUN_ID --log
 ```
+
+Use `gh run view NEW_RUN_ID --web` if you prefer the browser summary.
 
 ## Pause and roll back
 
@@ -160,9 +165,8 @@ For a code rollback, check out the intended revision, run `npm ci`, and run
 `npm install github:vhata/syndicord#COMMIT_OR_TAG` in its installation
 directory, then run `npx --no-install syndicord deploy`. Cloudflare's
 **Deployments → Rollback** also selects an earlier Worker version. A Worker
-rollback reverses neither D1 migrations, stored routing, nor Discord messages. A
-version that bundles feeds uses its own historical configuration; inspect that
-list before rolling back to it.
+rollback reverses neither D1 migrations, stored routing, nor Discord messages.
+Check that the selected version can read the current database schema.
 
 Prefer reverting the faulty code commit and deploying the revert. Resume CI when
 `main` contains the code you intend to deploy:
@@ -175,14 +179,35 @@ gh workflow run check.yml --ref main
 ## Restore D1
 
 [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
-retains seven days on Workers Free. A restore overwrites the database. Disable
-the Worker's cron trigger in Cloudflare, prevent concurrent code deployments,
-and allow running invocations to finish before recording the current restore
-point and restoring D1. A pause stored as `[]` is insufficient: restoring D1
-also restores the old feed configuration. Inspect the restored configuration and
-ledger before restoring the cron trigger. Restoring an older ledger can forget
-successful sends and produce duplicate Discord messages. Inspect pending
-deliveries before resuming; practise recovery on an isolated database before
-relying on it. CI never restores or resets D1 automatically.
+retains seven days on Workers Free. A restore overwrites the database. First, in
+Cloudflare open **Workers & Pages → your Worker → Settings → Triggers → Cron
+Triggers**. Record the current schedule, then remove it temporarily. Prevent
+concurrent deployments and allow up to 15 minutes for trigger changes to
+propagate, plus time for running invocations to finish. The pinned CLI has no
+direct cron-management command. A pause stored as `[]` is insufficient:
+restoring D1 also restores the old feed configuration.
+
+Record the current bookmark, then look up the intended restore point:
+
+```sh
+npm run syndicord -- cf d1 time-travel get-bookmark "$SYNDICORD_DATABASE_ID"
+npm run syndicord -- cf d1 time-travel get-bookmark "$SYNDICORD_DATABASE_ID" \
+  --timestamp 'YYYY-MM-DDTHH:MM:SSZ'
+```
+
+Save the first bookmark for undo. Review the selected historical bookmark, then
+restore it:
+
+```sh
+npm run syndicord -- cf d1 time-travel restore "$SYNDICORD_DATABASE_ID" \
+  --bookmark 'THE_HISTORICAL_BOOKMARK'
+```
+
+Keep the encryption key matching the restored webhook data. Inspect the restored
+configuration and ledger before adding the recorded cron schedule back on the
+Worker's **Cron Triggers** page. Restoring an older ledger can forget successful
+sends and produce duplicate Discord messages. Inspect pending deliveries before
+resuming; practise recovery on an isolated database before relying on it. CI
+never restores or resets D1 automatically.
 
 [Worker rollback reference](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)

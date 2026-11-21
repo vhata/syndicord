@@ -78,11 +78,11 @@ compiler.
 | `npm run check`        | Run all checks, including builds and tests |
 
 GitHub Actions runs `npm ci` and the full `npm run check` on pull requests and
-pushes to `main`. It can also be started manually from the Actions tab. CI also
-runs `npm run test:package` to verify npm installation with production
-dependencies in a temporary directory and exercise the installed CLI, local D1,
-and deployment dry-runs. This check needs npm registry access but no Cloudflare
-credentials. It does not run in commit hooks.
+pushes to `main`. Start it manually with `gh workflow run check.yml --ref main`
+or from the Actions tab. CI also runs `npm run test:package` to verify npm
+installation with production dependencies in a temporary directory and exercise
+the installed CLI, local D1, and deployment dry-runs. This check needs npm
+registry access but no Cloudflare credentials. It does not run in commit hooks.
 
 The same complete gate is available as `bash scripts/check.sh`. A separate
 **Queue and PR hygiene** job validates Docket queues, links, and PR
@@ -105,13 +105,13 @@ retain a `lint-staged automatic backup` in `git stash list`.
 cp .dev.vars.example .dev.vars
 ```
 
-Copy `feeds.example.json` to `.feeds.json` and edit the sample routes. Edit
-`.dev.vars` with Discord webhook URLs for those destination names. Keep both
-files private, then load the routes into the local database:
+Set `ADMIN_PASSWORD` and a base64-encoded 32-byte `CONFIG_ENCRYPTION_KEY` in
+`.dev.vars`; [administration setup](WEB.md#enable-administration) includes the
+key-generation command. Keep that file private, then start with an empty local
+database:
 
 ```sh
 npm run db:migrate:local
-npm run syndicord -- feeds set --local --file .feeds.json
 npm run dev
 ```
 
@@ -120,8 +120,14 @@ Worker configuration: the exported `SYNDICORD_DATABASE_ID`, or the built-in
 local placeholder when that variable is absent. Export that variable in the
 shell when changing it, rather than putting it in a dotenv file.
 
-The local server normally listens on port 8787. Trigger a poll through the local
-runtime's scheduled-event route:
+The local server normally listens on port 8787. Open
+`http://localhost:8787/admin` with username `admin`, or use a second terminal
+with `SYNDICORD_ADMIN_URL=http://localhost:8787` and `SYNDICORD_ADMIN_PASSWORD`
+set to the value in `.dev.vars`. Follow
+[the CLI configuration commands](OPERATIONS.md) to add webhooks and feeds. Both
+clients update this local server's database.
+
+Trigger a poll through the local runtime's scheduled-event route:
 
 ```sh
 curl -fsS 'http://localhost:8787/cdn-cgi/local/scheduled'
@@ -130,7 +136,7 @@ curl -fsS 'http://localhost:8787/cdn-cgi/local/scheduled'
 This local poll uses the configured feeds and **real Discord webhooks**. The
 first successful poll establishes a silent baseline. Later polls send new
 entries. The scheduled-event route belongs to the local runtime; the deployed
-Worker's HTTP handler returns 404.
+Worker serves the password-protected editor at `/admin`.
 
 Local D1 state is under `.cloudflare/state/` and is separate from hosted state.
 The automated tests create their own databases and do not change this state.
@@ -152,8 +158,8 @@ invocation, for example `npm --loglevel=notice ci`.
 
 Deployment builds the current source before touching the hosted installation. It
 does not depend on a previously generated package or a globally installed CLI.
-`npm run status -- --remote` also remains available for existing scripts; that
-wrapper requires an explicit `--remote` or `--local` target.
+`npm run status -- --remote` invokes the standalone status script; it requires
+an explicit `--remote` or `--local` target.
 
 `npm run package` builds the distributable CLI and Worker under ignored `dist/`.
 The npm prepare lifecycle performs this build when installing from Git. It does
@@ -178,8 +184,11 @@ GitHub.
 | `src/ledger.ts`        | D1 baselines, pending deliveries, leases, and cooldowns |
 | `src/runner.ts`        | Bounded polling and delivery orchestration              |
 | `src/config-store.ts`  | Installation configuration in D1                        |
+| `src/admin.ts`         | Password-protected configuration HTTP endpoints         |
+| `src/admin-store.ts`   | Encrypted webhook configuration and atomic API saves    |
+| `src/admin-page.ts`    | Feed, webhook, and routing web interface                |
 | `cli/`                 | Installed command-line interface                        |
-| `src/index.ts`         | Scheduled Worker entrypoint                             |
+| `src/index.ts`         | Scheduled and HTTP Worker entrypoints                   |
 | `test/`                | Unit, D1 integration, and built-Worker tests            |
 | `migrations/`          | D1 schema migrations                                    |
 | `cloudflare.config.ts` | Worker, bindings, schedule, and logging                 |

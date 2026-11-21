@@ -1,8 +1,9 @@
 # First deployment
 
-A syndicord installation consists of a Worker, its D1 database, and its
-encrypted `WEBHOOKS` secret. Feeds and routing live in D1. No Git checkout or
-GitHub repository is required to run or configure it.
+A syndicord installation consists of a Worker and its D1 database. Feeds,
+routing, and encrypted webhook URLs live in D1. The web interface and CLI manage
+the same configuration through the Worker API. No Git checkout or GitHub
+repository is required to run or configure it.
 
 ## Run from the repository
 
@@ -38,11 +39,10 @@ checkout.
 
 The same operations are available through either entry point:
 
-| From the checkout                                  | npm-installed CLI                                                  |
-| -------------------------------------------------- | ------------------------------------------------------------------ |
-| `npm run syndicord -- feeds get`                   | `npx --no-install syndicord feeds get`                             |
-| `npm run deploy -- --webhooks-file .webhooks.json` | `npx --no-install syndicord deploy --webhooks-file .webhooks.json` |
-| `npm run deploy`                                   | `npx --no-install syndicord deploy`                                |
+| From the checkout                | npm-installed CLI                      |
+| -------------------------------- | -------------------------------------- |
+| `npm run syndicord -- feeds get` | `npx --no-install syndicord feeds get` |
+| `npm run deploy`                 | `npx --no-install syndicord deploy`    |
 
 The examples below use the checkout commands. The repository's `.npmrc`
 suppresses npm's script banners so JSON output can be piped directly to `jq`.
@@ -63,7 +63,7 @@ independent installation needs its own D1 database. Account, Worker, and
 database selection are operational settings; they contain no feed or destination
 configuration.
 
-## Create the database and configure feeds
+## Create the database and deploy
 
 The following steps create metered Cloudflare resources; usage may fit the free
 plan. For an existing installation, reuse its database ID and skip creation.
@@ -71,62 +71,36 @@ plan. For an existing installation, reuse its database ID and skip creation.
 ```sh
 npm run syndicord -- cf d1 create --name "$SYNDICORD_WORKER_NAME"
 export SYNDICORD_DATABASE_ID='the-returned-database-uuid'
-npm run syndicord -- migrate
+npm run deploy
 ```
 
-Create `.feeds.json` with the feeds and destination names for this installation:
+From a checkout, deployment builds the current source. The npm-installed CLI
+uses its bundled Worker. Both apply outstanding migrations, bind D1, and install
+the cron schedule. The workers.dev URL is enabled; preview URLs are disabled. A
+fresh installation has no feeds, so polling remains idle until configured.
 
-```json
-[
-  {
-    "url": "https://example.com/feed.xml",
-    "destinations": ["updates"]
-  }
-]
-```
+## Enable configuration access
 
-For the first-delivery check, choose a feed you can publish to, such as your own
-repository's commit feed. Upload the configuration:
+Follow [administration setup](WEB.md#enable-administration) to set the temporary
+shared password and encryption key. Choose the Cloudflare dashboard steps or CLI
+commands in that guide. Keep the key in your password manager; it is needed to
+read the encrypted webhook URLs in D1.
 
-```sh
-npm run syndicord -- feeds set --file .feeds.json
-```
+Use either client, or switch between them at any time:
 
-This stores the configuration in D1. The local file is just input; the service
-never reads it. An explicit `[]` configures an installation with polling
-disabled.
+- **Web interface:** open the Worker's `/admin` address, sign in with username
+  `admin`, add webhook destinations and feeds, then save.
+- **CLI:** [select the installation](OPERATIONS.md#select-an-installation),
+  [add webhook destinations](OPERATIONS.md#add-or-change-webhooks), then
+  [save the feed list](OPERATIONS.md#add-or-change-a-feed).
 
-## Configure webhooks and deploy
+Create a webhook in Discord under **Edit Channel → Integrations → Webhooks** and
+copy its URL. For the first-delivery check, choose a feed you can publish to,
+such as your own repository's commit feed.
 
-For an existing Worker,
-[update webhooks without deploying](OPERATIONS.md#update-webhooks-without-deploying).
-The steps below create the Worker with its initial webhook secret.
-
-Create a webhook in Discord under the channel's **Edit Channel → Integrations →
-Webhooks**. Create `.webhooks.json` with the complete destination mapping:
-
-```json
-{
-  "updates": "https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN"
-}
-```
-
-Every destination used by a feed needs an entry. Deploy the Worker:
-
-```sh
-npm run deploy -- --webhooks-file .webhooks.json
-```
-
-From a checkout, deployment first builds the current source. The npm-installed
-CLI uses the Worker built during npm installation. Both apply outstanding
-migrations and check that feed configuration exists. It creates the Worker,
-uploads its secret, binds D1, and installs the cron schedule. Public and preview
-URLs are disabled. The secret is present before polling starts.
-
-Cloudflare is the authority for live configuration. Keep a backup of the
-complete webhook mapping in a shared password manager: Cloudflare does not
-return encrypted secret values. Delete the temporary files when finished. Keep
-the three installation identifiers for future CLI use.
+Save webhook URLs in your password manager before adding them. Both clients show
+destination names but never return stored URLs. Keep the installation
+identifiers, Worker address, password, and encryption key for future use.
 
 ## Verify delivery
 
@@ -145,14 +119,20 @@ npm run syndicord -- cf observability tail --worker "$SYNDICORD_WORKER_NAME"
 
 Run `npm run syndicord -- status` to inspect the installation's recorded health
 and backlog. One feed is checked each minute, rotating through the stored list.
-A successful cron invocation alone does not prove delivery; also inspect CPU
-time and errors in Cloudflare's Worker metrics. Local tests do not establish
+A successful cron invocation alone does not prove delivery. Check invocation
+outcomes and CPU time using either method:
+
+- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Metrics**.
+- **CLI:** The live tail above includes invocation events with `outcome`,
+  `cpuTimeMs`, and `wallTimeMs` fields under `$workers`.
+
+Absent or sampled logs are not proof of health. Local tests do not establish
 hosted CPU headroom.
 
 Use [operations](OPERATIONS.md) for configuration changes and
 [recovery](RECOVERY.md) for failures. To update code, pull the desired revision,
 run `npm ci` and `npm run check`, then run `npm run deploy` with the same
-identifiers. Stored feeds and webhook secrets are preserved. For an npm CLI
-installation, repeat the npm installation command to update it, then run
-`npx --no-install syndicord deploy`.
+identifiers. Stored feeds, webhook URLs, and Worker secrets are preserved. For
+an npm CLI installation, repeat the npm installation command to update it, then
+run `npx --no-install syndicord deploy`.
 [Automatic deployment from GitHub](DEPLOYMENT.md) is optional.

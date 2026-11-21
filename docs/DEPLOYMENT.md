@@ -38,10 +38,16 @@ gh variable set SYNDICORD_WORKER_NAME --env production --body "$SYNDICORD_WORKER
 ```
 
 `{owner}` and `{repo}` are filled in from `GH_REPO`. For an existing
-environment, check its settings instead of recreating the branch rule: it should
-allow only `main`. Required reviewers pause deployments; leave that rule unset
-for automatic deployment. Environment support depends on your GitHub plan for
-private repositories.
+environment, inspect its settings instead of recreating the branch rule:
+
+```sh
+gh api 'repos/{owner}/{repo}/environments/production'
+gh api 'repos/{owner}/{repo}/environments/production/deployment-branch-policies'
+```
+
+It should allow only `main`. Required reviewers pause deployments; leave that
+rule unset for automatic deployment. Environment support depends on your GitHub
+plan for private repositories.
 [GitHub environment reference](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
 
 ## Create the Cloudflare token
@@ -86,7 +92,8 @@ Provisioning**. **API Tokens Write** manages user-owned tokens and can remain
 off; it is not needed to create this account-owned token. Keep Workers and D1
 access enabled, complete authorization, then check the scopes again.
 
-This login consent is required even for a Super Administrator.
+This login consent is required even for a Super Administrator. It is an
+interactive OAuth consent step; the CLI cannot approve sensitive scopes for you.
 
 Create `ci-token-policy.json` with the permission IDs for **Workers Scripts
 Write** and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare
@@ -135,9 +142,8 @@ password manager.
 ## Run and inspect deployment
 
 CI builds GitHub's `main` and targets the account, Worker, and database selected
-by the environment. Feed and webhook changes use [the CLI](OPERATIONS.md) and do
-not require GitHub changes. For an installation with bundled feeds, complete
-[the configuration import](UPGRADING.md) before deploying this code.
+by the environment. Feed and webhook changes use [the CLI](OPERATIONS.md) or
+[web interface](WEB.md) and do not require GitHub changes.
 
 Enable the workflow and start a run to verify the setup:
 
@@ -151,13 +157,14 @@ Find the run you just started in the list. Replace `RUN_ID` with its numeric ID:
 
 ```sh
 gh run watch RUN_ID --exit-status
-gh run view RUN_ID --web
+gh run view RUN_ID --log
 ```
 
-The second command opens the run summary in your browser. Confirm that **Check**
-and **Deploy production** succeed and the summary contains **Deployed commit**
-and **Worker version** for the expected deployment. If it says **Skipped**
-because `main` has advanced, inspect the newer run instead.
+The second command prints the logs. Confirm that **Check** and **Deploy
+production** succeed and the deployment log identifies the expected commit and
+Worker version. For the browser summary, use `gh run view RUN_ID --web`; its
+**Deployed commit** and **Worker version** fields show the same values. If it
+says **Skipped** because `main` has advanced, inspect the newer run instead.
 
 Subsequent pushes to `main` run the same checks, migrations, and deployment
 automatically; use the command above whenever you need another manual run. For a
@@ -168,21 +175,22 @@ gh run view RUN_ID --log-failed
 ```
 
 Missing credentials or IDs stop deployment with setup guidance. GitHub stores
-the deployment token; Cloudflare keeps `WEBHOOKS`. No local secrets file is used
-by CI. [Change feeds or webhooks](OPERATIONS.md) independently of these
+the deployment token; Cloudflare keeps the administration password and
+encryption key. Configuration remains in D1. No local secrets file is used by
+CI. [Change feeds or webhooks](OPERATIONS.md) independently of these
 credentials.
 
 ## Deployment and migration behavior
 
 Only the checked commit on `main` can deploy. The job builds for the configured
 database, validates the build, then applies outstanding migrations and verifies
-that none remain before upload. It also requires valid feed configuration in D1;
-missing configuration stops the upload while the running Worker stays in place.
-Only that final step receives Cloudflare credentials. It preserves hosted
-secrets, provisions no missing database, and checks the active Worker's commit
-annotation after upload. Verification retries reads briefly to allow for stale
-Cloudflare metadata; [recovery](RECOVERY.md#failed-deployment) describes the
-retry limit and how to inspect a failure.
+that none remain before upload. A fresh installation starts with no feeds;
+configuration can be added after deployment. Only that final step receives
+Cloudflare credentials. It preserves hosted secrets, provisions no missing
+database, and checks the active Worker's commit annotation after upload.
+Verification retries reads briefly to allow for stale Cloudflare metadata;
+[recovery](RECOVERY.md#failed-deployment) describes the retry limit and how to
+inspect a failure.
 
 Migration and deployment are serialized. A newer push does not cancel work
 already running; stale pending revisions are skipped. A push during an upload is

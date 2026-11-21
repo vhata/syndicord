@@ -71,7 +71,7 @@ function webhookUrl(value: unknown): string {
 }
 
 export function validateWebhooks(value: unknown): Record<string, string> {
-  if (!record(value)) throw new Error('WEBHOOKS must be a JSON object');
+  if (!record(value)) throw new Error('Webhooks must be a JSON object');
   const webhooks: Record<string, string> = Object.create(null);
   const used = new Set<string>();
   for (const [name, raw] of Object.entries(value)) {
@@ -136,21 +136,12 @@ export function loadFeeds(feeds: unknown): FeedRoute[] {
   return routes;
 }
 
-export function loadConfig(feeds: unknown, secret: unknown): RelayConfig {
+export function loadConfig(feeds: unknown, values: unknown): RelayConfig {
   const routes = loadFeeds(feeds);
   const destinations = new Set(routes.flatMap((route) => route.destinations));
   const webhooks: Record<string, string> = Object.create(null);
   if (routes.length === 0) return { feeds: routes, webhooks };
-  let values: unknown;
-  try {
-    if (typeof secret !== 'string') throw new Error();
-    values = JSON.parse(secret);
-  } catch {
-    throw new Error(
-      'WEBHOOKS must be a JSON object mapping destination names to webhook URLs',
-    );
-  }
-  if (!record(values)) throw new Error('WEBHOOKS must be a JSON object');
+  if (!record(values)) throw new Error('Webhooks must be a JSON object');
   const used = new Set<string>();
   for (const name of destinations) {
     if (!Object.hasOwn(values, name))

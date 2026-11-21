@@ -1,17 +1,19 @@
-import { loadConfig } from './config.ts';
-import { ConfigurationError, readFeeds } from './config-store.ts';
+import { handleAdmin } from './admin.ts';
+import { readRelayConfiguration } from './admin-store.ts';
+import { ConfigurationError } from './config-store.ts';
 import { runRelay } from './runner.ts';
 
 export interface WorkerEnv {
   DB: D1Database;
-  WEBHOOKS?: string;
+  ADMIN_PASSWORD?: string;
+  CONFIG_ENCRYPTION_KEY?: string;
 }
 
 export default {
   scheduled(_event, env, ctx) {
     ctx.waitUntil(
-      readFeeds(env.DB)
-        .then((feeds) => runRelay(loadConfig(feeds, env.WEBHOOKS), env.DB))
+      readRelayConfiguration(env)
+        .then((config) => runRelay(config, env.DB))
         .catch((error: unknown) => {
           console.error(
             JSON.stringify({
@@ -26,7 +28,10 @@ export default {
         }),
     );
   },
-  fetch() {
-    return new Response('Not found', { status: 404 });
+  async fetch(request, env) {
+    return (
+      (await handleAdmin(request, env)) ??
+      new Response('Not found', { status: 404 })
+    );
   },
 } satisfies ExportedHandler<WorkerEnv>;

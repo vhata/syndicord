@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseStoredFeeds } from '../src/config-store.ts';
 import { verifyDeployment } from '../cli/verify-deployment.ts';
 
 type Environment = Record<string, string | undefined>;
@@ -127,16 +126,6 @@ export async function deploy(options: {
   };
   if (!(await fresh())) return 'superseded';
 
-  const secrets = json(['workers', 'secrets', 'list', '--worker', worker]);
-  if (
-    !Array.isArray(secrets) ||
-    !secrets.some((secret) => record(secret)?.name === 'WEBHOOKS')
-  ) {
-    throw new Error(
-      'Set the WEBHOOKS secret on the selected Worker before deploying.',
-    );
-  }
-
   // The deployment job holds one concurrency lock across this whole sequence.
   if (!(await fresh())) return 'superseded';
   run(cf, ['d1', 'migrations', 'apply', database, '--dir', 'migrations']);
@@ -151,36 +140,6 @@ export async function deploy(options: {
   if (!Array.isArray(remaining) || remaining.length !== 0) {
     throw new Error(
       'Database migrations are incomplete; Worker deployment stopped.',
-    );
-  }
-  const stored = json([
-    'd1',
-    'raw',
-    database,
-    '--sql',
-    'SELECT feeds FROM relay_configuration WHERE id = 1',
-  ]);
-  try {
-    const query =
-      Array.isArray(stored) && stored.length === 1 ? record(stored[0]) : null;
-    const result = record(query?.results);
-    const rows = result?.rows;
-    if (
-      query?.success !== true ||
-      !Array.isArray(result?.columns) ||
-      result.columns.length !== 1 ||
-      result.columns[0] !== 'feeds' ||
-      !Array.isArray(rows) ||
-      rows.length !== 1 ||
-      !Array.isArray(rows[0]) ||
-      rows[0].length !== 1 ||
-      typeof rows[0][0] !== 'string'
-    )
-      throw new Error('Missing feed configuration');
-    parseStoredFeeds(rows[0][0]);
-  } catch {
-    throw new Error(
-      'Configure feeds in the selected D1 database with syndicord feeds set before deploying. The running Worker has not been replaced.',
     );
   }
   if (!(await fresh(true))) return 'superseded';

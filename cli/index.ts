@@ -1,41 +1,45 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath, URL } from 'node:url';
-import { loadConfig, loadFeeds, validateWebhooks } from '../src/config.ts';
-import { WRITE_CONFIGURATION_SQL } from '../src/config-store.ts';
+import { loadFeeds, validateWebhooks } from '../src/config.ts';
 import { runStatus } from '../src/status-command.ts';
+import { adminClient, type AdminFetch } from './admin.ts';
 import {
   cloudflare,
   query,
-  rows,
   target,
-  temporary,
   type Cf,
   type Environment,
 } from './cloudflare.ts';
-import { deploy, migrate, storedFeeds } from './deploy.ts';
+import { deploy, migrate } from './deploy.ts';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SOURCE_CHECKOUT = import.meta.url.endsWith('/cli/index.ts');
 export const USAGE = `Usage: syndicord <command>
 
-  feeds get [--local]              Read the installation's feed routes
-  feeds set [--local] --file FILE|-  Replace feed routes from JSON (or stdin)
-  webhooks set --file FILE|-      Replace the complete WEBHOOKS secret
+  feeds get                       Read the installation's feed routes
+  feeds set --file FILE|-          Replace feed routes from JSON (or stdin)
+  webhooks list                   List destination names without webhook URLs
+  webhooks set --file FILE|-       Add or update the supplied webhook URLs
+  webhooks remove NAME            Remove an unused destination
   status [--local] [--json] [--interval-minutes N]
   migrate                         Apply the packaged D1 migrations
-  deploy [--dry-run] [--webhooks-file FILE|-]
+  deploy [--dry-run]               Deploy code without changing configuration
   cf <arguments...>                Run the bundled Cloudflare CLI
 
-Set CLOUDFLARE_ACCOUNT_ID and SYNDICORD_DATABASE_ID for the installation.
-SYNDICORD_WORKER_NAME defaults to syndicord. Each installation needs its own D1
-database. Feed routes live in D1; webhook URLs live in the encrypted Worker secret.
+Set SYNDICORD_ADMIN_URL and SYNDICORD_ADMIN_PASSWORD to manage feeds and webhooks
+through the same API as the web interface. See docs/WEB.md for configuration.
+Use a loopback URL for local configuration; configuration commands do not use
+--local. Saved webhook URLs are encrypted in D1 and never returned by the API.
+
+Status, migration, and deployment use CLOUDFLARE_ACCOUNT_ID and
+SYNDICORD_DATABASE_ID. SYNDICORD_WORKER_NAME defaults to syndicord.
 Configuration writes do not rebuild or deploy code. Use 'cf auth login' to sign in.
 Cloudflare resources and API operations may be billable under your account plan.`;
 
 interface Dependencies {
   cf?: Cf;
+  adminFetch?: AdminFetch;
   readInput?: (path: string) => Promise<unknown>;
   packageRoot?: string;
   sourceCheckout?: boolean;
@@ -87,11 +91,65 @@ export async function runCli(
     (args.length === 1 && ['--help', '-h'].includes(args[0]!))
   )
     return ok(USAGE);
-  const cf = dependencies.cf ?? cloudflare(env);
   const input = dependencies.readInput ?? readInput;
   const packageRoot = dependencies.packageRoot ?? PACKAGE_ROOT;
   try {
     const [command, ...rest] = args;
+    if (['feeds', 'webhooks'].includes(command!)) {
+      if (rest.includes('--local'))
+        throw new Error(
+          'Configuration commands do not use --local. Set SYNDICORD_ADMIN_URL to a loopback URL and omit --local to edit a local Worker.',
+        );
+      const admin = adminClient(env, dependencies.adminFetch);
+      if (command === 'feeds' && rest[0] === 'get' && rest.length === 1)
+        return ok(JSON.stringify((await admin.read()).feeds, null, 2));
+      if (command === 'feeds' && rest[0] === 'set') {
+        const feeds = loadFeeds(await input(fileArgument(rest.slice(1))));
+        const current = await admin.read();
+        for (const feed of feeds)
+          for (const name of feed.destinations)
+            if (!current.destinations.includes(name))
+              throw new Error(
+                `Missing webhook for destination ${name}. Add it before routing feeds to it.`,
+              );
+        await admin.write(current, feeds, {});
+        return ok(
+          `Saved ${feeds.length} feeds. The next scheduled poll uses this configuration.`,
+        );
+      }
+      if (command === 'webhooks' && rest[0] === 'list' && rest.length === 1)
+        return ok(JSON.stringify((await admin.read()).destinations, null, 2));
+      if (command === 'webhooks' && rest[0] === 'set') {
+        const webhooks = validateWebhooks(
+          await input(fileArgument(rest.slice(1))),
+        );
+        if (Object.keys(webhooks).length === 0)
+          throw new Error('Provide at least one destination webhook URL.');
+        const current = await admin.read();
+        await admin.write(current, current.feeds, webhooks);
+        return ok(
+          `Saved ${Object.keys(webhooks).length} webhook destinations. The next scheduled poll uses this configuration.`,
+        );
+      }
+      if (command === 'webhooks' && rest[0] === 'remove' && rest.length === 2) {
+        const name = rest[1]!;
+        if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name))
+          throw new Error(
+            'Destination names must start with a letter and contain at most 64 letters, digits, underscores or hyphens.',
+          );
+        const current = await admin.read();
+        if (!current.destinations.includes(name))
+          throw new Error(`Destination ${name} is not configured.`);
+        if (current.feeds.some((feed) => feed.destinations.includes(name)))
+          throw new Error(
+            `Remove routes to destination ${name} before deleting its webhook.`,
+          );
+        await admin.write(current, current.feeds, { [name]: null });
+        return ok(`Removed destination ${name}.`);
+      }
+      throw new Error(USAGE);
+    }
+    const cf = dependencies.cf ?? cloudflare(env);
     if (command === 'cf') {
       if (!rest.length)
         throw new Error(
@@ -100,54 +158,8 @@ export async function runCli(
       await cf(rest, { cwd: process.cwd(), interactive: true });
       return ok('');
     }
-    const local =
-      ['feeds', 'status'].includes(command!) && rest.includes('--local');
-    if (command === 'feeds' && local) rest.splice(rest.indexOf('--local'), 1);
+    const local = command === 'status' && rest.includes('--local');
     const installation = target(env, local);
-    if (command === 'feeds' && rest[0] === 'get' && rest.length === 1)
-      return ok(
-        JSON.stringify(await storedFeeds(cf, installation, local), null, 2),
-      );
-    if (command === 'feeds' && rest[0] === 'set') {
-      const feeds = loadFeeds(await input(fileArgument(rest.slice(1))));
-      rows(
-        await query(
-          cf,
-          installation.database,
-          [{ sql: WRITE_CONFIGURATION_SQL, params: [JSON.stringify(feeds)] }],
-          local,
-        ),
-      );
-      return ok(
-        `Saved ${feeds.length} feeds in D1. The next scheduled poll uses this configuration.`,
-      );
-    }
-    if (command === 'webhooks' && rest[0] === 'set') {
-      const webhooks = validateWebhooks(
-        await input(fileArgument(rest.slice(1))),
-      );
-      loadConfig(await storedFeeds(cf, installation), JSON.stringify(webhooks));
-      await temporary(async (cwd) => {
-        const file = join(cwd, 'webhooks.json');
-        await writeFile(file, JSON.stringify(webhooks), { mode: 0o600 });
-        await cf(
-          [
-            'workers',
-            'secrets',
-            'update',
-            'WEBHOOKS',
-            '--worker',
-            installation.worker,
-            '--type',
-            'secret_text',
-            '--text',
-            `@${file}`,
-          ],
-          { cwd },
-        );
-      });
-      return ok(`Updated WEBHOOKS on ${installation.worker}.`);
-    }
     if (command === 'status') {
       return runStatus([...(local ? [] : ['--remote']), ...rest], env, {
         query: (queries, database, localQuery) =>
@@ -159,19 +171,11 @@ export async function runCli(
       return ok('Database migrations are up to date.');
     }
     if (command === 'deploy') {
-      const options: { dryRun: boolean; webhooks?: Record<string, string> } = {
-        dryRun: false,
-      };
-      const remaining = [...rest];
-      const dryRunIndex = remaining.indexOf('--dry-run');
-      if (dryRunIndex !== -1) {
-        options.dryRun = true;
-        remaining.splice(dryRunIndex, 1);
-      }
-      if (remaining.length)
-        options.webhooks = validateWebhooks(
-          await input(fileArgument(remaining, '--webhooks-file')),
+      if (rest.length > 1 || (rest.length === 1 && rest[0] !== '--dry-run'))
+        throw new Error(
+          'Expected deploy [--dry-run]. Configure feeds and webhooks through their configuration commands.',
         );
+      const options = { dryRun: rest[0] === '--dry-run' };
       return ok(
         await deploy(
           cf,

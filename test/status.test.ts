@@ -19,10 +19,9 @@ const routes = [
     destinations: ['updates'],
   },
 ];
-const config = loadConfig(
-  routes,
-  '{"updates":"https://discord.com/api/webhooks/123/webhook-token"}',
-);
+const config = loadConfig(routes, {
+  updates: 'https://discord.com/api/webhooks/123/webhook-token',
+});
 const emptyRss =
   '<rss version="2.0"><channel><title>News</title></channel></rss>';
 const quiet = () => {};
@@ -63,13 +62,13 @@ function queryDatabase(db: D1Database) {
   };
 }
 
-test('status distinguishes an unconfigured database from intentional pause', async () => {
+test('status reports fresh and explicitly paused databases as disabled but rejects malformed configuration', async () => {
   const { db, dispose } = await emptyTestDatabase();
   try {
     const options = { query: queryDatabase(db) };
-    const unconfigured = await runStatus(['--local'], {}, options);
-    assert.equal(unconfigured.code, 2);
-    assert.match(unconfigured.stderr, /configuration is missing/);
+    const unconfigured = await runStatus(['--local', '--json'], {}, options);
+    assert.equal(unconfigured.code, 0, unconfigured.stderr);
+    assert.equal(JSON.parse(unconfigured.stdout).health, 'disabled');
     await db.prepare(WRITE_CONFIGURATION_SQL).bind('[]').run();
     const disabled = await runStatus(['--local', '--json'], {}, options);
     assert.equal(disabled.code, 0, disabled.stderr);

@@ -1,3 +1,12 @@
+## Documentation
+
+For user-facing setup and operations, show clear dashboard steps alongside
+simple CLI commands where both are available. Prefer the CLI's own prompts
+over shell loops, input-handling scripts, or API helpers. Keep advanced
+automation in a separate optional reference, not the main setup flow.
+Verify commands against the project's pinned tools; when no simple CLI
+option exists, do not obscure the task with a script to force one.
+
 <!-- docket:begin -->
 
 ## Docket

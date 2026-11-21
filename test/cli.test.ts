@@ -1,13 +1,5 @@
 import assert from 'node:assert/strict';
-import {
-  cp,
-  mkdtemp,
-  mkdir,
-  readFile,
-  rm,
-  stat,
-  writeFile,
-} from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -19,19 +11,7 @@ const environment = {
   SYNDICORD_DATABASE_ID: '12345678-1234-1234-1234-123456789abc',
   SYNDICORD_WORKER_NAME: 'installation-one',
 };
-const feeds = [
-  {
-    url: 'https://example.com/feed?token=feed-secret',
-    destinations: ['updates'],
-  },
-];
-const webhooks = {
-  updates: 'https://discord.com/api/webhooks/123/webhook-secret',
-};
-const raw = (rows: unknown[][], columns = ['feeds']) =>
-  JSON.stringify([{ success: true, results: { columns, rows } }]);
-
-test('CLI usage needs no target; remote operations require explicit valid account and database', async () => {
+test('CLI usage needs no target; infrastructure operations require explicit valid account and database', async () => {
   assert.equal((await runCli(['--help'], {})).code, 0);
   for (const env of [
     {},
@@ -42,133 +22,16 @@ test('CLI usage needs no target; remote operations require explicit valid accoun
     },
     { ...environment, SYNDICORD_WORKER_NAME: '../../another-worker' },
   ]) {
-    const result = await runCli(['feeds', 'get'], env, {
-      cf: async () => {
-        throw new Error('must not call');
-      },
-    });
-    assert.equal(result.code, 2);
-    assert.doesNotMatch(result.stderr, /must not call/);
-  }
-});
-
-test('feed commands use the selected D1 and parameterized temporary files, never a checkout', async () => {
-  const files: string[] = [];
-  const configurations = new Map<string, unknown>();
-  const cf: Cf = async (args) => {
-    assert.deepEqual(args.slice(0, 2), ['d1', 'raw']);
-    const file = args[4]!.slice(1);
-    files.push(file);
-    assert.ok(!args.join(' ').includes('feed-secret'));
-    const [statement] = JSON.parse(await readFile(file, 'utf8'));
-    if (statement.sql.trim().startsWith('INSERT')) {
-      assert.equal(statement.params.length, 1);
-      configurations.set(args[2]!, JSON.parse(statement.params[0]));
-      return raw([], []);
+    for (const command of ['status', 'migrate', 'deploy']) {
+      const result = await runCli([command], env, {
+        cf: async () => {
+          throw new Error('must not call');
+        },
+      });
+      assert.equal(result.code, 2);
+      assert.doesNotMatch(result.stderr, /must not call/);
     }
-    return raw(
-      configurations.has(args[2]!)
-        ? [[JSON.stringify(configurations.get(args[2]!))]]
-        : [],
-    );
-  };
-  const second = {
-    ...environment,
-    SYNDICORD_DATABASE_ID: '87654321-4321-4321-4321-cba987654321',
-    SYNDICORD_WORKER_NAME: 'installation-two',
-  };
-  assert.equal(
-    (
-      await runCli(['feeds', 'set', '--file', '-'], environment, {
-        cf,
-        readInput: async () => feeds,
-      })
-    ).code,
-    0,
-  );
-  assert.equal(
-    (
-      await runCli(['feeds', 'set', '--file', '-'], second, {
-        cf,
-        readInput: async () => [],
-      })
-    ).code,
-    0,
-  );
-  assert.deepEqual(
-    JSON.parse((await runCli(['feeds', 'get'], environment, { cf })).stdout),
-    feeds,
-  );
-  assert.deepEqual(
-    JSON.parse((await runCli(['feeds', 'get'], second, { cf })).stdout),
-    [],
-  );
-  for (const file of files) await assert.rejects(readFile(file));
-});
-
-test('invalid routes are rejected before a write and missing config stays explicit', async () => {
-  const invalid = await runCli(['feeds', 'set', '--file', '-'], environment, {
-    readInput: async () => [{ url: 'secret-invalid', destinations: [] }],
-    cf: async () => {
-      throw new Error('must not call');
-    },
-  });
-  assert.equal(invalid.code, 2);
-  assert.doesNotMatch(invalid.stderr, /secret-invalid|must not call/);
-  const missing = await runCli(['feeds', 'get'], environment, {
-    cf: async () => raw([]),
-  });
-  assert.equal(missing.code, 2);
-  assert.match(missing.stderr, /configuration is missing/);
-});
-
-test('webhook replacement validates the whole map and keeps values out of arguments and output', async () => {
-  const files: string[] = [];
-  const cf: Cf = async (args) => {
-    if (args[0] === 'd1') return raw([[JSON.stringify(feeds)]]);
-    assert.deepEqual(args.slice(0, 9), [
-      'workers',
-      'secrets',
-      'update',
-      'WEBHOOKS',
-      '--worker',
-      'installation-one',
-      '--type',
-      'secret_text',
-      '--text',
-    ]);
-    assert.ok(!args.join(' ').includes('webhook-secret'));
-    const path = args[9]!.slice(1);
-    files.push(path);
-    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), webhooks);
-    return '{}';
-  };
-  const result = await runCli(['webhooks', 'set', '--file', '-'], environment, {
-    cf,
-    readInput: async () => webhooks,
-  });
-  assert.equal(result.code, 0, result.stderr);
-  assert.doesNotMatch(JSON.stringify(result), /webhook-secret/);
-  for (const path of files) await assert.rejects(readFile(path));
-  const missing = await runCli(
-    ['webhooks', 'set', '--file', '-'],
-    environment,
-    { cf, readInput: async () => ({}) },
-  );
-  assert.equal(missing.code, 2);
-  assert.match(missing.stderr, /Missing webhook/);
-  const invalidUnused = await runCli(
-    ['webhooks', 'set', '--file', '-'],
-    environment,
-    {
-      cf,
-      readInput: async () => ({
-        ...webhooks,
-        unused: 'https://example.com/not-discord',
-      }),
-    },
-  );
-  assert.equal(invalidUnused.code, 2);
+  }
 });
 
 async function artifact() {
@@ -194,7 +57,6 @@ async function artifact() {
       name: 'build-machine-worker',
       env: {
         DB: { type: 'd1', id: 'build-machine-db' },
-        WEBHOOKS: { type: 'secret' },
       },
     }),
   );
@@ -210,6 +72,29 @@ async function artifact() {
   await writeFile(configPath, JSON.stringify(config));
   return directory;
 }
+
+test('deployment rejects configuration flags before building or changing resources', async () => {
+  for (const args of [
+    ['deploy', '--webhooks-file', '-'],
+    ['deploy', '--dry-run', '--webhooks-file', '-'],
+    ['deploy', '--dry-run', '--dry-run'],
+  ]) {
+    let called = false;
+    const result = await runCli(args, environment, {
+      cf: async () => {
+        called = true;
+        throw new Error('must not call');
+      },
+      readInput: async () => {
+        called = true;
+        throw new Error('must not read');
+      },
+    });
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, /Expected deploy/);
+    assert.equal(called, false);
+  }
+});
 
 test('package dry runs stage independent target copies, make no API writes, and leave the package unchanged', async () => {
   const packageRoot = await artifact();
@@ -249,7 +134,7 @@ test('package dry runs stage independent target copies, make no API writes, and 
         );
         assert.equal(worker.name, env.SYNDICORD_WORKER_NAME);
         assert.equal(worker.env.DB.id, env.SYNDICORD_DATABASE_ID);
-        assert.deepEqual(worker.env.WEBHOOKS, { type: 'secret' });
+        assert.deepEqual(Object.keys(worker.env), ['DB']);
         return '';
       };
       assert.equal(
@@ -279,7 +164,7 @@ test('package dry runs stage independent target copies, make no API writes, and 
   }
 });
 
-test('deployment migrates, checks hosted config, preserves secrets, and verifies the new serving version', async () => {
+test('deployment needs no feed configuration or secrets, migrates, and verifies the new serving version', async () => {
   const packageRoot = await artifact();
   const calls: string[][] = [];
   let message = '';
@@ -290,9 +175,6 @@ test('deployment migrates, checks hosted config, preserves secrets, and verifies
     calls.push(args);
     if (args[0] === 'd1' && args[1] === 'migrations')
       return args[2] === 'list' ? '[]' : '';
-    if (args[0] === 'd1') return raw([[JSON.stringify(feeds)]]);
-    if (args[1] === 'secrets')
-      return '[{"name":"WEBHOOKS","type":"secret_text"}]';
     if (args[0] === 'deploy') {
       message = args[4]!;
       return '';
@@ -345,7 +227,7 @@ test('deployment migrates, checks hosted config, preserves secrets, and verifies
       [
         ['d1', 'migrations', 'apply'],
         ['d1', 'migrations', 'list'],
-        ['d1', 'raw', environment.SYNDICORD_DATABASE_ID],
+        ['deploy', '--prebuilt', '--no-provision'],
       ],
     );
     assert.ok(
@@ -360,20 +242,15 @@ test('deployment migrates, checks hosted config, preserves secrets, and verifies
   }
 });
 
-test('deployment stops before upload for missing configuration or incomplete migrations', async () => {
+test('deployment stops before upload for incomplete or unverifiable migrations', async () => {
   const packageRoot = await artifact();
   try {
-    for (const incomplete of [false, true]) {
+    for (const pending of ['[{"Name":"pending.sql"}]', 'invalid-json']) {
       let uploaded = false;
       const cf: Cf = async (args) => {
         if (args[0] === 'deploy') uploaded = true;
-        if (args[1] === 'migrations')
-          return args[2] === 'list'
-            ? incomplete
-              ? '[{"Name":"pending.sql"}]'
-              : '[]'
-            : '';
-        return raw([]);
+        if (args[1] === 'migrations') return args[2] === 'list' ? pending : '';
+        throw new Error('unexpected command');
       };
       const result = await runCli(['deploy'], environment, {
         cf,
@@ -382,65 +259,8 @@ test('deployment stops before upload for missing configuration or incomplete mig
       });
       assert.equal(result.code, 2);
       assert.equal(uploaded, false);
+      assert.match(result.stderr, /migrations/);
     }
-  } finally {
-    await rm(packageRoot, { recursive: true, force: true });
-  }
-});
-
-test('first deployment uploads a validated secret through a private temporary file and verifies activation', async () => {
-  const packageRoot = await artifact();
-  let secretsFile = '';
-  let message = '';
-  let uploads = 0;
-  const cf: Cf = async (args) => {
-    assert.ok(!args.join(' ').includes('webhook-secret'));
-    if (args[1] === 'migrations') return args[2] === 'list' ? '[]' : '';
-    if (args[0] === 'd1') return raw([[JSON.stringify(feeds)]]);
-    if (args[1] === 'secrets')
-      throw new Error('fresh Worker cannot have a secret yet');
-    if (args[0] === 'deploy') {
-      uploads++;
-      message = args[4]!;
-      secretsFile = args[args.indexOf('--secrets-file') + 1]!;
-      assert.equal((await stat(secretsFile)).mode & 0o777, 0o600);
-      assert.deepEqual(JSON.parse(await readFile(secretsFile, 'utf8')), {
-        WEBHOOKS: JSON.stringify(webhooks),
-      });
-      return '';
-    }
-    if (args[1] === 'deployments')
-      return JSON.stringify({
-        deployments: [
-          {
-            versions: [
-              {
-                version_id: '87654321-4321-4321-4321-cba987654321',
-                percentage: 100,
-              },
-            ],
-          },
-        ],
-      });
-    if (args[1] === 'versions')
-      return JSON.stringify({ annotations: { 'workers/message': message } });
-    throw new Error('unexpected command');
-  };
-  try {
-    const result = await runCli(
-      ['deploy', '--webhooks-file', '-'],
-      environment,
-      {
-        cf,
-        packageRoot,
-        sourceCheckout: false,
-        readInput: async () => webhooks,
-      },
-    );
-    assert.equal(result.code, 0, result.stderr);
-    assert.equal(uploads, 1);
-    assert.doesNotMatch(JSON.stringify(result), /webhook-secret/);
-    await assert.rejects(readFile(secretsFile));
   } finally {
     await rm(packageRoot, { recursive: true, force: true });
   }
@@ -452,8 +272,6 @@ test('an ambiguous upload result is not retried or reported as a verified deploy
   const waits: number[] = [];
   const cf: Cf = async (args) => {
     if (args[1] === 'migrations') return args[2] === 'list' ? '[]' : '';
-    if (args[0] === 'd1') return raw([[JSON.stringify(feeds)]]);
-    if (args[1] === 'secrets') return '[{"name":"WEBHOOKS"}]';
     if (args[0] === 'deploy') {
       uploads++;
       return '';

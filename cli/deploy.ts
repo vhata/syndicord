@@ -1,21 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { access, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { CONFIGURATION_SQL, parseStoredFeeds } from '../src/config-store.ts';
-import { loadConfig } from '../src/config.ts';
-import { query, rows, temporary, type Cf, type Target } from './cloudflare.ts';
+import { temporary, type Cf, type Target } from './cloudflare.ts';
 import { verifyDeployment } from './verify-deployment.ts';
-
-export async function storedFeeds(cf: Cf, installation: Target, local = false) {
-  const result = rows(
-    await query(cf, installation.database, [{ sql: CONFIGURATION_SQL }], local),
-  );
-  if (result.length !== 1)
-    throw new Error(
-      'Feed configuration is missing. Run syndicord feeds set --file FILE before deploying.',
-    );
-  return parseStoredFeeds(result[0]?.feeds);
-}
 
 export async function migrate(
   cf: Cf,
@@ -99,7 +86,6 @@ export async function deploy(
   packageRoot: string,
   options: {
     dryRun: boolean;
-    webhooks?: Record<string, string>;
     sourceCheckout?: boolean;
   },
   wait?: (milliseconds: number) => Promise<void>,
@@ -120,34 +106,7 @@ export async function deploy(
   return temporary(async (cwd) => {
     // Check the selected artifact before migrations can change the database.
     await stageWorker(artifact, cwd, installation);
-    if (!options.dryRun) {
-      await migrate(cf, installation, packageRoot);
-      const feeds = await storedFeeds(cf, installation);
-      if (options.webhooks) loadConfig(feeds, JSON.stringify(options.webhooks));
-      else {
-        const secretNames = await temporary(async (cwd) => {
-          try {
-            return JSON.parse(
-              await cf(
-                ['workers', 'secrets', 'list', '--worker', installation.worker],
-                { cwd },
-              ),
-            );
-          } catch {
-            throw new Error(
-              'Could not inspect the Worker secrets. For the first deployment, provide --webhooks-file FILE.',
-            );
-          }
-        });
-        if (
-          !Array.isArray(secretNames) ||
-          !secretNames.some((secret) => secret?.name === 'WEBHOOKS')
-        )
-          throw new Error(
-            'WEBHOOKS is missing. For the first deployment, provide --webhooks-file FILE.',
-          );
-      }
-    }
+    if (!options.dryRun) await migrate(cf, installation, packageRoot);
     const version = JSON.parse(
       await readFile(join(packageRoot, 'package.json'), 'utf8'),
     ).version;
@@ -160,15 +119,6 @@ export async function deploy(
       message,
     ];
     if (options.dryRun) args.push('--dry-run');
-    if (options.webhooks) {
-      const file = join(cwd, 'secrets.json');
-      await writeFile(
-        file,
-        JSON.stringify({ WEBHOOKS: JSON.stringify(options.webhooks) }),
-        { mode: 0o600 },
-      );
-      args.push('--secrets-file', file);
-    }
     await cf(args, { cwd });
     if (options.dryRun)
       return `Validated ${options.sourceCheckout ? 'source' : 'package'} for Worker ${installation.worker}; no Cloudflare resources changed.`;
