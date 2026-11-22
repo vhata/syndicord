@@ -271,7 +271,8 @@ export class DeliveryLedger {
       .prepare(
         `
         WITH active AS MATERIALIZED (
-          SELECT DISTINCT json_extract(feeds.value, '$.url') AS feed_url,
+          -- TEXT affinity lets SQLite index both keys in the active lookup.
+          SELECT DISTINCT CAST(json_extract(feeds.value, '$.url') AS TEXT) AS feed_url,
             destinations.value AS destination
           FROM json_each(?) AS feeds
           CROSS JOIN json_each(json_extract(feeds.value, '$.destinations')) AS destinations

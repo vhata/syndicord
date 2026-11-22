@@ -51,6 +51,34 @@ async function expire(): Promise<void> {
     .run();
 }
 
+function measuredPendingLedger() {
+  const metrics = { rowsRead: Infinity, plan: [] as string[] };
+  const measured = new DeliveryLedger({
+    prepare(sql: string) {
+      const statement = db.prepare(sql);
+      return {
+        bind(...values: unknown[]) {
+          const bound = statement.bind(...values);
+          return {
+            async all() {
+              const result = await bound.all();
+              metrics.rowsRead = result.meta.rows_read;
+              metrics.plan = (
+                await db
+                  .prepare(`EXPLAIN QUERY PLAN ${sql}`)
+                  .bind(...values)
+                  .all<{ detail: string }>()
+              ).results.map((row) => row.detail);
+              return result;
+            },
+          };
+        },
+      };
+    },
+  } as unknown as D1Database);
+  return { measured, metrics };
+}
+
 test('large fan-out keeps active-route parameters compact and filters removed routes without duplicates', async () => {
   const names = Array.from({ length: 1100 }, (_, index) => `d${index}`);
   const largeRoute = {
@@ -125,42 +153,69 @@ test('pending selection reads due deliveries instead of scanning retained histor
   );
   await ledger.ingest(owner, busyRoute, [entry('new')]);
   assert.equal(await count('relay_deliveries'), 10_050);
-  let rowsRead = Infinity;
-  let plan: string[] = [];
-  const measured = new DeliveryLedger({
-    prepare(sql: string) {
-      const statement = db.prepare(sql);
-      return {
-        bind(...values: unknown[]) {
-          const bound = statement.bind(...values);
-          return {
-            async all() {
-              const result = await bound.all();
-              rowsRead = result.meta.rows_read;
-              plan = (
-                await db
-                  .prepare(`EXPLAIN QUERY PLAN ${sql}`)
-                  .bind(...values)
-                  .all<{ detail: string }>()
-              ).results.map((row) => row.detail);
-              return result;
-            },
-          };
-        },
-      };
-    },
-  } as unknown as D1Database);
+  const { measured, metrics } = measuredPendingLedger();
   const pending = await measured.pending(owner, [busyRoute], 5);
   assert.equal(pending.length, 5);
   assert.ok(
-    rowsRead < 1000,
-    `read ${rowsRead} rows despite only 50 pending deliveries`,
+    metrics.rowsRead < 1000,
+    `read ${metrics.rowsRead} rows despite only 50 pending deliveries`,
   );
   assert.match(
-    plan.join('\n'),
+    metrics.plan.join('\n'),
     /SEARCH deliveries USING INDEX relay_pending_due/,
   );
-  assert.match(plan.join('\n'), /SEARCH active USING AUTOMATIC.*INDEX/);
+  assert.match(metrics.plan.join('\n'), /SEARCH active USING AUTOMATIC.*INDEX/);
+});
+
+test('many feeds sharing a destination use both route keys for active lookup', async () => {
+  const routes = Array.from({ length: 1000 }, (_, index) => ({
+    url: `https://example.com/feed/${index}`,
+    destinations: ['news'],
+  }));
+  const config = loadConfig(routes, {
+    news: 'https://discord.com/api/webhooks/1/token',
+  });
+  validateConfigurationSize(config.feeds, config.webhooks);
+  await start();
+  await db.batch([
+    db
+      .prepare(
+        `
+      INSERT INTO relay_routes (feed_url, destination, baseline_id, initialized_at_ms)
+      SELECT value, 'news', 'baseline', 0 FROM json_each(?)
+    `,
+      )
+      .bind(JSON.stringify(routes.map((feed) => feed.url))),
+    db
+      .prepare(
+        `
+      INSERT INTO relay_deliveries
+        (feed_url, destination, entry_id, state, payload, attempts, first_seen_ms, next_attempt_ms)
+      SELECT feed_url, destination, 'new', 'pending', ?, 0, 0, 0 FROM relay_routes
+    `,
+      )
+      .bind(JSON.stringify(entry('new'))),
+  ]);
+  const { measured, metrics } = measuredPendingLedger();
+  const pending = await measured.pending(owner, routes, 5);
+  assert.equal(pending.length, 5);
+  assert.deepEqual(
+    pending.map((delivery) => delivery.feedUrl),
+    routes
+      .map((feed) => feed.url)
+      .sort()
+      .slice(0, 5),
+  );
+  assert.ok(
+    metrics.rowsRead < 15_000,
+    `read ${metrics.rowsRead} rows for 1000 active pairs`,
+  );
+  const activeLookup = metrics.plan.find((step) =>
+    step.startsWith('SEARCH active USING AUTOMATIC'),
+  );
+  assert.ok(activeLookup);
+  assert.match(activeLookup, /feed_url=\?/);
+  assert.match(activeLookup, /destination=\?/);
 });
 
 before(async () => {
