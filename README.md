@@ -46,7 +46,7 @@ does not post the old backlog**. Subsequent checks send new entries. By default,
 one feed is checked each minute and destinations retry independently. See
 [delivery behavior](docs/BEHAVIOR.md) for timing, limits, and retry details.
 
-[All documentation](docs/README.md) includes operator references, optional
+See the [documentation index](docs/README.md) for operator references, optional
 GitHub deployment, architecture, and contribution guidance.
 
 ## License
