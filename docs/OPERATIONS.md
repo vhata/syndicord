@@ -143,7 +143,8 @@ per run. With N feeds, each is checked about every N minutes. There is no fixed
 limit on the number of feeds or feed/destination pairs; a feed sent to two
 destinations uses two pairs. Larger installations take longer to revisit each
 feed, and delivery backlogs grow if new messages arrive faster than five per
-minute.
+minute. Entries must remain in the source feed until its next poll to be
+observed; longer rotations can miss entries removed between polls.
 
 Each save is limited to 96 KiB of normalized JSON for the complete feed list and
 webhook map, including unused saved destinations. This leaves room for API

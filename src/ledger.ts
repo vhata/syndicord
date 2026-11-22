@@ -278,8 +278,9 @@ export class DeliveryLedger {
         )
         SELECT deliveries.feed_url, deliveries.destination,
           deliveries.payload, deliveries.attempts
-        FROM relay_deliveries AS deliveries
-        JOIN active ON active.feed_url = deliveries.feed_url
+        -- Start with due pending rows, not each route's retained history.
+        FROM relay_deliveries AS deliveries INDEXED BY relay_pending_due
+        CROSS JOIN active ON active.feed_url = deliveries.feed_url
           AND active.destination = deliveries.destination
         LEFT JOIN relay_destinations AS destination
           ON destination.destination = deliveries.destination

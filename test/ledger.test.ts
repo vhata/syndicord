@@ -112,6 +112,57 @@ test('large fan-out keeps active-route parameters compact and filters removed ro
   );
 });
 
+test('pending selection reads due deliveries instead of scanning retained history per route', async () => {
+  const busyRoute = {
+    ...route,
+    destinations: Array.from({ length: 50 }, (_, index) => `d${index}`),
+  };
+  await start();
+  await ledger.ingest(
+    owner,
+    busyRoute,
+    Array.from({ length: 200 }, (_, index) => entry(`old${index}`)),
+  );
+  await ledger.ingest(owner, busyRoute, [entry('new')]);
+  assert.equal(await count('relay_deliveries'), 10_050);
+  let rowsRead = Infinity;
+  let plan: string[] = [];
+  const measured = new DeliveryLedger({
+    prepare(sql: string) {
+      const statement = db.prepare(sql);
+      return {
+        bind(...values: unknown[]) {
+          const bound = statement.bind(...values);
+          return {
+            async all() {
+              const result = await bound.all();
+              rowsRead = result.meta.rows_read;
+              plan = (
+                await db
+                  .prepare(`EXPLAIN QUERY PLAN ${sql}`)
+                  .bind(...values)
+                  .all<{ detail: string }>()
+              ).results.map((row) => row.detail);
+              return result;
+            },
+          };
+        },
+      };
+    },
+  } as unknown as D1Database);
+  const pending = await measured.pending(owner, [busyRoute], 5);
+  assert.equal(pending.length, 5);
+  assert.ok(
+    rowsRead < 1000,
+    `read ${rowsRead} rows despite only 50 pending deliveries`,
+  );
+  assert.match(
+    plan.join('\n'),
+    /SEARCH deliveries USING INDEX relay_pending_due/,
+  );
+  assert.match(plan.join('\n'), /SEARCH active USING AUTOMATIC.*INDEX/);
+});
+
 before(async () => {
   fixture = await createTestDatabase();
   db = fixture.db;
