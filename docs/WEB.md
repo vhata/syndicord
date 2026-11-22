@@ -1,22 +1,28 @@
-# Discord sign-in and administration
+# Configure Discord sign-in
 
-Open **`/admin`** on your Worker's HTTPS address and choose **Sign in with
-Discord** to manage feeds, webhooks, and routing. Access requires membership in
-an operator-configured Discord role. Use [scoped permissions](PERMISSIONS.md) to
-combine roles across servers and delegate individual destination channels.
-Without a policy, one configured server/role pair administers all configuration.
-The [syndicord CLI](OPERATIONS.md) signs in through the browser and edits the
-same configuration through the same API. Changes apply on the next scheduled
-poll.
+For installation owners. To use an existing installation, start with
+[managing feeds](OPERATIONS.md). [First deployment](SETUP.md) brings you here
+once the Worker is running.
+
+People open **`/admin`** on the Worker's HTTPS address and sign in with Discord.
+Access requires membership in an operator-configured Discord role. Use
+[scoped permissions](PERMISSIONS.md) to combine roles across servers and
+delegate individual destination channels. Without a policy, one configured
+server/role pair administers all configuration. The
+[syndicord CLI](OPERATIONS.md) signs in through the browser and edits the same
+configuration through the same API. Changes apply on the next scheduled poll.
 
 ## Enable administration
 
-[Select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation),
-then deploy code and migrations with `npm run deploy` or your
-[deployment workflow](DEPLOYMENT.md). Administration remains disabled until all
-settings below are present. Missing OAuth settings do not prevent deployment or
-scheduled relay operation. A fresh installation starts empty, with polling
-paused.
+Start with a deployed Worker and its HTTPS address. If you have not deployed
+yet, complete [first deployment](SETUP.md#create-the-database-and-deploy).
+Administration remains disabled until all settings below are present. Missing
+OAuth settings do not prevent deployment or scheduled relay operation. A fresh
+installation starts empty, with polling paused.
+
+Choose **one admin role** for everyone who may edit all configuration, or
+[scoped roles](PERMISSIONS.md) for separate feed and channel responsibilities.
+Both use the same Discord application and encryption key.
 
 ### Register a Discord application
 
@@ -34,7 +40,9 @@ paused.
 4. In Discord, enable **User Settings → Advanced → Developer Mode**. Right-click
    the server and choose **Copy Server ID**. Under **Server Settings → Roles**,
    create or select the role allowed to administer syndicord and copy its role
-   ID from the role's context menu. Use the numeric IDs, not names.
+   ID from the role's context menu. Use the numeric IDs, not names. For scoped
+   access, collect the roles and channels in your
+   [policy](PERMISSIONS.md#configure-access).
 
 There is no Discord CLI setup command in this project; use these dashboard
 steps. No bot installation or privileged member intent is needed. Sign-in asks
@@ -43,6 +51,10 @@ server, or assign a role. Invitations and role assignment remain separate
 server-administration actions.
 
 ### Configure the Worker
+
+For CLI commands,
+[select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation)
+first. Choose one way to save the settings below.
 
 Generate an encryption key once, and save it in your password manager. Reuse an
 installation's existing key if it already has saved webhooks:
@@ -65,8 +77,10 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
   above, then deploy the changes. IDs and the callback URL are not confidential,
   but storing them as secrets preserves them alongside the other runtime
   settings during code deployment.
-- **CLI:** Run these commands. Each uses the CLI's hidden value prompt; paste
-  the corresponding value rather than putting credentials in shell history.
+- **CLI:** Each command uses a hidden value prompt. Paste the value there. For
+  scoped roles, run the first four commands, then
+  [set `DISCORD_AUTH_POLICY`](PERMISSIONS.md#configure-access); skip the last
+  two commands for the single-role settings.
 
   ```sh
   npm run syndicord -- cf workers secrets update CONFIG_ENCRYPTION_KEY \
@@ -83,9 +97,8 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
     --worker "$SYNDICORD_WORKER_NAME" --type secret_text
   ```
 
-For scoped access, configure
-[`DISCORD_AUTH_POLICY`](PERMISSIONS.md#configure-access) instead of the two
-single-role settings. All other settings remain required.
+For scoped access, use `DISCORD_AUTH_POLICY` instead of `DISCORD_GUILD_ID` and
+`DISCORD_ROLE_ID` in either method. All other settings remain required.
 
 For the [npm-installed CLI](SETUP.md#optional-npm-installation), substitute
 `npx --no-install syndicord` for `npm run syndicord --`.
@@ -94,38 +107,6 @@ Visit the Worker's `/admin` address and sign in. Its Cloudflare overview shows
 its HTTPS address. An authorized account sees its Discord identity, a **Sign
 out** control, and the editor. An account without the configured membership or
 role receives an explanation and can sign out or try another Discord account.
-
-## Installation name and colour
-
-The admin editor and its sign-in and access pages can show an installation name
-beside the syndicord mark and use a custom header colour. The name also appears
-in the browser tab. Both settings are optional:
-
-| Setting              | Value                                                                                                                |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `ADMIN_NAME`         | Installation name, for example `Community updates`. Surrounding spaces are removed; at most 80 characters are shown. |
-| `ADMIN_HEADER_COLOR` | Six-digit hex colour, for example `#304B70`. Header text automatically uses black or white for contrast.             |
-
-In **Cloudflare Dashboard → Workers & Pages → your Worker → Settings → Variables
-and Secrets**, add either setting as a **Secret** and deploy the changes. These
-values are visible on the page; using the Secret type preserves them during code
-deployments, like the other installation settings.
-
-Alternatively, use the CLI's value prompts:
-
-```sh
-npm run syndicord -- cf workers secrets update ADMIN_NAME \
-  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
-npm run syndicord -- cf workers secrets update ADMIN_HEADER_COLOR \
-  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
-```
-
-For local development, set these values in `.dev.vars`. Reload the page after
-changing them. An absent or blank name shows only syndicord; an absent or
-invalid colour uses the default dark green header. Remove either setting from
-**Variables and Secrets**, or use `cf workers secrets delete ADMIN_NAME` or
-`cf workers secrets delete ADMIN_HEADER_COLOR` with the same Worker selection,
-to restore its default. Custom logos and page-wide themes are not supported.
 
 ## CLI login
 
@@ -185,33 +166,10 @@ together for recovery.
 
 ## Add feeds and routing
 
-With `DISCORD_AUTH_POLICY`, use the
-[catalog and subscription controls](PERMISSIONS.md#feeds-and-subscriptions). The
-following whole-configuration flow applies only to single-role installations.
-
-1. In Discord, open the destination channel's **Edit Channel → Integrations →
-   Webhooks**, create a webhook, and copy its URL.
-2. In syndicord, add that webhook with a short destination name.
-3. Add a feed URL, choose its destinations, and save.
-
-For terminal equivalents, use [`webhooks set` and `feeds set`](OPERATIONS.md). A
-feed can send to several destinations, and a destination can receive several
-feeds. There is no fixed feed or route count limit; see
-[polling and configuration-size limits](OPERATIONS.md#polling-limits). Each feed
-needs at least one destination. Remove a feed to stop its routes; remove all
-feeds to pause polling. New routes silently establish a baseline before
-delivering new posts. A poll already in progress may finish using its earlier
-configuration.
-
-Saved webhook URLs stay hidden. To rotate one, replace its URL under the same
-destination name. Remove its routes before deleting the webhook. Deleting it in
-syndicord does not delete it in Discord.
-
-If another client changes configuration while a form is open, the editor rejects
-the stale save. Reload and reapply your change. CLI writes also reject changes
-that race with the command; exported feed files must be kept current. Feeds and
-encrypted webhooks remain in D1's `relay_configuration` record, and saves update
-them atomically. Deployments preserve configuration and secrets.
+Use [managing feeds](OPERATIONS.md) for the web and CLI steps in either access
+model. Feed changes apply on the next scheduled poll without a deployment. New
+feed/destination pairs establish a silent baseline before delivering posts. See
+[delivery behavior](BEHAVIOR.md) for retries and configuration changes.
 
 ## Troubleshooting and acceptance
 
@@ -231,6 +189,38 @@ the role while both clients are signed in. Confirm that fresh reads/saves are
 refused, logout invalidates the session, and a new login restores access only
 after membership and role are granted. These checks require your own Discord
 application and Cloudflare deployment.
+
+## Installation name and colour
+
+The admin editor and its sign-in and access pages can show an installation name
+beside the syndicord mark and use a custom header colour. The name also appears
+in the browser tab. Both settings are optional:
+
+| Setting              | Value                                                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `ADMIN_NAME`         | Installation name, for example `Community updates`. Surrounding spaces are removed; at most 80 characters are shown. |
+| `ADMIN_HEADER_COLOR` | Six-digit hex colour, for example `#304B70`. Header text automatically uses black or white for contrast.             |
+
+In **Cloudflare Dashboard → Workers & Pages → your Worker → Settings → Variables
+and Secrets**, add either setting as a **Secret** and deploy the changes. These
+values are visible on the page; using the Secret type preserves them during code
+deployments, like the other installation settings.
+
+Alternatively, use the CLI's value prompts:
+
+```sh
+npm run syndicord -- cf workers secrets update ADMIN_NAME \
+  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+npm run syndicord -- cf workers secrets update ADMIN_HEADER_COLOR \
+  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+```
+
+For local development, set these values in `.dev.vars`. Reload the page after
+changing them. An absent or blank name shows only syndicord; an absent or
+invalid colour uses the default dark green header. Remove either setting from
+**Variables and Secrets**, or use `cf workers secrets delete ADMIN_NAME` or
+`cf workers secrets delete ADMIN_HEADER_COLOR` with the same Worker selection,
+to restore its default. Custom logos and page-wide themes are not supported.
 
 ## Local preview
 
@@ -264,3 +254,6 @@ this setting in the hosted installation and keep external proxies from logging
 callback queries. Browser writes require the same origin; CLI writes
 authenticate with the CLI's separate bearer session. Server-side authorization
 covers both the editor and the shared configuration API.
+
+[Documentation index](README.md) · [Manage feeds](OPERATIONS.md) ·
+[Scoped permissions](PERMISSIONS.md)

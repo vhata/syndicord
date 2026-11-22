@@ -1,20 +1,91 @@
-# Optional provider API recipes
+# Advanced provider operations
 
 Use [setup](SETUP.md) for the normal dashboard and CLI instructions. Routine
 feed and webhook edits use the [web interface](WEB.md) or
 [syndicord CLI](OPERATIONS.md).
 
-This advanced reference is for operators who want terminal access to provider
-settings without a direct command in the pinned Cloudflare CLI, or want to
-create Discord webhooks through its API. The recipes use Bash, `curl`, and `jq`,
-and operate on your selected hosted installation.
+Use this optional reference for account-token policies and provider API tasks.
+Normal setup uses [dashboard steps and native CLI commands](SETUP.md). The API
+recipes below use Bash, `curl`, and `jq`; they operate on your selected hosted
+installation.
+
+- [Create a deployment token with the CLI](#create-a-deployment-token-with-the-cli)
+- [Find the Worker address](#find-the-worker-address)
+- [Pause and restore cron triggers](#pause-and-restore-cron-triggers)
+- [Create a Discord webhook](#create-a-discord-webhook)
+
+## Create a deployment token with the CLI
+
+First
+[select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation).
+Your membership needs **API Token Provisioning** (or Super Administrator), with
+the product permissions you want to grant. This creates an account-owned token
+for [GitHub deployment](DEPLOYMENT.md).
+
+The pinned CLI's OAuth scopes support **Workers Scripts Write**. Use the
+dashboard for the narrower **Workers Editor** permission.
+[Workers permission reference](https://developers.cloudflare.com/workers/authorization/workers/)
+
+Check the saved login before creating the token:
+
+```sh
+npm run syndicord -- cf auth scopes --filter account_api_tokens
+npm run syndicord -- cf auth scopes --filter workers-scripts.write
+npm run syndicord -- cf auth scopes --filter d1.write
+```
+
+These must show `account_api_tokens:create`, `workers-scripts.write`, and
+`d1.write`. If a grant is missing, run
+`npm run syndicord -- cf auth login --force`. On the browser authorization page,
+open **Additional access → Sensitive scopes** and enable **Account API Token
+Provisioning**. **API Tokens Write** manages user-owned tokens and can remain
+off; it is not needed to create this account-owned token. Keep Workers and D1
+access enabled, complete authorization, then check the scopes again.
+
+This login consent is required even for a Super Administrator. It is an
+interactive OAuth consent step; the CLI cannot approve sensitive scopes for you.
+
+Create `ci-token-policy.json` with the permission IDs for **Workers Scripts
+Write** and **D1 Write** below. Replace only `ACCOUNT_ID` with your Cloudflare
+account ID:
+
+```json
+[
+  {
+    "effect": "allow",
+    "permission_groups": [
+      { "id": "e086da7e2179491d91ee5f35b3ca210a" },
+      { "id": "09b2857d1c31407795e75e3fed8617a1" }
+    ],
+    "resources": {
+      "com.cloudflare.api.account.ACCOUNT_ID": "*"
+    }
+  }
+]
+```
+
+Both permissions apply across the selected account. The policy grants no zone
+access.
+
+Create the token:
+
+```sh
+npm run syndicord -- cf accounts tokens create --name syndicord-github --policies @ci-token-policy.json
+```
+
+In the JSON printed by `cf`, copy the complete `value` string (beginning with
+`cfat_`), without the surrounding quotes.
+
+Continue with
+[storing the token in GitHub](DEPLOYMENT.md#store-the-token-in-github).
+[Account token requirements](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
 
 ## Cloudflare API access
 
 Use an existing account API token with the permissions required by the
 operation. The saved `cf auth login` session does not populate
-`CLOUDFLARE_API_TOKEN`. [Token creation](DEPLOYMENT.md#create-through-the-cli)
-has a CLI option.
+`CLOUDFLARE_API_TOKEN`.
+[Token creation](#create-a-deployment-token-with-the-cli) has a CLI option.
 
 Enter the token at a hidden prompt and define this helper in your current Bash
 session. The token travels through stdin, not curl's command arguments:
