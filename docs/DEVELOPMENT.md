@@ -178,23 +178,26 @@ GitHub.
 
 ## Layout
 
-| Path                   | Purpose                                                 |
-| ---------------------- | ------------------------------------------------------- |
-| `src/config.ts`        | Feed and webhook validation                             |
-| `src/feed.ts`          | RSS and Atom normalization                              |
-| `src/discord.ts`       | Message formatting and confirmed webhook delivery       |
-| `src/ledger.ts`        | D1 baselines, pending deliveries, leases, and cooldowns |
-| `src/runner.ts`        | Bounded polling and delivery orchestration              |
-| `src/config-store.ts`  | Installation configuration in D1                        |
-| `src/admin.ts`         | Authorized configuration HTTP endpoints                 |
-| `src/admin-auth.ts`    | Discord OAuth, role checks, and application sessions    |
-| `src/admin-store.ts`   | Encrypted webhook configuration and atomic API saves    |
-| `src/admin-page.ts`    | Feed, webhook, and routing web interface                |
-| `cli/`                 | Installed command-line interface                        |
-| `src/index.ts`         | Scheduled and HTTP Worker entrypoints                   |
-| `test/`                | Unit, D1 integration, and built-Worker tests            |
-| `migrations/`          | D1 schema migrations                                    |
-| `cloudflare.config.ts` | Worker, bindings, schedule, and logging                 |
+| Path                          | Purpose                                                 |
+| ----------------------------- | ------------------------------------------------------- |
+| `src/config.ts`               | Feed and webhook validation                             |
+| `src/feed.ts`                 | RSS and Atom normalization                              |
+| `src/discord.ts`              | Message formatting and confirmed webhook delivery       |
+| `src/ledger.ts`               | D1 baselines, pending deliveries, leases, and cooldowns |
+| `src/runner.ts`               | Bounded polling and delivery orchestration              |
+| `src/config-store.ts`         | Installation configuration in D1                        |
+| `src/admin.ts`                | Authorized configuration HTTP endpoints                 |
+| `src/admin-auth.ts`           | Discord OAuth, role checks, and application sessions    |
+| `src/admin-policy.ts`         | Operator-owned grants and exact channel scopes          |
+| `src/catalog-store.ts`        | Scoped catalog operations and atomic relay projection   |
+| `src/webhook-verification.ts` | Bounded Discord destination verification                |
+| `src/admin-store.ts`          | Encrypted webhook configuration and atomic API saves    |
+| `src/admin-page.ts`           | Feed, webhook, and routing web interface                |
+| `cli/`                        | Installed command-line interface                        |
+| `src/index.ts`                | Scheduled and HTTP Worker entrypoints                   |
+| `test/`                       | Unit, D1 integration, and built-Worker tests            |
+| `migrations/`                 | D1 schema migrations                                    |
+| `cloudflare.config.ts`        | Worker, bindings, schedule, and logging                 |
 
 See [setup](SETUP.md) for the first hosted deployment,
 [operations](OPERATIONS.md) for feeds and webhooks, and

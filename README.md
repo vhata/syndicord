@@ -31,11 +31,13 @@ one feed and sends a bounded batch of pending entries.
 
 Use the [Discord-authenticated web interface](docs/WEB.md) or
 [CLI](docs/OPERATIONS.md) to add feeds and webhooks and choose where each feed
-goes. Both clients use the same API and can be used interchangeably. Feeds and
-routing live in Cloudflare D1; webhook URLs are encrypted with a separate Worker
-secret. Run the CLI directly from the repository or install it through npm to
-manage an installation without a checkout. The same code can serve separate
-accounts or Workers, each with its own database and configuration.
+goes. [Scoped role grants](docs/PERMISSIONS.md) separate feed administration
+from routing to approved channels across Discord servers. Both clients use the
+same API and can be used interchangeably. Feeds and routing live in Cloudflare
+D1; webhook URLs are encrypted with a separate Worker secret. Run the CLI
+directly from the repository or install it through npm to manage an installation
+without a checkout. The same code can serve separate accounts or Workers, each
+with its own database and configuration.
 
 Start with [setup](docs/SETUP.md), then [enable the web interface](docs/WEB.md).
 For CLI changes, [add or change feeds](docs/OPERATIONS.md#add-or-change-a-feed)

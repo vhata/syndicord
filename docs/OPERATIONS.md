@@ -1,5 +1,10 @@
 # Feeds and webhooks
 
+For an installation using `DISCORD_AUTH_POLICY`, follow the
+[scoped catalog, destination, and subscription commands](PERMISSIONS.md). The
+`feeds set` and `webhooks` commands below apply to single-role installations;
+the scoped API rejects whole-configuration changes.
+
 [First deployment](SETUP.md) · [Web interface](WEB.md) · [Status](STATUS.md) ·
 [Automatic deployment](DEPLOYMENT.md) · [Troubleshooting](RECOVERY.md)
 
@@ -14,7 +19,7 @@ npm run syndicord -- login
 ```
 
 Approve the browser request only when its code matches the terminal. Your
-account must belong to the configured server and have its required role. See
+account must match one of the operator-configured server/role grants. See
 [Discord setup and CLI login](WEB.md#cli-login) for details. Run
 `npm run syndicord -- logout` when finished; expired sessions require `login`
 again.
@@ -130,11 +135,11 @@ Each independent installation has its own Worker and D1 database. Check that the
 admin URL and Cloudflare identifiers refer to the intended installation when
 switching between configuration and infrastructure commands.
 
-| Setting                                    | Authoritative location   |
-| ------------------------------------------ | ------------------------ |
-| Feed URLs, routing, encrypted webhook URLs | D1 `relay_configuration` |
-| Discord OAuth settings and encryption key  | Worker secrets           |
-| Baselines, pending deliveries, and health  | D1 delivery ledger       |
+| Setting                                                          | Authoritative location   |
+| ---------------------------------------------------------------- | ------------------------ |
+| Feed URLs, routing, encrypted webhook URLs                       | D1 `relay_configuration` |
+| Discord OAuth settings, authorization policy, and encryption key | Worker secrets           |
+| Baselines, pending deliveries, and health                        | D1 delivery ledger       |
 
 ## Polling limits
 
@@ -147,8 +152,10 @@ minute. Entries must remain in the source feed until its next poll to be
 observed; longer rotations can miss entries removed between polls.
 
 Each save is limited to 96 KiB of normalized JSON for the complete feed list and
-webhook map, including unused saved destinations. This leaves room for API
-metadata within the 128 KiB request and response limits. Remove unused
+webhook map, including unused saved destinations. Scoped catalogs include all
+catalog metadata and unrouted feeds in this bound; only subscribed feeds enter
+the polling rotation. Requests and single-role responses are limited to 128 KiB.
+Scoped responses allow 256 KiB for expanded channel permissions. Remove unused
 destinations or shorten feed URLs if a save reaches this size. Existing larger
 configurations remain readable so they can be reduced.
 

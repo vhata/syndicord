@@ -1,8 +1,11 @@
 import type { FeedRoute } from './types.ts';
+import type { ChannelScope } from './catalog-types.ts';
 
 export interface RelayConfig {
   feeds: FeedRoute[];
   webhooks: Record<string, string>;
+  /** Verified immutable targets, present for catalog-managed destinations. */
+  destinationBindings?: Record<string, ChannelScope>;
 }
 
 const NAME = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;

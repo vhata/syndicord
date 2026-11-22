@@ -1,9 +1,7 @@
 # Discord permissions for feeds and destinations
 
-This design records the user's decisions from 2026-11-22. It describes planned
-behavior, not the currently implemented single-server, single-role access gate.
-Implementation is tracked as `multi-server-discord-permissions` in
-[TODO.md](../../TODO.md).
+This specification records the permission boundaries agreed on 2026-11-22. See
+[scoped permissions](../PERMISSIONS.md) for configuration and operation.
 
 ## Agreed authority boundaries
 
@@ -81,23 +79,24 @@ not permit taking over an existing destination.
   activation, webhook replacement, source replacement without subscription
   transfer, bulk-save isolation, and role revocation with synthetic tests.
 
-## Remaining implementation design
+## Maintenance and upgrade decisions
 
-The decisions above do not settle every maintenance permission. Resolve these
-details before implementation; they are not silently granted by feed creation or
-routing authority:
-
-- Who can edit feed labels or unused feed URLs and who can delete unused feeds.
-  Proposed default: delete only feeds with no subscriptions, retaining pending
-  delivery and identity invariants.
-- Whether existing routes continue after their creator loses a role. Proposed
-  default: revocation removes management access; routes remain until explicitly
-  removed or their destination is disabled.
-- Catalog visibility, especially raw feed URLs containing credentials. The
-  requested ability to route any catalog feed permits sharing its content with
-  authorized destinations; it does not require exposing its credentials.
-- How channel/thread scopes, webhook rotation, and webhooks moved in Discord
-  retain their verified destination binding.
-- Operator-policy representation, the storage/API transition, and the upgrade
-  path for existing installations. Preserve delivery state and do not widen
-  existing access implicitly.
+- Feed administrators can rename feed labels and delete only unsubscribed feeds.
+  Source URLs are immutable even when unused; replacements get separate IDs.
+- Removing a management role leaves existing routes running.
+- Catalog responses expose labels and opaque IDs, never raw source URLs. Channel
+  administrators can route any catalog feed into their approved channels.
+- Scoped destinations bind to exact servers/channels and reject thread targets.
+  Rotation verifies the same binding. Delivery rechecks it before sending;
+  Discord lookup and execution cannot be made atomic.
+- Operators configure versioned JSON in `DISCORD_AUTH_POLICY`. Its absence keeps
+  the single-role mode only while no catalog exists. Policy changes revoke
+  sessions; malformed policies fail closed.
+- Explicit catalog initialization verifies saved webhooks and atomically copies
+  the existing routes, preserving delivery keys and ledger state. Failures leave
+  the configuration unchanged. After initialization the old bulk API stays
+  closed.
+- A single-operation API checks fresh grants after uploads and provider
+  requests, applies optimistic concurrency, and bounds the full stored
+  configuration to 96 KiB, including unused catalog entries and webhook
+  credentials.

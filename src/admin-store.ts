@@ -7,18 +7,20 @@ import {
 import type { RelayConfig } from './config.ts';
 import { ConfigurationError, parseStoredFeeds } from './config-store.ts';
 import type { FeedRoute } from './types.ts';
+import { catalogRoutes, parseCatalog } from './catalog-document.ts';
 
 export interface ConfigurationEnv {
   DB: D1Database;
   CONFIG_ENCRYPTION_KEY?: string;
 }
 
-interface ConfigurationRow {
+export interface ConfigurationRow {
   feeds: string;
   encrypted_webhooks: string | null;
+  catalog: string | null;
 }
 
-interface ConfigurationSnapshot {
+export interface ConfigurationSnapshot {
   row: ConfigurationRow | null;
   feeds: FeedRoute[];
   webhooks: Record<string, string>;
@@ -35,7 +37,7 @@ export class AdminError extends Error {
 }
 
 const READ_CONFIGURATION =
-  'SELECT feeds, encrypted_webhooks FROM relay_configuration WHERE id = 1';
+  'SELECT feeds, encrypted_webhooks, catalog FROM relay_configuration WHERE id = 1';
 const encoder = new TextEncoder();
 const ENCRYPTION_CONTEXT = encoder.encode('syndicord-webhooks-v1');
 
@@ -67,7 +69,10 @@ export async function configurationKey(value: unknown): Promise<CryptoKey> {
   }
 }
 
-async function seal(webhooks: Record<string, string>, key: CryptoKey) {
+export async function sealWebhooks(
+  webhooks: Record<string, string>,
+  key: CryptoKey,
+) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: ENCRYPTION_CONTEXT },
@@ -103,23 +108,32 @@ async function open(value: string, key: CryptoKey) {
   }
 }
 
-async function revision(row: ConfigurationRow | null) {
+export async function configurationRevision(row: ConfigurationRow | null) {
   const digest = await crypto.subtle.digest(
     'SHA-256',
     encoder.encode(
-      JSON.stringify([row?.feeds ?? null, row?.encrypted_webhooks ?? null]),
+      JSON.stringify([
+        row?.feeds ?? null,
+        row?.encrypted_webhooks ?? null,
+        row?.catalog ?? null,
+      ]),
     ),
   );
   return base64(new Uint8Array(digest));
 }
 
-async function snapshot(
+export async function readConfigurationSnapshot(
   env: ConfigurationEnv,
   key: CryptoKey,
 ): Promise<ConfigurationSnapshot> {
   const row =
     await env.DB.prepare(READ_CONFIGURATION).first<ConfigurationRow>();
-  const feeds = row === null ? [] : parseStoredFeeds(row.feeds);
+  const feeds =
+    row === null
+      ? []
+      : row.catalog === null
+        ? parseStoredFeeds(row.feeds)
+        : catalogRoutes(parseCatalog(row.catalog));
   const webhooks =
     row?.encrypted_webhooks !== null && row?.encrypted_webhooks !== undefined
       ? await open(row.encrypted_webhooks, key)
@@ -128,8 +142,23 @@ async function snapshot(
     row,
     feeds,
     webhooks,
-    revision: await revision(row),
+    revision: await configurationRevision(row),
   };
+}
+
+export async function hasCatalog(env: ConfigurationEnv): Promise<boolean> {
+  const row = await env.DB.prepare(
+    'SELECT catalog FROM relay_configuration WHERE id = 1',
+  ).first<{ catalog: string | null }>();
+  return row?.catalog !== null && row?.catalog !== undefined;
+}
+
+function requireLegacy(value: ConfigurationSnapshot) {
+  if (value.row?.catalog !== null && value.row?.catalog !== undefined)
+    throw new AdminError(
+      'This installation uses scoped permissions. Ask the operator to configure DISCORD_AUTH_POLICY and use the feed catalog.',
+      403,
+    );
 }
 
 function publicSnapshot(value: ConfigurationSnapshot) {
@@ -145,7 +174,9 @@ export async function readAdminConfiguration(
   env: ConfigurationEnv,
   key: CryptoKey,
 ) {
-  return publicSnapshot(await snapshot(env, key));
+  const value = await readConfigurationSnapshot(env, key);
+  requireLegacy(value);
+  return publicSnapshot(value);
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -166,7 +197,8 @@ export async function saveAdminConfiguration(
     )
   )
     throw new AdminError('Provide a revision, feed list, and webhook changes.');
-  const before = await snapshot(env, key);
+  const before = await readConfigurationSnapshot(env, key);
+  requireLegacy(before);
   if (input.revision !== before.revision)
     throw new AdminError(
       'Configuration changed. Reload it before saving your changes.',
@@ -198,7 +230,7 @@ export async function saveAdminConfiguration(
       error instanceof Error ? error.message : 'Invalid configuration.',
     );
   }
-  const encrypted = await seal(webhooks, key);
+  const encrypted = await sealWebhooks(webhooks, key);
   const storedFeeds = JSON.stringify(feeds);
   const result =
     before.row === null
@@ -215,7 +247,7 @@ export async function saveAdminConfiguration(
           `
         UPDATE relay_configuration SET feeds = ?, encrypted_webhooks = ?,
           updated_at_ms = CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)
-        WHERE id = 1 AND feeds = ? AND encrypted_webhooks IS ?
+        WHERE id = 1 AND feeds = ? AND encrypted_webhooks IS ? AND catalog IS NULL
       `,
         )
           .bind(
@@ -230,12 +262,16 @@ export async function saveAdminConfiguration(
       'Configuration changed. Reload it before saving your changes.',
       409,
     );
-  const row = { feeds: storedFeeds, encrypted_webhooks: encrypted };
+  const row = {
+    feeds: storedFeeds,
+    encrypted_webhooks: encrypted,
+    catalog: null,
+  };
   return publicSnapshot({
     row,
     feeds,
     webhooks,
-    revision: await revision(row),
+    revision: await configurationRevision(row),
   });
 }
 
@@ -246,6 +282,37 @@ export async function readRelayConfiguration(
   const row =
     await env.DB.prepare(READ_CONFIGURATION).first<ConfigurationRow>();
   if (row === null) return { feeds: [], webhooks: Object.create(null) };
+  if (row.catalog !== null) {
+    const catalog = parseCatalog(row.catalog);
+    const feeds = catalogRoutes(catalog);
+    if (JSON.stringify(feeds) !== row.feeds || row.encrypted_webhooks === null)
+      throw new ConfigurationError(
+        'The saved catalog and relay configuration disagree. Ask the operator to restore their last consistent version.',
+      );
+    const webhooks = await open(
+      row.encrypted_webhooks,
+      await configurationKey(env.CONFIG_ENCRYPTION_KEY),
+    );
+    const destinationBindings: Record<
+      string,
+      { guildId: string; channelId: string }
+    > = Object.create(null);
+    for (const destination of catalog.destinations) {
+      if (!Object.hasOwn(webhooks, destination.deliveryKey))
+        throw new ConfigurationError(
+          'A saved catalog destination has no webhook.',
+        );
+      destinationBindings[destination.deliveryKey] = {
+        guildId: destination.guildId,
+        channelId: destination.channelId,
+      };
+    }
+    if (Object.keys(webhooks).length !== catalog.destinations.length)
+      throw new ConfigurationError(
+        'The saved catalog and webhook destinations disagree.',
+      );
+    return { feeds, webhooks, destinationBindings };
+  }
   const feeds = parseStoredFeeds(row.feeds);
   if (row.encrypted_webhooks === null) return loadConfig(feeds, {});
   const webhooks = await open(

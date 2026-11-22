@@ -58,9 +58,10 @@ export function adminEndpoint(env: Environment) {
 export async function readAdminResponse(
   response: Response,
   signal: AbortSignal,
+  maxBytes = MAX_BYTES,
 ): Promise<unknown> {
   if (
-    Number(response.headers.get('content-length')) > MAX_BYTES ||
+    Number(response.headers.get('content-length')) > maxBytes ||
     !response.body
   )
     throw new Error(INVALID_RESPONSE);
@@ -78,7 +79,7 @@ export async function readAdminResponse(
       if (signal.aborted) throw new Error(INVALID_RESPONSE);
       if (part.done) break;
       size += part.value.byteLength;
-      if (size > MAX_BYTES) throw new Error(INVALID_RESPONSE);
+      if (size > maxBytes) throw new Error(INVALID_RESPONSE);
       chunks.push(part.value);
     }
   } finally {
@@ -270,7 +271,7 @@ async function authRequest(
 function failure(status: number): never {
   if (status === 403)
     throw new Error(
-      'Access was denied. Your Discord account must belong to the configured server and have its required role. Run syndicord login to try another account.',
+      'Access was denied. Your Discord account must have one of the server roles configured by this installation’s operator. Run syndicord login to try another account.',
     );
   if (status === 401 || status === 410)
     throw new Error(

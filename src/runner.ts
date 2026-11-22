@@ -5,6 +5,10 @@ import { parseFeedDocument } from './feed.ts';
 import { FeedFetchError, fetchFeed } from './http.ts';
 import { DeliveryLedger, LostLeaseError } from './ledger.ts';
 import type { Fetcher } from './types.ts';
+import {
+  verifyWebhook,
+  WebhookVerificationError,
+} from './webhook-verification.ts';
 
 export interface RelayEvent {
   event: string;
@@ -97,11 +101,65 @@ export async function runRelay(
     const pending = await ledger.pending(owner, config.feeds, 5);
     const blocked = new Set<string>();
     for (const delivery of pending) {
-      if (now() > deadline - 7000) break;
+      // A scoped delivery needs both a metadata lookup and the send deadline.
+      if (now() > deadline - (config.destinationBindings ? 13000 : 7000)) break;
       if (blocked.has(delivery.destination)) continue;
       const webhook = config.webhooks[delivery.destination];
       if (!webhook) continue;
       if (!(await ledger.renew(owner))) throw new LostLeaseError();
+      if (config.destinationBindings) {
+        const binding = config.destinationBindings[delivery.destination];
+        let reason = 'webhook_verification_failed';
+        let failure: unknown;
+        let verified = false;
+        if (binding) {
+          try {
+            const actual = await verifyWebhook(webhook, fetcher);
+            verified =
+              actual.guildId === binding.guildId &&
+              actual.channelId === binding.channelId;
+            if (!verified) reason = 'webhook_binding_changed';
+          } catch (error) {
+            failure = error;
+          }
+        }
+        if (!verified) {
+          const delay = Math.max(
+            Math.min(
+              6 * 60 * 60_000,
+              60_000 * 2 ** Math.min(delivery.attempts, 10),
+            ),
+            failure instanceof WebhookVerificationError
+              ? (failure.retryAfterMs ?? 0)
+              : 0,
+          );
+          if (!(await ledger.retry(owner, delivery, delay, reason)))
+            throw new LostLeaseError();
+          report.deferred++;
+          blocked.add(delivery.destination);
+          log({
+            event: 'delivery_deferred',
+            destination: delivery.destination,
+            reason,
+          });
+          if (
+            failure instanceof WebhookVerificationError &&
+            failure.retryAfterMs !== null
+          ) {
+            if (
+              !(await ledger.cooldown(
+                owner,
+                failure.global ? '*' : delivery.destination,
+                delay,
+              ))
+            )
+              throw new LostLeaseError();
+            if (failure.global) break;
+          }
+          continue;
+        }
+        if (!(await ledger.renew(owner))) throw new LostLeaseError();
+      }
       const result = await sendDiscord(
         webhook,
         delivery.entry,
