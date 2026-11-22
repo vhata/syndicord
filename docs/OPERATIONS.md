@@ -152,6 +152,11 @@ metadata within the 128 KiB request and response limits. Remove unused
 destinations or shorten feed URLs if a save reaches this size. Existing larger
 configurations remain readable so they can be reduced.
 
+Installation capacity also depends on
+[Cloudflare Workers CPU limits](https://developers.cloudflare.com/workers/platform/limits/),
+[D1 database quotas](https://developers.cloudflare.com/d1/platform/limits/), and
+Discord rate limits.
+
 Runs stop starting deliveries after 30 seconds; HTTP requests have six-second
 deadlines. Leases, retries, and Discord cooldowns can delay work further. Feeds
 must be UTF-8 XML, at most 256 KiB and 200 entries, with at most three redirects
