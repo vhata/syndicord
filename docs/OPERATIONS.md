@@ -154,10 +154,10 @@ observed; longer rotations can miss entries removed between polls.
 Each save is limited to 96 KiB of normalized JSON for the complete feed list and
 webhook map, including unused saved destinations. Scoped catalogs include all
 catalog metadata and unrouted feeds in this bound; only subscribed feeds enter
-the polling rotation. This leaves room for API metadata within the 128 KiB
-request and response limits. Remove unused destinations or shorten feed URLs if
-a save reaches this size. Existing larger configurations remain readable so they
-can be reduced.
+the polling rotation. Requests and single-role responses are limited to 128 KiB.
+Scoped responses allow 256 KiB for expanded channel permissions. Remove unused
+destinations or shorten feed URLs if a save reaches this size. Existing larger
+configurations remain readable so they can be reduced.
 
 Installation capacity also depends on
 [Cloudflare Workers CPU limits](https://developers.cloudflare.com/workers/platform/limits/),

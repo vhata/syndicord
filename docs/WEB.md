@@ -152,8 +152,9 @@ npm run syndicord -- logout
 
 ## Grant and revoke access
 
-- **Grant:** Invite the person to the configured server separately, then assign
-  the configured role in **Server Settings → Members**. Have them sign in.
+- **Grant:** Invite the person to a configured server separately, then assign
+  its configured role in **Server Settings → Members**. Have them sign in. With
+  a scoped policy, their matching roles combine the corresponding grants.
 - **Revoke:** Remove that role, or remove the person from the server. Both the
   editor and configuration API check Discord membership and role; every
   configuration write requires a fresh check. Already loaded pages may remain
@@ -218,7 +219,7 @@ them atomically. Deployments preserve configuration and secrets.
 | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Administration disabled             | OAuth/key settings, valid policy or server/role pair, callback origin/path, and migrations          |
 | Discord rejects the callback        | The exact registered redirect matches `DISCORD_REDIRECT_URI` and the origin used in the browser/CLI |
-| Access denied                       | The signed-in account belongs to the configured server and has the exact configured role ID         |
+| Access denied                       | The account matches a policy grant, or the single-role mode’s exact server/role IDs                 |
 | Sign-in expired or already used     | Start sign-in again; callbacks and CLI grants are single use                                        |
 | Discord unavailable or rate limited | Wait as directed and retry; configuration has not been authorized                                   |
 | CLI cannot authenticate             | Select the intended origin and run `login` again                                                    |

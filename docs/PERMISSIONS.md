@@ -99,7 +99,9 @@ Import preserves the delivery keys, baselines, pending messages, and sent
 history. Subsequent label changes also preserve those identities. Catalog
 storage, routing, and encrypted webhook credentials are updated together with
 optimistic concurrency checks. The complete normalized configuration is bounded
-to 96 KiB, including unrouted feeds and unused destinations.
+to 96 KiB, including unrouted feeds and unused destinations. Requests are
+limited to 128 KiB; scoped responses allow 256 KiB to include the caller’s
+channel grants.
 
 ## Feeds and subscriptions
 

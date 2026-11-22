@@ -271,7 +271,7 @@ async function authRequest(
 function failure(status: number): never {
   if (status === 403)
     throw new Error(
-      'Access was denied. Your Discord account must belong to the configured server and have its required role. Run syndicord login to try another account.',
+      'Access was denied. Your Discord account must have one of the server roles configured by this installation’s operator. Run syndicord login to try another account.',
     );
   if (status === 401 || status === 410)
     throw new Error(
