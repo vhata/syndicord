@@ -24,6 +24,7 @@ import {
   discordFixture,
   responseCookie,
   TEST_DISCORD_TOKEN,
+  TEST_GUILD_ID,
   TEST_ROLE_ID,
   TEST_USER_ID,
 } from './helpers/auth.ts';
@@ -67,6 +68,250 @@ function authError(status: number) {
   return (error: unknown) =>
     error instanceof AuthError && error.status === status;
 }
+
+const SECOND_GUILD_ID = '100000000000000102';
+const SECOND_ROLE_ID = '100000000000000103';
+const FIRST_CHANNEL_ID = '100000000000000105';
+const SECOND_CHANNEL_ID = '100000000000000106';
+function scopedEnv(env: AuthEnv): AuthEnv {
+  return {
+    ...env,
+    DISCORD_AUTH_POLICY: JSON.stringify({
+      version: 1,
+      grants: [
+        { guildId: TEST_GUILD_ID, roleId: TEST_ROLE_ID, addFeeds: true },
+        {
+          guildId: TEST_GUILD_ID,
+          roleId: SECOND_ROLE_ID,
+          channelIds: [FIRST_CHANNEL_ID],
+        },
+        {
+          guildId: SECOND_GUILD_ID,
+          roleId: SECOND_ROLE_ID,
+          channelIds: [SECOND_CHANNEL_ID],
+        },
+      ],
+    }),
+  };
+}
+
+test('scoped auth is operator-controlled and never falls back from an invalid policy', async () => {
+  const { env, dispose } = await fixture();
+  try {
+    const scoped = scopedEnv(env);
+    delete scoped.DISCORD_GUILD_ID;
+    delete scoped.DISCORD_ROLE_ID;
+    assert.ok(authConfiguration(scoped));
+    for (const invalid of [
+      '',
+      'null',
+      '{}',
+      '{',
+      JSON.stringify({ version: 2, grants: [] }),
+    ]) {
+      const changed = { ...env, DISCORD_AUTH_POLICY: invalid };
+      assert.equal(authConfiguration(changed), null);
+      assert.equal(
+        (await handleAuth(req('/admin/auth/login'), changed))!.status,
+        503,
+      );
+    }
+    const legacy = authConfiguration(env)!;
+    assert.deepEqual(Object.keys(legacy), [
+      'clientId',
+      'clientSecret',
+      'redirectUri',
+      'origin',
+      'guildId',
+      'roleId',
+    ]);
+    assert.equal(Object.hasOwn(legacy, 'policy'), false);
+  } finally {
+    await dispose();
+  }
+});
+
+test('one Discord sign-in combines server-role grants and rechecks partial role revocation', async () => {
+  const { env: legacy, dispose } = await fixture();
+  const env = scopedEnv(legacy);
+  const calls: Request[] = [];
+  const guilds = {
+    [TEST_GUILD_ID]: { roles: [TEST_ROLE_ID, SECOND_ROLE_ID], status: 200 },
+    [SECOND_GUILD_ID]: { roles: [SECOND_ROLE_ID], status: 200 },
+  };
+  const fetcher = discordFixture({ guilds, calls });
+  try {
+    const { cookie, response } = await browserLogin(env, fetcher);
+    assert.equal(response.headers.get('location'), '/admin');
+    calls.length = 0;
+    const user = await requireAdmin(signed(cookie), env, fetcher);
+    assert.deepEqual(user.permissions, {
+      mode: 'scoped',
+      addFeeds: true,
+      channels: [
+        { guildId: TEST_GUILD_ID, channelId: FIRST_CHANNEL_ID },
+        { guildId: SECOND_GUILD_ID, channelId: SECOND_CHANNEL_ID },
+      ],
+    });
+    assert.equal(
+      calls.length,
+      2,
+      'one membership fetch per guild despite multiple grants',
+    );
+    guilds[TEST_GUILD_ID].roles = [SECOND_ROLE_ID];
+    guilds[SECOND_GUILD_ID].roles = [];
+    assert.deepEqual(
+      (await requireAdmin(signed(cookie), env, fetcher)).permissions,
+      {
+        mode: 'scoped',
+        addFeeds: false,
+        channels: [{ guildId: TEST_GUILD_ID, channelId: FIRST_CHANNEL_ID }],
+      },
+    );
+    guilds[TEST_GUILD_ID].roles = [];
+    await assert.rejects(
+      requireAdmin(signed(cookie), env, fetcher),
+      authError(403),
+    );
+  } finally {
+    await dispose();
+  }
+});
+
+test('absent guild membership grants nothing while other servers still grant their exact scopes', async () => {
+  const { env: legacy, dispose } = await fixture();
+  const env = scopedEnv(legacy);
+  const guilds = {
+    [TEST_GUILD_ID]: { roles: [TEST_ROLE_ID], status: 404 },
+    [SECOND_GUILD_ID]: { roles: [SECOND_ROLE_ID], status: 200 },
+  };
+  const fetcher = discordFixture({ guilds });
+  try {
+    const { cookie } = await browserLogin(env, fetcher);
+    for (const status of [403, 404]) {
+      guilds[TEST_GUILD_ID].status = status;
+      assert.deepEqual(
+        (await requireAdmin(signed(cookie), env, fetcher)).permissions,
+        {
+          mode: 'scoped',
+          addFeeds: false,
+          channels: [
+            { guildId: SECOND_GUILD_ID, channelId: SECOND_CHANNEL_ID },
+          ],
+        },
+      );
+    }
+    guilds[SECOND_GUILD_ID].status = 404;
+    await assert.rejects(
+      requireAdmin(signed(cookie), env, fetcher),
+      authError(403),
+    );
+  } finally {
+    await dispose();
+  }
+});
+
+test('unavailable or malformed checks fail closed even after another guild grants access', async () => {
+  const { env: legacy, db, dispose } = await fixture();
+  const env = scopedEnv(legacy);
+  const calls: Request[] = [];
+  const guilds = {
+    [TEST_GUILD_ID]: { roles: [TEST_ROLE_ID], status: 200 },
+    [SECOND_GUILD_ID]: { roles: [SECOND_ROLE_ID], status: 200 },
+  };
+  const fetcher = discordFixture({ guilds, calls });
+  try {
+    const { cookie } = await browserLogin(env, fetcher);
+    guilds[SECOND_GUILD_ID].status = 500;
+    await assert.rejects(
+      requireAdmin(signed(cookie), env, fetcher),
+      authError(503),
+    );
+    for (const body of [
+      { roles: 'invalid' },
+      { roles: [SECOND_ROLE_ID], user: { id: 'wrong-user' } },
+    ]) {
+      const malformed: DiscordFetch = async (input, init) => {
+        if (String(input).includes(SECOND_GUILD_ID)) return Response.json(body);
+        return fetcher(input, init);
+      };
+      await assert.rejects(
+        requireAdmin(signed(cookie), env, malformed),
+        authError(503),
+      );
+    }
+    guilds[SECOND_GUILD_ID].status = 429;
+    await assert.rejects(
+      requireAdmin(signed(cookie), env, fetcher),
+      authError(429),
+    );
+    const before = calls.length;
+    await assert.rejects(
+      requireAdmin(signed(cookie), env, fetcher),
+      authError(429),
+    );
+    assert.equal(calls.length, before, 'cached cooldown makes no guild checks');
+    await db.prepare('UPDATE admin_sessions SET retry_at_ms = 0').run();
+    guilds[SECOND_GUILD_ID].status = 401;
+    await assert.rejects(
+      requireAdmin(signed(cookie), env, fetcher),
+      authError(401),
+    );
+    assert.equal(
+      await db
+        .prepare('SELECT COUNT(*) AS count FROM admin_sessions')
+        .first('count'),
+      0,
+    );
+  } finally {
+    await dispose();
+  }
+});
+
+test('operator policy changes revoke both browser and separately approved CLI sessions', async () => {
+  const { env: legacy, dispose } = await fixture();
+  const env = scopedEnv(legacy);
+  const fetcher = discordFixture({
+    guilds: {
+      [TEST_GUILD_ID]: { roles: [TEST_ROLE_ID] },
+      [SECOND_GUILD_ID]: { roles: [SECOND_ROLE_ID] },
+    },
+  });
+  try {
+    const { cookie } = await browserLogin(env, fetcher);
+    const cli = await cliLogin(env, fetcher);
+    const cliRequest = req('/admin/api/config', {
+      headers: { Authorization: `Bearer ${cli.token}` },
+    });
+    assert.equal(
+      (await requireAdmin(cliRequest, env, fetcher)).permissions.addFeeds,
+      true,
+    );
+    const policy = JSON.parse(env.DISCORD_AUTH_POLICY!);
+    policy.grants.reverse();
+    const reordered = { ...env, DISCORD_AUTH_POLICY: JSON.stringify(policy) };
+    assert.equal(
+      (await requireAdmin(signed(cookie), reordered, fetcher)).permissions
+        .addFeeds,
+      true,
+    );
+    policy.grants = [];
+    const denied = { ...env, DISCORD_AUTH_POLICY: JSON.stringify(policy) };
+    for (const request of [signed(cookie), cliRequest])
+      await assert.rejects(
+        requireAdmin(request, denied, fetcher),
+        authError(401),
+      );
+    const fresh = await browserLogin(denied, fetcher);
+    assert.equal(fresh.response.headers.get('location'), '/admin?auth=denied');
+    await assert.rejects(
+      requireAdmin(signed(fresh.cookie), denied, fetcher),
+      authError(403),
+    );
+  } finally {
+    await dispose();
+  }
+});
 
 test('missing or unsafe OAuth configuration disables authentication without changing relay data', async () => {
   const { env, db, dispose } = await fixture();
@@ -174,6 +419,7 @@ test('login uses exact scopes, S256 PKCE, cookie binding and one-time state; sto
       id: TEST_USER_ID,
       name: 'Fixture User',
       kind: 'browser',
+      permissions: { mode: 'legacy', addFeeds: true, channels: [] },
     });
     const replay = (await handleAuth(
       new Request(start.url, { headers: { Cookie: start.cookie } }),

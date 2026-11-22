@@ -32,6 +32,10 @@ export interface DiscordFixtureOptions {
   name?: string;
   retryAfter?: string;
   calls?: Request[];
+  guilds?: Record<
+    string,
+    { roles?: string[]; status?: number; retryAfter?: string }
+  >;
 }
 
 // Options are read on each request so tests can revoke a role after login.
@@ -72,12 +76,19 @@ export function discordFixture(
         username: 'fixture-user',
         global_name: options.name ?? 'Fixture User',
       });
-    assert.equal(path, `/api/v10/users/@me/guilds/${TEST_GUILD_ID}/member`);
+    const guild = /^\/api\/v10\/users\/@me\/guilds\/(\d+)\/member$/.exec(
+      path,
+    )?.[1];
+    assert.ok(guild, 'Expected a Discord guild membership request');
+    if (!options.guilds) assert.equal(guild, TEST_GUILD_ID);
+    const membership = options.guilds
+      ? (options.guilds[guild] ?? { status: 404 })
+      : options;
     return Response.json(
-      { roles: options.roles ?? [TEST_ROLE_ID], user: { id: TEST_USER_ID } },
+      { roles: membership.roles ?? [TEST_ROLE_ID], user: { id: TEST_USER_ID } },
       {
-        status: options.status ?? 200,
-        headers: { 'Retry-After': options.retryAfter ?? '2' },
+        status: membership.status ?? 200,
+        headers: { 'Retry-After': membership.retryAfter ?? '2' },
       },
     );
   };

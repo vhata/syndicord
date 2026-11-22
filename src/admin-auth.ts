@@ -1,6 +1,12 @@
 import * as oauth from 'oauth4webapi';
 import { AdminError, configurationKey } from './admin-store.ts';
 import type { ConfigurationEnv } from './admin-store.ts';
+import {
+  DISCORD_ID,
+  parseAuthPolicy,
+  permissionsForRoles,
+} from './admin-policy.ts';
+import type { AdminPermissions, AuthPolicy } from './admin-policy.ts';
 
 export interface AuthEnv extends ConfigurationEnv {
   DISCORD_CLIENT_ID?: string;
@@ -8,6 +14,7 @@ export interface AuthEnv extends ConfigurationEnv {
   DISCORD_REDIRECT_URI?: string;
   DISCORD_GUILD_ID?: string;
   DISCORD_ROLE_ID?: string;
+  DISCORD_AUTH_POLICY?: string;
 }
 
 export interface AuthConfiguration {
@@ -15,14 +22,16 @@ export interface AuthConfiguration {
   clientSecret: string;
   redirectUri: string;
   origin: string;
-  guildId: string;
-  roleId: string;
+  guildId?: string;
+  roleId?: string;
+  policy?: AuthPolicy;
 }
 
 export interface AdminIdentity {
   id: string;
   name: string;
   kind: 'browser' | 'cli';
+  permissions: AdminPermissions;
 }
 
 export class AuthError extends AdminError {
@@ -61,7 +70,7 @@ const SESSION_MS = 8 * 60 * 60 * 1000;
 const LOGIN_MS = 10 * 60 * 1000;
 const POLL_MS = 2000;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-const ID_PATTERN = /^[1-9][0-9]{16,19}$/;
+const ID_PATTERN = DISCORD_ID;
 const encoder = new TextEncoder();
 const server: oauth.AuthorizationServer = {
   issuer: 'https://discord.com',
@@ -76,14 +85,22 @@ export function authConfiguration(
 ): AuthConfiguration | null {
   if (
     !ID_PATTERN.test(env.DISCORD_CLIENT_ID ?? '') ||
-    !ID_PATTERN.test(env.DISCORD_GUILD_ID ?? '') ||
-    !ID_PATTERN.test(env.DISCORD_ROLE_ID ?? '') ||
     !env.DISCORD_CLIENT_SECRET ||
     !env.CONFIG_ENCRYPTION_KEY ||
     !env.DISCORD_REDIRECT_URI
   )
     return null;
   try {
+    const policy =
+      env.DISCORD_AUTH_POLICY === undefined
+        ? undefined
+        : parseAuthPolicy(env.DISCORD_AUTH_POLICY);
+    if (
+      !policy &&
+      (!ID_PATTERN.test(env.DISCORD_GUILD_ID ?? '') ||
+        !ID_PATTERN.test(env.DISCORD_ROLE_ID ?? ''))
+    )
+      return null;
     const callback = new URL(env.DISCORD_REDIRECT_URI);
     const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(
       callback.hostname,
@@ -105,8 +122,10 @@ export function authConfiguration(
       clientSecret: env.DISCORD_CLIENT_SECRET,
       redirectUri: callback.href,
       origin: callback.origin,
-      guildId: env.DISCORD_GUILD_ID!,
-      roleId: env.DISCORD_ROLE_ID!,
+      // Preserve the original legacy shape: old sessions keep their config hash.
+      ...(policy
+        ? { policy }
+        : { guildId: env.DISCORD_GUILD_ID!, roleId: env.DISCORD_ROLE_ID! }),
     };
   } catch {
     return null;
@@ -373,7 +392,7 @@ async function discordJson(fetcher: DiscordFetch, path: string, token: string) {
     );
   if (result.status === 403 || result.status === 404)
     throw new AuthError(
-      'You must belong to the configured Discord server and have its required role. Ask a server administrator for access, or try another account.',
+      'Your Discord account does not have access to this server. Ask a server administrator for access, or try another account.',
       403,
     );
   if (!result.ok)
@@ -391,15 +410,15 @@ async function discordJson(fetcher: DiscordFetch, path: string, token: string) {
   }
 }
 
-async function membership(
-  config: AuthConfiguration,
+async function memberRoles(
+  guildId: string,
   token: string,
   userId: string,
   fetcher: DiscordFetch,
 ) {
   const member = await discordJson(
     fetcher,
-    `/users/@me/guilds/${config.guildId}/member`,
+    `/users/@me/guilds/${guildId}/member`,
     token,
   );
   if (
@@ -421,11 +440,40 @@ async function membership(
       'Discord returned an invalid membership response. Try again shortly.',
       503,
     );
-  if (!member.roles.includes(config.roleId))
-    throw new AuthError(
-      'Your Discord account does not have the required server role. Ask a server administrator for access, or try another account.',
-      403,
-    );
+  return member.roles as string[];
+}
+
+async function membership(
+  config: AuthConfiguration,
+  token: string,
+  userId: string,
+  fetcher: DiscordFetch,
+): Promise<AdminPermissions> {
+  if (!config.policy) {
+    const roles = await memberRoles(config.guildId!, token, userId, fetcher);
+    if (roles.includes(config.roleId!))
+      return { mode: 'legacy', addFeeds: true, channels: [] };
+  } else {
+    const roles = new Map<string, string[]>();
+    for (const guildId of new Set(
+      config.policy.grants.map((grant) => grant.guildId),
+    )) {
+      try {
+        roles.set(guildId, await memberRoles(guildId, token, userId, fetcher));
+      } catch (error) {
+        // A missing membership contributes no grants. Provider failures must
+        // fail the whole check, even if another server already granted access.
+        if (!(error instanceof AuthError) || error.status !== 403) throw error;
+      }
+    }
+    const permissions = permissionsForRoles(config.policy, roles);
+    if (permissions.addFeeds || permissions.channels.length > 0)
+      return permissions;
+  }
+  throw new AuthError(
+    'Your Discord account does not have a configured administration role. Ask a server administrator for access, or try another account.',
+    403,
+  );
 }
 
 async function readSession(
@@ -464,8 +512,9 @@ async function checkSession(
     error.user = { id: session.user_id, name: session.user_name };
     throw error;
   }
+  let permissions: AdminPermissions;
   try {
-    await membership(
+    permissions = await membership(
       config,
       await open(session, await configurationKey(env.CONFIG_ENCRYPTION_KEY)),
       session.user_id,
@@ -487,7 +536,12 @@ async function checkSession(
     }
     throw error;
   }
-  return { id: session.user_id, name: session.user_name, kind: session.kind };
+  return {
+    id: session.user_id,
+    name: session.user_name,
+    kind: session.kind,
+    permissions,
+  };
 }
 
 export async function requireAdmin(
