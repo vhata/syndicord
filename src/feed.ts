@@ -129,11 +129,37 @@ function safeLink(value: string | undefined, base: string): string | null {
   }
 }
 
-function resolveBase(value: string | undefined, parent: string): string {
+interface LinkBase {
+  identity: string;
+  public: string;
+}
+
+interface EntryLink {
+  link: string;
+  presentationLink: string | null;
+}
+
+function entryLink(
+  value: string | undefined,
+  base: LinkBase,
+): EntryLink | null {
+  const link = safeLink(value, base.identity);
+  if (!link) return null;
+  // Keep the existing identity URL. Only publish URLs that do not need any
+  // path or query inherited from the private configured feed URL.
+  return {
+    link,
+    presentationLink: link === safeLink(value, base.public) ? link : null,
+  };
+}
+
+function resolveBase(value: string | undefined, parent: LinkBase): LinkBase {
   if (!value) return parent;
-  const base = safeLink(value, parent);
-  if (!base) throw new Error('Feed contains an invalid XML base URL');
-  return base;
+  const identity = safeLink(value, parent.identity);
+  const publicBase = safeLink(value, parent.public);
+  if (!identity || !publicBase)
+    throw new Error('Feed contains an invalid XML base URL');
+  return { identity, public: publicBase };
 }
 
 interface XmlNode {
@@ -183,9 +209,9 @@ function element(
 function atomLinksWithBases(
   xml: string,
   markup: string,
-  feedBase: string,
+  feedBase: LinkBase,
   count: number,
-): (string | null)[] | null {
+): (EntryLink | null)[] | null {
   if (!/\bxml:base\s*=/i.test(markup)) return null;
   const nodes = new XMLParser({
     preserveOrder: true,
@@ -232,7 +258,7 @@ function atomLinksWithBases(
       const href = link.attributes.href
         ? decodeXML(link.attributes.href)
         : undefined;
-      const resolved = safeLink(href, base);
+      const resolved = entryLink(href, base);
       if (resolved) return resolved;
     }
     return null;
@@ -250,6 +276,7 @@ interface Candidate {
   title: string;
   description: string;
   link: string | null;
+  presentationLink: string | null;
   publishedAt: string | null;
   identityDescription?: string;
 }
@@ -291,6 +318,7 @@ async function normalize(candidate: Candidate): Promise<FeedEntry | null> {
     id,
     title: truncate(candidate.title || 'Untitled', MAX_TITLE_LENGTH),
     link: candidate.link,
+    presentationLink: candidate.presentationLink,
     description: truncate(candidate.description, MAX_DESCRIPTION_LENGTH),
     publishedAt: candidate.publishedAt,
   };
@@ -300,11 +328,15 @@ export async function parseFeedDocument(
   xml: string,
   feedUrl: string,
 ): Promise<ParsedFeed> {
-  const base = safeLink(feedUrl, feedUrl);
-  if (!base)
+  const configuredBase = safeLink(feedUrl, feedUrl);
+  if (!configuredBase)
     throw new Error(
       'Feed URL must be an HTTP or HTTPS URL without credentials',
     );
+  const base: LinkBase = {
+    identity: configuredBase,
+    public: new URL(configuredBase).origin + '/',
+  };
   const markup = xml.replace(/<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->/g, '');
   if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(markup)) {
     throw new Error('Feed document declarations are not supported');
@@ -327,11 +359,11 @@ export async function parseFeedDocument(
     candidates = (parsed.feed.items ?? []).map((item) => {
       const itemBase = resolveBase(item.xml?.base, feedBase);
       const link =
-        safeLink(item.link, itemBase) ??
+        entryLink(item.link, itemBase) ??
         (item.guid?.isPermaLink === false ||
         !/^https?:\/\//i.test(item.guid?.value ?? '')
           ? null
-          : safeLink(item.guid?.value, itemBase));
+          : entryLink(item.guid?.value, itemBase));
       const description = item.description || item.content?.encoded;
       return {
         id: item.guid?.value,
@@ -341,7 +373,8 @@ export async function parseFeedDocument(
         ...(!item.guid?.value?.trim() && !link
           ? { identityDescription: text(description) }
           : {}),
-        link,
+        link: link?.link ?? null,
+        presentationLink: link?.presentationLink ?? null,
         publishedAt: date(item.pubDate ?? item.dc?.dates?.[0]),
       };
     });
@@ -364,7 +397,7 @@ export async function parseFeedDocument(
       );
       const link = linksWithBases
         ? (linksWithBases[index] ?? null)
-        : (links.map((link) => safeLink(link.href, entryBase)).find(Boolean) ??
+        : (links.map((link) => entryLink(link.href, entryBase)).find(Boolean) ??
           null);
       const description = entry.summary ?? entry.content;
       const html =
@@ -376,7 +409,8 @@ export async function parseFeedDocument(
         ...(!entry.id?.trim() && !link
           ? { identityDescription: atomText(description) }
           : {}),
-        link,
+        link: link?.link ?? null,
+        presentationLink: link?.presentationLink ?? null,
         publishedAt: date(entry.published ?? entry.updated),
       };
     });

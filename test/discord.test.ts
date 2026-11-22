@@ -5,6 +5,7 @@ import test from 'node:test';
 import { URL as NodeURL } from 'node:url';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { buildMessage, sendDiscord } from '../src/discord.ts';
+import { parseFeedDocument } from '../src/feed.ts';
 import type { FeedEntry, Fetcher } from '../src/types.ts';
 
 const webhook = 'https://discord.com/api/webhooks/123/test-token';
@@ -14,6 +15,7 @@ const entry: FeedEntry = {
   id: 'id:entry',
   title: 'A new post',
   link: 'https://example.test/post',
+  presentationLink: 'https://example.test/post',
   description: 'A short description.',
   publishedAt: '2026-11-18T12:00:00.000Z',
 };
@@ -54,6 +56,7 @@ test('omits unsafe entry links and empty descriptions', () => {
       title: '',
       description: '',
       link: 'javascript:alert(1)',
+      presentationLink: 'javascript:alert(1)',
       publishedAt: 'bad-date',
     },
     feedUrl,
@@ -67,7 +70,11 @@ test('omits unsafe entry links and empty descriptions', () => {
   });
   assert.equal(
     buildMessage(
-      { ...entry, link: 'https://user:password@example.test/' },
+      {
+        ...entry,
+        link: 'https://user:password@example.test/',
+        presentationLink: 'https://user:password@example.test/',
+      },
       'file:///feed',
     ).embeds[0]?.url,
     undefined,
@@ -107,6 +114,7 @@ test('keeps private feed paths and queries out of source links and entry fallbac
         const candidate = {
           ...entry,
           link,
+          presentationLink: link,
           ...(feedTitle === undefined ? {} : { feedTitle }),
         };
         const unchanged = structuredClone(candidate);
@@ -132,6 +140,8 @@ test('recognizes a normalized entry link pointing at the configured feed', () =>
     {
       ...entry,
       link: 'https://EXAMPLE.test:443/feed.xml?token=private-query-token',
+      presentationLink:
+        'https://EXAMPLE.test:443/feed.xml?token=private-query-token#post',
     },
     'https://example.test/feed.xml?token=private-query-token',
   ).embeds[0]!;
@@ -143,7 +153,7 @@ test('sends only public source and fallback URLs in the webhook payload', async 
   let body = '';
   const result = await sendDiscord(
     webhook,
-    { ...entry, link: null },
+    { ...entry, link: null, presentationLink: null },
     'https://example.test/private-path-token/feed.xml?access=private-query-token',
     async (_url, init) => {
       body = init?.body as string;
@@ -155,6 +165,49 @@ test('sends only public source and fallback URLs in the webhook payload', async 
   const payload = JSON.parse(body);
   assert.equal(payload.embeds[0].author.url, sourceUrl);
   assert.equal(payload.embeds[0].url, sourceUrl);
+});
+
+test('parsed RSS and Atom entries never send inherited feed credentials', async () => {
+  const configuredFeed = 'https://example.test/feed.xml';
+  const finalFeed =
+    'https://redirected.test/private%2Dpath-token/feed.xml?token=private-query-token';
+  for (const relative of ['#post', './post', '?page=2']) {
+    for (const xml of [
+      `<rss version="2.0"><channel><title>Test</title><item><link>${relative}</link></item></channel></rss>`,
+      `<feed xmlns="http://www.w3.org/2005/Atom"><title>Test</title><entry><link href="${relative}"/></entry></feed>`,
+    ]) {
+      const parsed = (await parseFeedDocument(xml, finalFeed)).entries[0]!;
+      const original = structuredClone(parsed);
+      let body = '';
+      const result = await sendDiscord(
+        webhook,
+        parsed,
+        configuredFeed,
+        async (_url, init) => {
+          body = String(init?.body);
+          return json({ id: '123' });
+        },
+      );
+      assert.equal(result.ok, true);
+      assert.doesNotMatch(body, /private(?:%2D|-)(?:path|query)-token/);
+      assert.equal(JSON.parse(body).embeds[0].url, sourceUrl);
+      assert.deepEqual(parsed, original);
+      assert.equal(parsed.id, `link:${new URL(relative, finalFeed).href}`);
+    }
+  }
+});
+
+test('preserves explicit public entry links even when their path and query overlap the feed', async () => {
+  const publicLink = 'https://example.test/blog/post?lang=en#section';
+  const privateFeed = 'https://example.test/blog/feed.xml?lang=en';
+  const parsed = await parseFeedDocument(
+    `<rss version="2.0"><channel><title>Test</title><item><link>${publicLink}</link></item></channel></rss>`,
+    privateFeed,
+  );
+  assert.equal(
+    buildMessage(parsed.entries[0]!, privateFeed).embeds[0]?.url,
+    publicLink,
+  );
 });
 
 test('truncates Markdown without splitting literal backslash escapes', () => {
