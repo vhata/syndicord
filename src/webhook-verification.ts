@@ -15,9 +15,11 @@ function seconds(value: unknown): number | null {
     (typeof value === 'string' && !value.trim())
   )
     return null;
-  const delay = Number(value) * 1000;
-  return Number.isFinite(delay) && delay >= 0 && delay <= 24 * 60 * 60_000
-    ? Math.ceil(delay)
+  const delay = Math.ceil(Number(value) * 1000);
+  return Number.isSafeInteger(delay) &&
+    delay >= 0 &&
+    delay <= Number.MAX_SAFE_INTEGER - Date.now()
+    ? delay
     : null;
 }
 
@@ -27,9 +29,7 @@ function headerDelay(headers: Headers): number {
   return Math.max(
     1000,
     seconds(retry) ??
-      (Number.isFinite(timestamp)
-        ? Math.min(24 * 60 * 60_000, Math.max(0, timestamp - Date.now()))
-        : 0),
+      (Number.isFinite(timestamp) ? Math.max(0, timestamp - Date.now()) : 0),
     seconds(headers.get('X-RateLimit-Reset-After')) ?? 0,
   );
 }

@@ -121,4 +121,12 @@ test('verification errors bound and sanitize provider bodies while preserving Di
       error.retryAfterMs === 12000 &&
       error.global,
   );
+  await assert.rejects(
+    verifyWebhook(url, async () =>
+      Response.json({ retry_after: 172800 }, { status: 429 }),
+    ),
+    (error: unknown) =>
+      error instanceof WebhookVerificationError &&
+      error.retryAfterMs === 172800000,
+  );
 });
