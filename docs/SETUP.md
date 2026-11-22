@@ -28,24 +28,33 @@ checkout. For local checks and code contributions, see
 
 ### Optional npm installation
 
-To operate without a retained source checkout, run this in an installation
-directory outside the repository:
+To use syndicord from any directory without a retained source checkout, first
+build its installable package:
 
 ```sh
-npm install github:vhata/syndicord
-npx --no-install syndicord --help
+npm pack github:vhata/syndicord
 ```
 
-npm's Git package support requires Git and builds the CLI and Worker during
-installation. Stay in that directory and substitute these commands throughout
-the guides:
+Install the `.tgz` file named in the output, replacing `FILENAME.tgz` below:
 
-| From the checkout                | npm-installed CLI                      |
-| -------------------------------- | -------------------------------------- |
-| `npm run syndicord -- feeds get` | `npx --no-install syndicord feeds get` |
-| `npm run deploy`                 | `npx --no-install syndicord deploy`    |
+```sh
+npm install --global ./FILENAME.tgz
+npx syndicord --help
+```
 
-No global installation is required. The checkout's `.npmrc` suppresses npm
+npm's Git package support requires Git. Packing builds the CLI and Worker in
+npm's temporary checkout before the global install. This avoids npm 11's
+[global Git preparation bug](https://github.com/npm/cli/issues/8440). After a
+successful installation, you can delete the `.tgz` file. Substitute these
+commands throughout the guides:
+
+| From the checkout                | npm-installed CLI         |
+| -------------------------------- | ------------------------- |
+| `npm run syndicord -- feeds get` | `npx syndicord feeds get` |
+| `npm run deploy`                 | `npx syndicord deploy`    |
+
+`npx syndicord` uses the installed CLI. Files supplied with `--file` are
+resolved from your current directory. The checkout's `.npmrc` suppresses npm
 script banners so command output remains usable as JSON.
 
 ## Select an installation
@@ -165,10 +174,11 @@ npm run check
 npm run deploy
 ```
 
-For an npm installation, repeat its installation command, then run
-`npx --no-install syndicord deploy`. Keep the same account, Worker, and database
-identifiers. Deployments preserve feeds, webhook URLs, and Worker secrets. You
-can also enable [automatic deployment from GitHub](DEPLOYMENT.md).
+For an npm installation, repeat the
+[packing and global-install steps](#optional-npm-installation), then run
+`npx syndicord deploy`. Keep the same account, Worker, and database identifiers.
+Deployments preserve feeds, webhook URLs, and Worker secrets. You can also
+enable [automatic deployment from GitHub](DEPLOYMENT.md).
 
 [Documentation index](README.md) · [Manage feeds](OPERATIONS.md) ·
 [Cloudflare database setup](https://developers.cloudflare.com/d1/get-started/)

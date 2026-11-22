@@ -104,16 +104,20 @@ npm diagnostics for one invocation, use `npm --loglevel=notice ci`.
 `npm run package` builds the distributable CLI and Worker under ignored `dist/`.
 The npm prepare lifecycle builds these when installing from Git; it does nothing
 in a built npm package, which contains no source or development tools. The
-installed CLI uses its bundled Worker. Deployment from source always rebuilds
-before touching the hosted installation, without relying on an older package or
-globally installed CLI.
+global installation uses `npm pack` to prepare the Git source in npm's temporary
+checkout, then installs the resulting tarball. The installed CLI uses its
+bundled Worker. Deployment from source always rebuilds before touching the
+hosted installation, without relying on an older package or globally installed
+CLI.
 
 `npm run test:package` installs production dependencies in disposable
 directories and exercises the installed CLI, local D1, and deployment dry-runs,
-then cleans up. No installation identifiers, live feeds, secrets, or local state
-are packaged. Registry publication is a separate release operation; normal
-[installation from GitHub](SETUP.md#optional-npm-installation) needs no registry
-release.
+then cleans up. It also packs from Git, installs that tarball globally into a
+temporary prefix, and runs `npx syndicord` from an unrelated directory with a
+fresh offline npm cache. No installation identifiers, live feeds, secrets, or
+local state are packaged. Registry publication is a separate release operation;
+normal [installation from GitHub](SETUP.md#optional-npm-installation) needs no
+registry release.
 
 ## Test policy
 

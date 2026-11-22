@@ -207,12 +207,12 @@ gh run list --workflow check.yml --limit 5
 ```
 
 For a code rollback, check out the intended revision, run `npm ci`, and run
-`npm run deploy`. For the npm-installed CLI, install the intended Git ref using
-`npm install github:vhata/syndicord#COMMIT_OR_TAG` in its installation
-directory, then run `npx --no-install syndicord deploy`. Cloudflare's
-**Deployments → Rollback** also selects an earlier Worker version. A Worker
-rollback reverses neither D1 migrations, stored routing, nor Discord messages.
-Check that the selected version can read the current database schema.
+`npm run deploy`. For the npm-installed CLI, prepare the intended Git ref using
+`npm pack github:vhata/syndicord#COMMIT_OR_TAG`, install the resulting `.tgz`
+with `npm install --global ./FILENAME.tgz`, then run `npx syndicord deploy`.
+Cloudflare's **Deployments → Rollback** also selects an earlier Worker version.
+A Worker rollback reverses neither D1 migrations, stored routing, nor Discord
+messages. Check that the selected version can read the current database schema.
 
 Prefer reverting the faulty code commit and deploying the revert. Resume CI when
 `main` contains the code you intend to deploy: choose **Enable workflow**, then

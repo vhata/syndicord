@@ -18,9 +18,9 @@ npm run syndicord -- status
 First [sign in to Cloudflare](OPERATIONS.md#select-a-cloudflare-installation) if
 needed. The command uses the project's pinned `cf` dependency. For the
 [npm-installed CLI](SETUP.md#optional-npm-installation), use
-`npx --no-install syndicord status`. It only queries D1; it needs no webhook
-secret or `.dev.vars` file. Hosted reads count toward D1 usage. The database ID
-is non-secret deployment configuration; use the ID recorded for the deployment
+`npx syndicord status`. It only queries D1; it needs no webhook secret or
+`.dev.vars` file. Hosted reads count toward D1 usage. The database ID is
+non-secret deployment configuration; use the ID recorded for the deployment
 rather than creating a new database. Use `npm run syndicord -- status --local`
 from a development checkout for its local D1 state instead. Remote is the
 default for the CLI; the command never changes migrations, releases a lease, or

@@ -108,7 +108,7 @@ For scoped access, use `DISCORD_AUTH_POLICY` instead of `DISCORD_GUILD_ID` and
 `DISCORD_ROLE_ID` in either method. All other settings remain required.
 
 For the [npm-installed CLI](SETUP.md#optional-npm-installation), substitute
-`npx --no-install syndicord` for `npm run syndicord --`.
+`npx syndicord` for `npm run syndicord --`.
 
 Visit the Worker's `/admin` address and sign in. Its Cloudflare overview shows
 its HTTPS address. An authorized account sees its Discord identity, a **Sign

@@ -17,7 +17,7 @@ software or Cloudflare account is needed.
 **CLI:** [Install the CLI](SETUP.md#run-from-the-repository), then select the
 same installation as below. Examples use a source checkout; for an
 [npm installation](SETUP.md#optional-npm-installation), replace
-`npm run syndicord --` with `npx --no-install syndicord`.
+`npm run syndicord --` with `npx syndicord`.
 
 ### Select an installation
 
