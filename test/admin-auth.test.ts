@@ -313,6 +313,47 @@ test('operator policy changes revoke both browser and separately approved CLI se
   }
 });
 
+test('membership checks cannot authorize a session that expired or logged out while Discord responded', async () => {
+  const { env: legacy, db, dispose } = await fixture();
+  const env = scopedEnv(legacy);
+  const fetcher = discordFixture({
+    guilds: {
+      [TEST_GUILD_ID]: { roles: [TEST_ROLE_ID] },
+      [SECOND_GUILD_ID]: { roles: [SECOND_ROLE_ID] },
+    },
+  });
+  try {
+    for (const change of ['expiry', 'logout']) {
+      const { cookie } = await browserLogin(env, fetcher);
+      const delayed: DiscordFetch = async (input, init) => {
+        const response = await fetcher(input, init);
+        if (String(input).includes(SECOND_GUILD_ID)) {
+          if (change === 'expiry')
+            await db
+              .prepare('UPDATE admin_sessions SET expires_at_ms = 0')
+              .run();
+          else
+            await handleAuth(
+              req('/admin/auth/logout', {
+                method: 'POST',
+                headers: { Cookie: cookie, Origin: origin },
+              }),
+              env,
+              fetcher,
+            );
+        }
+        return response;
+      };
+      await assert.rejects(
+        requireAdmin(signed(cookie), env, delayed),
+        authError(401),
+      );
+    }
+  } finally {
+    await dispose();
+  }
+});
+
 test('missing or unsafe OAuth configuration disables authentication without changing relay data', async () => {
   const { env, db, dispose } = await fixture();
   try {

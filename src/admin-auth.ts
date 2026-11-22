@@ -520,6 +520,22 @@ async function checkSession(
       session.user_id,
       fetcher,
     );
+    // Checking several servers can outlive a session or a concurrent logout.
+    const active = await env.DB.prepare(
+      'SELECT token_hash FROM admin_sessions WHERE token_hash = ? AND kind = ? AND expires_at_ms > ? AND config_hash = ?',
+    )
+      .bind(
+        session.token_hash,
+        session.kind,
+        Date.now(),
+        await configurationHash(config),
+      )
+      .first();
+    if (!active)
+      throw new AuthError(
+        'Your session expired or signed out. Sign in with Discord again.',
+        401,
+      );
   } catch (error) {
     if (error instanceof AuthError) {
       error.user = { id: session.user_id, name: session.user_name };
