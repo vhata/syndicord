@@ -43,13 +43,19 @@ function snapshot(value: unknown): AdminSnapshot {
   }
 }
 
-export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
+export function adminTransport<T>(
+  env: Environment,
+  fetcher: AdminFetch,
+  path: '/admin/api/config' | '/admin/api/catalog',
+  parse: (value: unknown) => T,
+) {
   const destination = adminEndpoint(env);
+  const endpoint = new URL(path, destination.origin).href;
 
   async function request(
-    method: 'GET' | 'PUT',
+    method: 'GET' | 'PUT' | 'POST',
     payload?: unknown,
-  ): Promise<AdminSnapshot> {
+  ): Promise<T> {
     const body = payload === undefined ? undefined : JSON.stringify(payload);
     if (body !== undefined && Buffer.byteLength(body) > MAX_BYTES)
       throw new Error(
@@ -62,14 +68,14 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
     let response: Response | undefined;
     try {
       try {
-        response = await fetcher(destination.url, {
+        response = await fetcher(endpoint, {
           method,
           redirect: 'error',
           signal: controller.signal,
           headers: {
             Authorization: authorization,
             Accept: 'application/json',
-            ...(method === 'PUT'
+            ...(method !== 'GET'
               ? {
                   Origin: destination.origin,
                   'Content-Type': 'application/json',
@@ -80,10 +86,32 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
         });
       } catch {
         throw new Error(
-          method === 'PUT'
+          method !== 'GET'
             ? 'The configuration save could not be confirmed. Inspect the current configuration before retrying; the request was not retried.'
             : 'Cannot reach the administration API. Check its URL, availability, and network connection.',
         );
+      }
+      let diagnostic: Record<string, unknown> | undefined;
+      if ([400, 403].includes(response.status)) {
+        try {
+          const value = await readAdminResponse(response, controller.signal);
+          if (
+            typeof value === 'object' &&
+            value !== null &&
+            !Array.isArray(value)
+          )
+            diagnostic = value as Record<string, unknown>;
+        } catch {
+          // Only explicitly recognized diagnostics enter command output.
+        }
+        if (diagnostic?.code === 'scoped_catalog_required')
+          throw new Error(
+            'This installation uses scoped permissions. Use syndicord catalog, destinations, and subscriptions commands; bulk feeds/webhooks commands are unavailable.',
+          );
+        if (diagnostic?.code === 'scoped_policy_required')
+          throw new Error(
+            'The operator has not enabled scoped permissions. Use the feeds and webhooks commands for this installation.',
+          );
       }
       if (response.status === 401)
         throw new Error(
@@ -91,7 +119,9 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
         );
       if (response.status === 403)
         throw new Error(
-          'Your Discord account no longer has the required server membership and role. Ask the server administrator for access, or run syndicord login with another account.',
+          path === '/admin/api/config'
+            ? 'Your Discord account no longer has the required server membership and role. Ask the server administrator for access, or run syndicord login with another account.'
+            : 'Your Discord account does not have permission for this operation. Ask a server administrator about the required role and channel scope, or run syndicord login with another account.',
         );
       if (response.status === 429)
         throw new Error(
@@ -102,18 +132,7 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
           'Configuration changed while this command was running. Read the latest configuration, reapply your changes, and retry manually.',
         );
       if (response.status === 400) {
-        let message: unknown;
-        try {
-          const value = await readAdminResponse(response, controller.signal);
-          if (
-            typeof value === 'object' &&
-            value !== null &&
-            !Array.isArray(value)
-          )
-            message = (value as Record<string, unknown>).error;
-        } catch {
-          // Arbitrary or malformed server diagnostics never enter CLI output.
-        }
+        const message = diagnostic?.error;
         if (
           typeof message === 'string' &&
           (message === CONFIGURATION_SIZE_ERROR ||
@@ -126,15 +145,15 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
       }
       if (!response.ok)
         throw new Error(
-          method === 'PUT'
+          method !== 'GET'
             ? `The administration API rejected or could not confirm the save (HTTP ${response.status}). Check the configuration and inspect its current state before retrying.`
             : `The administration API is unavailable (HTTP ${response.status}). Check that web administration is enabled at SYNDICORD_ADMIN_URL.`,
         );
       try {
-        return snapshot(await readAdminResponse(response, controller.signal));
+        return parse(await readAdminResponse(response, controller.signal));
       } catch {
         throw new Error(
-          method === 'PUT'
+          method !== 'GET'
             ? 'The configuration save response was invalid or incomplete. Inspect the current configuration before retrying; the request was not retried.'
             : INVALID_RESPONSE,
         );
@@ -146,6 +165,11 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
     }
   }
 
+  return request;
+}
+
+export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
+  const request = adminTransport(env, fetcher, '/admin/api/config', snapshot);
   return {
     read: () => request('GET'),
     write: (

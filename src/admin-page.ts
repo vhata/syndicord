@@ -1,3 +1,5 @@
+import { scopedContent, scopedScript } from './scoped-admin-page.ts';
+
 const script = String.raw`
 (() => {
   const byId = (id) => document.getElementById(id);
@@ -306,6 +308,7 @@ const script = String.raw`
 export interface AdminIdentity {
   id: string;
   name: string;
+  permissions?: { mode: 'legacy' | 'scoped' };
 }
 
 export interface AdminBranding {
@@ -356,6 +359,7 @@ export function renderAdminPage(
 ): string {
   const safeNonce = escapeHtml(nonce);
   const brand = branding(options);
+  const scoped = user.permissions?.mode === 'scoped';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -368,7 +372,7 @@ export function renderAdminPage(
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
     body { margin: 0; color: var(--ink); background: var(--paper); font-size: 14px; line-height: 1.5; }
-    button, input { font: inherit; }
+    button, input, select { font: inherit; }
     button { cursor: pointer; }
     button:disabled { cursor: not-allowed; opacity: .5; }
     :focus-visible { outline: 3px solid #176d61; outline-offset: 3px; }
@@ -425,7 +429,7 @@ export function renderAdminPage(
     .editor h3 { font-size: 16px; font-weight: 650; }
     .field { margin-top: 18px; }
     .field-label, legend { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-    input[type="url"], input[type="text"], input[type="password"] { display: block; width: 100%; min-width: 0; background: white; color: var(--ink); border: 1px solid #aebbb4; border-radius: 5px; padding: 10px; font-size: 16px; }
+    select, input[type="url"], input[type="text"], input[type="password"] { display: block; width: 100%; min-width: 0; background: white; color: var(--ink); border: 1px solid #aebbb4; border-radius: 5px; padding: 10px; font-size: 16px; }
     input[readonly] { background: #edf1ee; color: var(--muted); }
     input::placeholder { color: #6a756f; }
     .field-help { font-size: 12px; color: var(--muted); margin-top: 6px; }
@@ -461,7 +465,10 @@ export function renderAdminPage(
     </div>
     <noscript>Enable JavaScript to manage your feeds, webhooks, and routing.</noscript>
     <p id="loading">Loading configuration…</p>
-    <div id="workspace" hidden>
+    ${
+      scoped
+        ? scopedContent
+        : `    <div id="workspace" hidden>
       <div class="grid">
         <section class="panel" aria-labelledby="feeds-heading">
           <div class="panel-header">
@@ -495,9 +502,11 @@ export function renderAdminPage(
         </section>
       </div>
       <p class="operations-note">One feed is checked each minute. Changes apply on the next poll. New routes only deliver entries found after their first check.</p>
-    </div>
+    </div>`
+    }
+
   </main>
-  <script nonce="${safeNonce}">${script}</script>
+  <script nonce="${safeNonce}">${scoped ? scopedScript : script}</script>
 </body>
 </html>`;
 }
@@ -553,7 +562,7 @@ export function renderAccessPage(
       ${options.allowLogin ? `<a class="button" href="/admin/auth/login">${options.retry ? 'Try Discord sign-in again' : 'Sign in with Discord'}</a>` : ''}
       ${options.showLogout ? '<form action="/admin/auth/logout" method="post"><button class="button secondary" type="submit">Sign out</button></form>' : ''}
     </div>
-    ${options.allowLogin ? '<p class="help">Access requires membership in this installation’s configured Discord server and its required role. Signing in does not join a server or assign roles.</p><p class="help">To use another account, switch accounts in Discord, then try signing in again. Ask your server administrator about invitations and access.</p>' : ''}
+    ${options.allowLogin ? '<p class="help">Access requires a Discord server role configured by this installation’s operator. Signing in does not join a server or assign roles.</p><p class="help">To use another account, switch accounts in Discord, then try signing in again. Ask your server administrator about invitations and access.</p>' : ''}
   </main>
 </body>
 </html>`;

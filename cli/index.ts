@@ -13,6 +13,7 @@ import {
   type Environment,
 } from './cloudflare.ts';
 import { deploy, migrate } from './deploy.ts';
+import { CATALOG_USAGE, runCatalogCommand } from './catalog.ts';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SOURCE_CHECKOUT = import.meta.url.endsWith('/cli/index.ts');
@@ -20,6 +21,7 @@ export const USAGE = `Usage: syndicord <command>
 
   login [--no-browser]            Sign in with Discord in your browser
   logout                          Invalidate this installation’s CLI session
+  catalog|destinations|subscriptions   Manage scoped configuration (see below)
   feeds get                       Read the installation's feed routes
   feeds set --file FILE|-          Replace feed routes from JSON (or stdin)
   webhooks list                   List destination names without webhook URLs
@@ -39,7 +41,9 @@ Status, migration, and deployment use CLOUDFLARE_ACCOUNT_ID and
 SYNDICORD_DATABASE_ID. SYNDICORD_WORKER_NAME defaults to syndicord.
 Configuration writes do not rebuild or deploy code. 'cf auth login' signs in to
 Cloudflare for infrastructure operations.
-Cloudflare resources and API operations may be billable under your account plan.`;
+Cloudflare resources and API operations may be billable under your account plan.
+
+${CATALOG_USAGE}`;
 
 interface Dependencies {
   cf?: Cf;
@@ -125,6 +129,16 @@ export async function runCli(
           : await logout(env, dependencies.adminFetch),
       );
     }
+    if (['catalog', 'destinations', 'subscriptions'].includes(command!))
+      return ok(
+        await runCatalogCommand(
+          command!,
+          rest,
+          env,
+          dependencies.adminFetch,
+          input,
+        ),
+      );
     if (['feeds', 'webhooks'].includes(command!)) {
       if (rest.includes('--local'))
         throw new Error(
