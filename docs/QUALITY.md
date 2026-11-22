@@ -1,4 +1,8 @@
-# Quality and validation
+# Quality and tooling reference
+
+For the first clone and a contribution walkthrough, start with
+[development](DEVELOPMENT.md). Use this reference when you need the exact
+checks, tooling behavior, or review requirements.
 
 Changes use GitHub pull requests and independent review under
 [Docket's contract](../docket/CONTRACT.md). The user controls merging and hosted
@@ -28,17 +32,88 @@ when the dependency manifest or lockfile changes.
 | `bash scripts/check.sh`     | Both complete npm check commands, stopping on the first failure                            |
 | `bash docket/scripts/ci.sh` | Queue structure, Markdown links, and PR markers when PR metadata is supplied               |
 
-Husky's pre-commit hook calls lint-staged. Prettier writes staged formatting
-changes; Oxlint rejects correctness errors. Unstaged changes are preserved.
-Commits do not build, generate types, or run tests, and there is no pre-push
-hook. Vendored `docket/` files and private `.docket/` evidence are excluded from
-formatting. Hook recovery is documented in
-[development](DEVELOPMENT.md#commit-hooks-and-ci).
-
 Toolchain versions are pinned in `.node-version`, `package.json`, and
-`package-lock.json`. Miniflare and type generation require local runtime
-processes and loopback ports. Package acceptance also needs npm registry access.
-None of these checks requires Cloudflare credentials.
+`package-lock.json`. The package supports Node.js 26.12 or newer in the 26.x
+line and npm 11. Miniflare and type generation require local runtime processes
+and loopback ports. Package acceptance also needs npm registry access. None of
+these checks requires Cloudflare credentials.
+
+Tests use fixture feeds, fake HTTP/Discord responses, and temporary local D1
+instances. Built-Worker runtime tests exercise scheduled events. Generated
+files, local databases, and secrets are ignored by Git. `package.json` records
+approvals for pinned native installers; review them when updating dependencies.
+
+## Hooks and formatting
+
+Husky calls lint-staged before a commit. Prettier formats staged files and
+includes its changes in the commit; Oxlint rejects correctness errors without
+starting TypeScript. lint-staged backs up the original state and preserves
+unstaged changes, including those in a partially staged file. Commits do not
+build, generate types, or run tests. There is no pre-push hook.
+
+| Command                                                     | Purpose                                                                    |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `npm run check:staged`                                      | Check staged files as the commit hook does                                 |
+| `npm run lint` / `npm run lint:fix`                         | Check source/configuration or apply automatic fixes                        |
+| `npm run format` / `npm run format:check`                   | Format source, configuration, workflows, and Markdown, or check formatting |
+| `npm run format:markdown` / `npm run format:markdown:check` | Format Markdown or check it                                                |
+| `npm run types`                                             | Refresh editor types under `.cloudflare/types/`                            |
+| `npm run build`                                             | Build `.cloudflare/output/` without uploading                              |
+| `npm test`                                                  | Build the Worker and run source/runtime tests                              |
+
+Prettier wraps Markdown prose to its default 80-column target. `AGENTS.md`,
+`TODO.md`, and `review/` preserve their existing prose wrapping for
+installer-managed text, queue metadata, and review records. Vendored `docket/`
+and private `.docket/` files are excluded from formatting. CI checks formatting
+through `npm run format:check`.
+
+If a commit reports a missing hook command or package after an update, run
+`npm ci` in that checkout and retry. For a lint-staged failure, inspect
+`git status` and `git diff --cached`; an interrupted run may retain a
+`lint-staged automatic backup` in `git stash list`.
+
+## CLI and package development
+
+Run the source CLI and local status without installing globally:
+
+```sh
+npm run syndicord -- --help
+npm run syndicord -- status --local
+```
+
+Local status needs the local migrations from
+[development](DEVELOPMENT.md#run-locally). `status` without `--local` reads
+hosted D1 and requires Cloudflare access; see [operational status](STATUS.md).
+The standalone `npm run status -- --local` script requires an explicit `--local`
+or `--remote` target.
+
+For a deployment dry-run, first set the account, Worker, and database IDs from
+[installation selection](OPERATIONS.md#select-a-cloudflare-installation), then
+run:
+
+```sh
+npm run deploy -- --dry-run
+```
+
+This validates the build without uploading or applying hosted migrations.
+
+The repository's `.npmrc` sets `loglevel=silent` so npm banners do not pollute
+JSON output. Commands retain their own output, errors, and exit status. To see
+npm diagnostics for one invocation, use `npm --loglevel=notice ci`.
+
+`npm run package` builds the distributable CLI and Worker under ignored `dist/`.
+The npm prepare lifecycle builds these when installing from Git; it does nothing
+in a built npm package, which contains no source or development tools. The
+installed CLI uses its bundled Worker. Deployment from source always rebuilds
+before touching the hosted installation, without relying on an older package or
+globally installed CLI.
+
+`npm run test:package` installs production dependencies in disposable
+directories and exercises the installed CLI, local D1, and deployment dry-runs,
+then cleans up. No installation identifiers, live feeds, secrets, or local state
+are packaged. Registry publication is a separate release operation; normal
+[installation from GitHub](SETUP.md#optional-npm-installation) needs no registry
+release.
 
 ## Test policy
 
@@ -113,9 +188,17 @@ private or generated state.
 pushes to main, and manual dispatch. **Check** calls the same setup and check
 scripts as local validation. **Queue and PR hygiene** runs
 `docket/scripts/ci.sh` with the PR body and full base history. Production
-deployment on main waits for both jobs. Superseded PR runs are cancelled; main
-runs are retained. There is no scheduled extended validation workflow; the
+deployment on main waits for both jobs. The workflow uses the Node version in
+`.node-version` and npm version in `package.json`, caches npm downloads, and
+disables hooks while running checks directly. Superseded PR runs are cancelled;
+main runs are retained. There is no scheduled extended validation workflow; the
 complete package suite runs on every PR and main push.
+
+To inspect CI, open the repository's **Actions → CI** page or use
+`gh run list --workflow check.yml`. A manual run on `main` also attempts a
+production deployment: use **Run workflow → main** or
+`gh workflow run check.yml --ref main` only when that deployment is intended.
+See [automatic deployment](DEPLOYMENT.md) for credentials and setup.
 
 As inspected on 2026-11-20, the default branch's active GitHub ruleset prevents
 deletion and requires linear history, with an administrator bypass. It does not

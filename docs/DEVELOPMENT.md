@@ -1,180 +1,102 @@
-# Development
+# Develop and contribute
 
-syndicord uses TypeScript, npm, and the Cloudflare CLI (`cf`), with Wrangler as
-its bundler. Node.js 26.13.0 is recorded in `.node-version`; the package
-requires Node.js 26.12 or newer in the 26.x line and npm 11. The commands use a
-POSIX shell, such as Bash or zsh.
+Use Node.js 26.13.0 (`.node-version`) and npm 11.20.0 (`package.json`). The
+project uses TypeScript and the Cloudflare CLI (`cf`), with Wrangler as its
+bundler. Commands below use Bash or another POSIX shell.
 
 ## Check the project
 
 ```sh
+git clone https://github.com/vhata/syndicord.git
+cd syndicord
 bash scripts/setup.sh
 bash scripts/check.sh
 bash docket/scripts/ci.sh
 ```
 
-`scripts/setup.sh` runs `npm ci`, which installs the pinned dependencies, builds
-the CLI and Worker, and installs Git hooks for this checkout. Run it after
-cloning and after pulling changes to `package.json` or `package-lock.json`.
-Linked worktrees each need their own installation.
+Setup installs pinned dependencies, builds the CLI and Worker, and installs
+commit hooks. The checks cover formatting, lint, types, tests, npm installation,
+and documentation links. They use fixture feeds, fake Discord responses, and
+local databases: **no Cloudflare account or Discord credentials are needed**.
+They require npm registry access and permission to bind local loopback ports.
 
-`scripts/check.sh` runs `npm run check` and `npm run test:package`. These cover
-formatting, linting, generated Workers types, TypeScript, the Worker build,
-tests, and npm installation. Tests use fixture feeds, fake Discord responses,
-and temporary local D1 databases. A runtime test exercises scheduled events in
-the built Worker. These checks need no Cloudflare account or Discord
-credentials.
+Run setup again when dependencies change, and in each new worktree. Use
+`npm test` for the source/runtime tests while working; run both check scripts
+before review. See [the complete command reference](QUALITY.md#gates) for
+individual checks and their scope.
 
-Miniflare and type generation start local runtime processes and bind loopback
-ports. Restricted sandboxes must permit those operations. Local tests do not
-measure hosted CPU usage or prove live Discord delivery.
+## Make a change
 
-`npm run types` refreshes editor types under `.cloudflare/types/`.
-`npm run format` formats source, configuration, workflows, and Markdown.
-`npm test` builds the Worker and runs the tests. `npm run build` writes the
-deployment artifact to `.cloudflare/output/` without uploading it.
-
-`package-lock.json` pins dependency versions. `package.json` records approvals
-for the pinned native installers used by Cloudflare's tools; review these when
-updating dependencies. Generated files, local databases, and secrets are ignored
-by Git.
-
-## Commit hooks and CI
-
-### Format Markdown
+Read [AGENTS.md](../AGENTS.md) and the [Docket contract](../docket/CONTRACT.md).
+Choose a focused change; [TODO.md](../TODO.md) lists work to pick up. For a
+directly requested change, replace `my-change` with a descriptive name:
 
 ```sh
-npm run format:markdown
-npm run format:markdown:check
+bash docket/scripts/claim-check.sh my-change
+bash docket/scripts/start-work.sh task my-change
+cd .worktrees/task-my-change
+bash scripts/setup.sh
 ```
 
-Prettier formats Markdown structure and wraps prose to its default 80-column
-target. The staged pre-commit hook formats changed Markdown files automatically,
-and CI checks formatting through `npm run format:check`.
+For a queued task, use its existing slug and `todo` or `review` instead of
+`task`. Work in that worktree, update the relevant docs, and commit coherent
+changes. Open a draft PR through GitHub's **Pull requests → New pull request**
+(select **Create draft pull request**) or `gh pr create --draft`. Follow the PR
+template; its title and description become the squash commit message.
 
-`AGENTS.md`, `TODO.md`, and `review/` keep their existing prose wrapping to
-preserve installer-managed text, line-oriented queue metadata, and review
-records. Vendored `docket/` and private `.docket/` files are excluded from
-formatting.
-
-### Staged checks
-
-The pre-commit hook uses Husky and lint-staged to run Oxlint and Prettier on
-staged files. Prettier's formatting changes are included in the commit; lint
-errors block it. lint-staged backs up the original state and preserves unstaged
-changes, including unstaged edits to a partially staged file.
-
-Commits do not run type generation, builds, or tests. There is no pre-push hook.
-Oxlint checks syntax and code correctness without starting the TypeScript
-compiler.
-
-| Command                | Scope                                      |
-| ---------------------- | ------------------------------------------ |
-| `npm run check:staged` | Run the commit checks on staged files      |
-| `npm run lint`         | Check source and configuration with Oxlint |
-| `npm run lint:fix`     | Apply Oxlint's automatic fixes             |
-| `npm run format`       | Apply Prettier formatting                  |
-| `npm run format:check` | Check formatting without editing files     |
-| `npm run check`        | Run all checks, including builds and tests |
-
-GitHub Actions runs `npm ci` and the full `npm run check` on pull requests and
-pushes to `main`. Start it manually with `gh workflow run check.yml --ref main`
-or from the Actions tab. CI also runs `npm run test:package` to verify npm
-installation with production dependencies in a temporary directory and exercise
-the installed CLI, local D1, and deployment dry-runs. This check needs npm
-registry access but no Cloudflare credentials. It does not run in commit hooks.
-
-The same complete gate is available as `bash scripts/check.sh`. A separate
-**Queue and PR hygiene** job validates Docket queues, links, and PR
-descriptions. See [quality and validation](QUALITY.md) for review inputs, test
-policy, and hosting settings.
-
-The workflow uses the Node version in `.node-version` and the npm version in
-`package.json`, with cached npm downloads. Superseded PR runs are cancelled;
-each push to `main` is checked. Hooks are disabled in CI, which runs the checks
-directly.
-
-If Git reports a missing hook command or package after an update, run `npm ci`
-in that checkout and retry the commit. To inspect a lint-staged failure, use
-`git status` and `git diff --cached` before retrying; an interrupted run may
-retain a `lint-staged automatic backup` in `git stash list`.
+Run the checks and obtain an independent review. Resolve findings, then mark the
+PR ready for review. The repository owner handles final review, merging,
+releases, and deployment. [Quality and review](QUALITY.md) explains test policy
+and review evidence; the contract covers the full workflow.
 
 ## Run locally
+
+Tests above are the quickest way to exercise the project. For an interactive
+editor, you also need a development Discord application and role:
 
 ```sh
 cp .dev.vars.example .dev.vars
 ```
 
-Set the Discord OAuth settings and a base64-encoded 32-byte
-`CONFIG_ENCRYPTION_KEY` in `.dev.vars`;
-[administration setup](WEB.md#enable-administration) explains application setup
-and key generation. Register the local callback separately as described in
-[local preview](WEB.md#local-preview). Keep that file private, then start with
-an empty local database:
+Fill in the OAuth settings and a base64-encoded 32-byte `CONFIG_ENCRYPTION_KEY`
+in that private file. Follow
+[administration setup](WEB.md#enable-administration) and register
+`http://localhost:8787/admin/auth/callback` as described in
+[local preview](WEB.md#local-preview). Then start the local database and server:
 
 ```sh
 npm run db:migrate:local
 npm run dev
 ```
 
-The migration command always uses `--local`. It uses the same database ID as the
-Worker configuration: the exported `SYNDICORD_DATABASE_ID`, or the built-in
-local placeholder when that variable is absent. Export that variable in the
-shell when changing it, rather than putting it in a dotenv file.
+Open `http://localhost:8787/admin` and sign in. For the CLI, use a second
+terminal in the same checkout:
 
-The local server normally listens on port 8787. Open
-`http://localhost:8787/admin` and sign in with Discord, or use a second terminal
-with `SYNDICORD_ADMIN_URL=http://localhost:8787` and run
-`npm run syndicord -- login`. Follow
-[the CLI configuration commands](OPERATIONS.md) to add webhooks and feeds. Both
-clients update this local server's database.
+```sh
+export SYNDICORD_ADMIN_URL='http://localhost:8787'
+npm run syndicord -- login
+```
 
-Trigger a poll through the local runtime's scheduled-event route:
+Both clients edit this local database; use
+[the feed-management guide](OPERATIONS.md) to configure it. Local state lives in
+`.cloudflare/state/`, separately from hosted state and the automated tests'
+temporary databases.
+
+The migration command always uses `--local`. It uses the exported
+`SYNDICORD_DATABASE_ID`, or the built-in local placeholder when absent. Set a
+custom database ID in the shell, not a dotenv file, so migrations and the Worker
+select the same database.
+
+To trigger a local poll, open `http://localhost:8787/cdn-cgi/local/scheduled` in
+a browser, or run:
 
 ```sh
 curl -fsS 'http://localhost:8787/cdn-cgi/local/scheduled'
 ```
 
-This local poll uses the configured feeds and **real Discord webhooks**. The
-first successful poll establishes a silent baseline. Later polls send new
-entries. The scheduled-event route belongs to the local runtime; the deployed
-Worker serves the Discord-authenticated editor at `/admin`.
-
-Local D1 state is under `.cloudflare/state/` and is separate from hosted state.
-The automated tests create their own databases and do not change this state.
-
-## CLI development and installation checks
-
-Run every operational command directly from the checkout:
-
-```sh
-npm run syndicord -- --help
-npm run syndicord -- status
-npm run deploy -- --dry-run
-```
-
-The repository's `.npmrc` sets `loglevel=silent` so npm script banners do not
-pollute JSON output. Commands still write their own output and errors and retain
-their exit status. To see npm's own diagnostics, override the setting for that
-invocation, for example `npm --loglevel=notice ci`.
-
-Deployment builds the current source before touching the hosted installation. It
-does not depend on a previously generated package or a globally installed CLI.
-`npm run status -- --remote` invokes the standalone status script; it requires
-an explicit `--remote` or `--local` target.
-
-`npm run package` builds the distributable CLI and Worker under ignored `dist/`.
-The npm prepare lifecycle performs this build when installing from Git. It does
-nothing in a built npm package, which contains no source or development tools.
-The installed CLI uses its bundled Worker; source deployment always rebuilds.
-
-`npm run test:package` checks the installed form in disposable directories and
-cleans up its fixtures afterwards. No installation-specific identifiers, live
-feeds, secrets, or local state are included in the npm package. Registry
-publication is a separate release operation.
-
-See [setup](SETUP.md#optional-npm-installation) for normal npm installation from
-GitHub.
+**This uses real feeds and Discord webhooks.** The first successful poll records
+a silent baseline; later polls can send messages. The scheduled-event route is
+provided by the local runtime. Hosted delivery is driven by cron.
 
 ## Layout
 
@@ -199,13 +121,29 @@ GitHub.
 | `migrations/`                 | D1 schema migrations                                    |
 | `cloudflare.config.ts`        | Worker, bindings, schedule, and logging                 |
 
-See [setup](SETUP.md) for the first hosted deployment,
-[operations](OPERATIONS.md) for feeds and webhooks, and
-[automatic deployment](DEPLOYMENT.md) for GitHub Actions.
+Read [relay behavior](BEHAVIOR.md) for the polling and delivery model,
+[authentication design](WEB.md#authentication-design) for sign-in, and
+[permissions](PERMISSIONS.md) for the shared catalog and channel grants.
+
+<a id="format-markdown"></a> <a id="staged-checks"></a>
+
+## Commit hooks and CI
+
+Commits run staged formatting and lint only. Builds and tests belong in the
+check scripts and CI. See
+[hooks and formatting](QUALITY.md#hooks-and-formatting) for commands and
+recovery, and [CI and hosting](QUALITY.md#ci-and-hosting) for workflow details.
+
+## CLI development and installation checks
+
+Use `npm run syndicord -- --help` to explore the source CLI. See
+[CLI and package development](QUALITY.md#cli-and-package-development) for
+package builds, installation checks, local status, and deployment dry-runs.
+Normal [CLI installation](SETUP.md#optional-npm-installation) and
+[hosted deployment](SETUP.md) have separate guides.
 
 ## Tooling references
 
 - [Cloudflare configuration](https://developers.cloudflare.com/cf/projects/cloudflare-config/)
 - [Cloudflare CLI project commands](https://developers.cloudflare.com/cf/projects/)
-
-For advanced provider operations, see the optional [API recipes](API.md).
+- [Advanced provider API recipes](API.md)
