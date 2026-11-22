@@ -1,5 +1,8 @@
 # Scoped Discord permissions
 
+**For operators configuring access.** To add feeds, destinations, or
+subscriptions, use the [everyday guide](OPERATIONS.md#scoped-access).
+
 An operator can delegate the shared feed catalog and individual Discord channels
 to different roles. Sign in once; syndicord combines the grants for every
 configured server/role pair you match. The browser and CLI use the same server
@@ -124,43 +127,18 @@ pairs silently establish a baseline before sending new posts. An unrouted feed
 is kept in the catalog without being polled. Removing all subscriptions pauses
 polling and delivery; a run already in progress may finish using its snapshot.
 
-CLI examples:
-
-```sh
-npm run syndicord -- catalog list
-npm run syndicord -- catalog add --file .new-feed.json
-npm run syndicord -- destinations list
-npm run syndicord -- subscriptions list
-npm run syndicord -- subscriptions add FEED_ID DESTINATION_ID
-npm run syndicord -- subscriptions remove FEED_ID DESTINATION_ID
-```
-
-`.new-feed.json` contains a label and source URL:
-
-```json
-{ "label": "Example updates", "url": "https://example.com/feed.xml" }
-```
-
-Use `catalog rename FEED_ID LABEL` to change a label and
-`catalog remove FEED_ID` to delete an unused feed. Secret-bearing input files
-also accept `--file -` for stdin. Keep URL backups privately and remove
-temporary files when finished.
+For the browser steps, JSON input examples, and CLI commands, see
+[manage feeds and channels](OPERATIONS.md#scoped-access). Both clients offer
+adding, renaming, deleting unused feeds, and adding/removing subscriptions.
+Secret-bearing input files accept `--file -`; back up URLs privately and delete
+temporary files after use.
 
 ## Destinations and webhook rotation
 
-Create a webhook in Discord under **Edit Channel → Integrations → Webhooks**. In
-the scoped editor, register its URL and a label. Or save this input privately:
-
-```json
-{
-  "label": "Comic updates",
-  "webhookUrl": "https://discord.com/api/webhooks/ID/TOKEN"
-}
-```
-
-```sh
-npm run syndicord -- destinations register --file .new-destination.json
-```
+Follow [register a destination](OPERATIONS.md#2-register-a-destination) for
+browser and CLI steps, and
+[change or remove something](OPERATIONS.md#change-or-remove-something) for
+rotation, renaming, and deletion. The guarantees below explain those rules.
 
 Syndicord uses Discord's
 [webhook-token lookup](https://docs.discord.com/developers/resources/webhook#get-webhook-with-token)
@@ -169,13 +147,10 @@ granted channel scope. It does not send a message or require separate operator
 approval. Saved credentials remain encrypted and are never returned.
 
 Destinations have immutable IDs and server/channel bindings; labels are
-editable. `destinations rotate DESTINATION_ID --file .replacement.json` accepts
-`{"webhookUrl":"https://discord.com/api/webhooks/ID/NEW_TOKEN"}` and verifies
-that the target is unchanged. To route to a different channel, register a new
-destination and explicitly subscribe feeds there. Remove subscriptions before
-`destinations remove DESTINATION_ID`. Use
-`destinations rename DESTINATION_ID LABEL` to change only the label. Removal in
-syndicord does not delete a Discord webhook.
+editable. Rotation verifies that the target is unchanged. To route to a
+different channel, register a new destination and explicitly subscribe feeds
+there. Remove subscriptions before deleting a destination. Removal in syndicord
+does not delete a Discord webhook.
 
 Scoped destinations support channel webhooks without `thread_id`. The lookup
 verifies the webhook's parent channel, not a supplied thread target, so thread

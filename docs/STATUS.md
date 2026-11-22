@@ -1,5 +1,11 @@
 # Operational status
 
+**For operators with Cloudflare access.** If you manage feeds through Discord
+roles, ask the operator to run this check. For live logs and CPU errors, use
+**Cloudflare → Workers & Pages → your Worker → Logs → Live** and **Metrics**, or
+[tail events in the CLI](RECOVERY.md#inspect-a-run). The status report below
+summarizes saved D1 health; it is not a live delivery test.
+
 Inspect polling health and pending deliveries without invoking the Worker or
 sending a Discord message:
 
@@ -9,8 +15,9 @@ export SYNDICORD_DATABASE_ID='your-existing-database-uuid'
 npm run syndicord -- status
 ```
 
-The command uses the project's `cf` dependency and its existing authentication.
-For the [npm-installed CLI](SETUP.md#optional-npm-installation), use
+First [sign in to Cloudflare](OPERATIONS.md#select-a-cloudflare-installation) if
+needed. The command uses the project's pinned `cf` dependency. For the
+[npm-installed CLI](SETUP.md#optional-npm-installation), use
 `npx --no-install syndicord status`. It only queries D1; it needs no webhook
 secret or `.dev.vars` file. Hosted reads count toward D1 usage. The database ID
 is non-secret deployment configuration; use the ID recorded for the deployment
@@ -52,7 +59,12 @@ checks both the run heartbeat and each feed's health.
 The output includes pending counts and oldest pending age for active routes,
 alongside destination suspension/cooldown state. Removed routes are excluded;
 their retained pending deliveries resume if the same configuration is restored.
-Feed indices identify entries in `npm run syndicord -- feeds get`. Only
+Feed indices are zero-based positions in the current relay feed list. In
+single-role mode, this is `npm run syndicord -- feeds get`. In scoped mode,
+unrouted feeds are omitted and these indices are **not catalog IDs**; the bulk
+`feeds get` command is unavailable. Destination names in this report are ledger
+keys, which may differ from scoped labels and IDs. Use the
+[operator recovery notes](RECOVERY.md#inspect-a-run) when matching records. Only
 hostnames are printed; feed paths/query strings, webhook URLs, fingerprints, and
 message payloads are not included.
 

@@ -1,9 +1,13 @@
 # Relay behavior
 
+[Documentation](README.md) · [Manage feeds](OPERATIONS.md) · [Status](STATUS.md)
+
 Each subscribed RSS or Atom feed has one or more Discord destinations. A scoped
 catalog can also retain feeds without subscriptions; those feeds are not polled.
 Webhook URLs are secrets. Each new entry produces one message per destination,
 containing the original title, link, and a short description.
+
+## Messages
 
 Messages show the feed name above a linked entry title, with a teal accent and a
 source footer. A missing feed name falls back to the feed's hostname. The
@@ -25,6 +29,8 @@ appears when the feed provides a valid date.
 Feed HTML is reduced to text and message mentions are disabled. Feed names are
 stored with pending entries so retries retain their source attribution.
 
+## Baselines and entry identity
+
 The first successful poll of a feed/destination pair records its existing
 entries without sending them. A successful empty feed also establishes this
 baseline. Fetch and parse failures do not establish a baseline. A newly added
@@ -34,6 +40,8 @@ Entry identity uses the feed's stable ID, then its link, then a deterministic
 fingerprint of its content. Identity is scoped to the full feed URL and the
 destination name. Dates do not determine whether an entry is new. Changes to an
 entry with the same identity do not send another message.
+
+## Retries and configuration changes
 
 Pending deliveries retain their message data even after entries disappear from a
 feed. Destinations succeed and retry independently. Removed feeds and
@@ -62,3 +70,35 @@ Polling and delivery work are bounded. Feeds rotate between invocations so a
 slow or broken feed does not block the others. No public HTTP endpoint triggers
 polling. Logs identify feeds and destination names without webhook URLs or
 response bodies.
+
+## Polling limits
+
+The default one-minute cron checks one feed and attempts at most five deliveries
+per run. With N feeds, each is checked about every N minutes. There is no fixed
+limit on the number of feeds or feed/destination pairs; a feed sent to two
+destinations uses two pairs. Larger installations take longer to revisit each
+feed, and delivery backlogs grow if new messages arrive faster than five per
+minute. Entries must remain in the source feed until its next poll to be
+observed; longer rotations can miss entries removed between polls.
+
+Each save is limited to 96 KiB of normalized JSON for the complete feed list and
+webhook map, including unused saved destinations. Scoped catalogs include all
+catalog metadata and unrouted feeds in this bound; only subscribed feeds enter
+the polling rotation. Requests and single-role responses are limited to 128 KiB.
+Scoped responses allow 256 KiB for expanded channel permissions. Remove unused
+destinations or shorten feed URLs if a save reaches this size. Existing larger
+configurations remain readable so they can be reduced.
+
+Installation capacity also depends on
+[Cloudflare Workers CPU limits](https://developers.cloudflare.com/workers/platform/limits/),
+[D1 database quotas](https://developers.cloudflare.com/d1/platform/limits/), and
+Discord rate limits.
+
+Runs stop starting deliveries after 30 seconds; HTTP requests have six-second
+deadlines. Leases, retries, and Discord cooldowns can delay work further. Feeds
+must be UTF-8 XML, at most 256 KiB and 200 entries, with at most three redirects
+and no HTTPS downgrade. Malformed or unsupported XML does not change a baseline.
+
+D1 retains entry identities indefinitely and clears pending payloads after
+successful delivery. Monitor database growth for busy feeds. See
+[relay behavior](BEHAVIOR.md) for identity and retry semantics.

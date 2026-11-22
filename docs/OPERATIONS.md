@@ -1,38 +1,163 @@
-# Feeds and webhooks
+# Manage feeds and channels
 
-For an installation using `DISCORD_AUTH_POLICY`, follow the
-[scoped catalog, destination, and subscription commands](PERMISSIONS.md). The
-`feeds set` and `webhooks` commands below apply to single-role installations;
-the scoped API rejects whole-configuration changes.
+Use this guide for an **existing installation**. Ask its operator for the
+`/admin` address and the Discord role you need. Hosting a new installation?
+Start with [setup](SETUP.md).
 
-[First deployment](SETUP.md) · [Web interface](WEB.md) · [Status](STATUS.md) ·
-[Automatic deployment](DEPLOYMENT.md) · [Troubleshooting](RECOVERY.md)
+A feed supplies articles; a webhook posts to a Discord channel; a subscription
+(or route) connects them. The browser and CLI edit the same saved configuration.
+Changes take effect on the next scheduled poll, without a deployment.
 
-## Select an installation
+## Sign in
 
-The CLI and web interface use the same Worker API. Set its origin, without an
-`/admin` suffix, then sign in with Discord:
+**Web:** Open the installation's `/admin` address and choose **Sign in with
+Discord**. Your Discord roles determine which controls you can use. No local
+software or Cloudflare account is needed.
+
+**CLI:** [Install the CLI](SETUP.md#run-from-the-repository), then select the
+same installation as below. Examples use a source checkout; for an
+[npm installation](SETUP.md#optional-npm-installation), replace
+`npm run syndicord --` with `npx --no-install syndicord`.
+
+### Select an installation
 
 ```sh
 export SYNDICORD_ADMIN_URL='https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev'
 npm run syndicord -- login
 ```
 
-Approve the browser request only when its code matches the terminal. Your
-account must match one of the operator-configured server/role grants. See
-[Discord setup and CLI login](WEB.md#cli-login) for details. Run
-`npm run syndicord -- logout` when finished; expired sessions require `login`
-again.
+Use the origin without `/admin`. Approve the browser request only when its code
+matches the terminal. Configuration commands need no Cloudflare credentials. Use
+`login --no-browser` if you want to open the printed URL yourself, and
+`npm run syndicord -- logout` to sign out. Expired sessions require another
+login; see [session details](WEB.md#cli-login).
 
-Configuration commands need no Cloudflare credentials. For local development,
-use `http://localhost:8787` with the local OAuth settings; `--local` is not a
-configuration-command option. HTTPS is required except for loopback addresses.
+For local development use `http://localhost:8787`; configuration commands do not
+accept `--local`. Other addresses must use HTTPS.
 
-Run commands from your checkout. For the
-[npm-installed CLI](SETUP.md#optional-npm-installation), use
-`npx --no-install syndicord` instead of `npm run syndicord --`.
+## Choose the section matching your editor
 
-## Add or change webhooks
+| The editor shows…                                               | Your mode                                              | Follow                                    |
+| --------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------- |
+| **Feed catalog**, **Your destinations**, **Your subscriptions** | Scoped access: feed and channel roles can be different | [Scoped access](#scoped-access)           |
+| **Feeds** and **Webhooks**, with **Add webhook**                | Single role: authorized members manage all routes      | [Single-role access](#single-role-access) |
+
+The operator chooses the mode. If you see **Verify and initialize catalog**,
+finish the operator's [catalog setup](PERMISSIONS.md#configure-access) first.
+
+## Scoped access
+
+You can see all feed labels and only the destinations your roles allow you to
+manage. Adding feeds and managing channels are separate permissions; you may
+have either or both. Source URLs stay private, so keep a backup and use labels
+without secrets. Adding a feed makes its content available for other channel
+administrators to subscribe to.
+
+### 1. Choose or add a feed
+
+**Web:** Look in **Feed catalog**. To add a source, choose **Add feed**, enter a
+label and RSS/Atom URL, and save. If that control is unavailable, ask a feed
+administrator to add it.
+
+**CLI:** List the catalog; if you have feed permission, save the JSON below as
+`.new-feed.json` and add it:
+
+```sh
+npm run syndicord -- catalog list
+```
+
+```json
+{ "label": "Example updates", "url": "https://example.com/feed.xml" }
+```
+
+```sh
+npm run syndicord -- catalog add --file .new-feed.json
+npm run syndicord -- catalog list
+```
+
+An unrouted feed is kept in the catalog but is not polled. Source URLs cannot be
+edited: add a replacement feed and explicitly change each destination's
+subscription. Renaming a label keeps the source and subscriptions intact.
+
+### 2. Register a destination
+
+In Discord, open **Edit Channel → Integrations → Webhooks**, create a webhook,
+and copy its URL. You need permission to manage webhooks in that channel. Keep
+the URL in your password manager; syndicord never reveals saved webhook URLs.
+Discord has no supported setup CLI in this project; advanced bot-based creation
+is an [optional API recipe](API.md#create-a-discord-webhook).
+
+**Web:** Under **Your destinations**, choose **Register webhook**, enter a label
+and the URL, and save.
+
+**CLI:** Save this as `.new-destination.json`, then register it:
+
+```json
+{
+  "label": "Community updates",
+  "webhookUrl": "https://discord.com/api/webhooks/ID/TOKEN"
+}
+```
+
+```sh
+npm run syndicord -- destinations register --file .new-destination.json
+npm run syndicord -- destinations list
+```
+
+Registration verifies the webhook's actual server and channel against your
+permissions without sending a message. Scoped access supports channel webhooks;
+thread routing and forum/media channels requiring `thread_id` are unsupported.
+
+### 3. Subscribe the channel
+
+**Web:** Under **Your subscriptions**, choose **Subscribe**, select the feed and
+destination, and save.
+
+**CLI:** Copy the IDs from `catalog list` and `destinations list`:
+
+```sh
+npm run syndicord -- subscriptions add FEED_ID DESTINATION_ID
+npm run syndicord -- subscriptions list
+```
+
+The first successful poll quietly records existing entries. Only new entries
+after that baseline are sent. With N subscribed feeds, each is normally checked
+about every N minutes. See [what to expect](#what-to-expect-after-saving).
+
+### Change or remove something
+
+The CLI commands below follow `npm run syndicord --` (or your installed entry
+point). Replace the IDs with those from the list commands; quote labels with
+spaces.
+
+| Task                         | Web editor                                | CLI command                                                   |
+| ---------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
+| Rename a feed                | **Rename** beside the feed                | `catalog rename FEED_ID 'New label'`                          |
+| Rename a destination         | **Rename** beside the destination         | `destinations rename DESTINATION_ID 'New label'`              |
+| Stop one subscription        | **Unsubscribe** beside the subscription   | `subscriptions remove FEED_ID DESTINATION_ID`                 |
+| Delete an unused feed        | **Delete** beside the feed                | `catalog remove FEED_ID`                                      |
+| Delete an unused destination | **Delete** beside the destination         | `destinations remove DESTINATION_ID`                          |
+| Replace webhook credentials  | **Rotate webhook** beside the destination | `destinations rotate DESTINATION_ID --file .replacement.json` |
+
+For rotation, `.replacement.json` contains
+`{"webhookUrl":"https://discord.com/api/webhooks/ID/NEW_TOKEN"}`. The
+replacement must point to the same server and channel. To move channels,
+register a new destination and explicitly subscribe feeds there.
+
+Remove all subscriptions before deleting a feed or destination; a feed may be
+used by channels you cannot administer. Deleting a destination in syndicord does
+not delete its webhook in Discord. Removing all subscriptions pauses polling and
+delivery, but a run already in progress may finish. Restoring the same
+subscription resumes pending entries; label changes preserve delivery history.
+See [permissions and verification](PERMISSIONS.md) for the exact rules.
+
+## Single-role access
+
+Everyone with the configured role can edit the whole configuration. Add a
+webhook first, then select it when adding a feed. Use only this section's
+`feeds` / `webhooks` commands in this mode; scoped installations reject them.
+
+### Add or change webhooks
 
 Create a webhook in Discord under **Edit Channel → Integrations → Webhooks** and
 copy its URL.
@@ -60,7 +185,8 @@ unchanged. Use the same name with a new URL to rotate a webhook. URLs are stored
 encrypted in D1 and never returned by the API. Keep a backup in your password
 manager and delete `.webhooks.json` when finished.
 
-To remove a destination, first remove its routes from the feed list, then run:
+To remove a destination, first remove its routes from the feed list, then choose
+**Remove** beside the webhook in the editor, or run:
 
 ```sh
 npm run syndicord -- webhooks remove security
@@ -73,7 +199,7 @@ Destination names start with a letter and contain letters, digits, underscores,
 or hyphens. Each needs a distinct webhook URL. A numeric `thread_id` query
 parameter selects an existing thread; forum/media channels require one.
 
-## Add or change a feed
+### Add or change a feed
 
 - **Web interface:** Choose **Add feed**, enter its URL, select its
   destinations, and save. Use **Edit** on an existing feed to change and save
@@ -114,9 +240,27 @@ so treat exported configuration accordingly. `--file -` reads JSON from stdin.
 
 New feed/destination pairs silently record their current entries, then send new
 ones. Removing a route stops future delivery attempts; restoring the same route
-resumes pending entries. Renaming a destination creates a new baseline. Store
-`[]` to pause polling and delivery. A run already in progress may finish using
-the configuration it read at its start.
+resumes pending entries. Renaming a destination creates a new baseline. In the
+editor, **Remove** deletes a feed and its routes. To pause polling and delivery,
+remove all feeds or save a CLI feed file containing `[]`. A run already in
+progress may finish using the configuration it read at its start.
+
+## What to expect after saving
+
+- A new route starts with a **silent baseline**, then sends new entries. Saving
+  a form does not itself send a message. An existing poll may finish using its
+  earlier configuration.
+- Configuration and encrypted webhook changes are saved together in D1. If a
+  save conflicts, reload and reapply it. After an uncertain result, inspect the
+  saved state before retrying; neither client automatically retries an ambiguous
+  save. For bulk feed files, export a fresh copy before editing.
+- Keep source URLs and webhook URLs private. Save backups in your password
+  manager and delete temporary JSON files after use. File-based input also
+  accepts `--file -` for stdin.
+
+For a first real message, follow [verify delivery](SETUP.md#verify-delivery).
+For missing messages, ask the operator to check [status](STATUS.md) and
+[troubleshooting](RECOVERY.md).
 
 ## Select a Cloudflare installation
 
@@ -143,32 +287,7 @@ switching between configuration and infrastructure commands.
 
 ## Polling limits
 
-The default one-minute cron checks one feed and attempts at most five deliveries
-per run. With N feeds, each is checked about every N minutes. There is no fixed
-limit on the number of feeds or feed/destination pairs; a feed sent to two
-destinations uses two pairs. Larger installations take longer to revisit each
-feed, and delivery backlogs grow if new messages arrive faster than five per
-minute. Entries must remain in the source feed until its next poll to be
-observed; longer rotations can miss entries removed between polls.
-
-Each save is limited to 96 KiB of normalized JSON for the complete feed list and
-webhook map, including unused saved destinations. Scoped catalogs include all
-catalog metadata and unrouted feeds in this bound; only subscribed feeds enter
-the polling rotation. Requests and single-role responses are limited to 128 KiB.
-Scoped responses allow 256 KiB for expanded channel permissions. Remove unused
-destinations or shorten feed URLs if a save reaches this size. Existing larger
-configurations remain readable so they can be reduced.
-
-Installation capacity also depends on
-[Cloudflare Workers CPU limits](https://developers.cloudflare.com/workers/platform/limits/),
-[D1 database quotas](https://developers.cloudflare.com/d1/platform/limits/), and
-Discord rate limits.
-
-Runs stop starting deliveries after 30 seconds; HTTP requests have six-second
-deadlines. Leases, retries, and Discord cooldowns can delay work further. Feeds
-must be UTF-8 XML, at most 256 KiB and 200 entries, with at most three redirects
-and no HTTPS downgrade. Malformed or unsupported XML does not change a baseline.
-
-D1 retains entry identities indefinitely and clears pending payloads after
-successful delivery. Monitor database growth for busy feeds. See
-[relay behavior](BEHAVIOR.md) for identity and retry semantics.
+By default, one feed is checked and up to five deliveries are attempted each
+minute. Larger feed lists take longer to revisit. See
+[capacity and limits](BEHAVIOR.md#polling-limits) for request/configuration
+sizes, feed bounds, timeouts, and storage behavior.

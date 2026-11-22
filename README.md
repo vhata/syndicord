@@ -7,51 +7,47 @@
 <p align="center"><strong>Your feeds. In the conversation.</strong><br>RSS and Atom updates, delivered to Discord.</p>
 
 <p align="center">
-  <a href="docs/SETUP.md">Set up syndicord</a> ·
-  <a href="docs/BEHAVIOR.md">How delivery works</a> ·
+  <a href="docs/OPERATIONS.md">Use syndicord</a> ·
+  <a href="docs/SETUP.md">Host an installation</a> ·
   <a href="docs/DEVELOPMENT.md">Development</a>
 </p>
 
-syndicord is an RSS-to-Discord relay that runs on Cloudflare Workers. It polls
-feeds on a schedule and posts new entries to Discord through one or more
-webhooks.
+syndicord brings RSS and Atom updates into Discord. It runs on Cloudflare
+Workers, checks feeds on a schedule, and posts new entries to the channels you
+choose. Messages include the feed name, title, link, and a short excerpt.
 
-Each feed is mapped to its destinations: send a feed to a single channel, share
-it across several channels, or bring multiple feeds together in one channel.
-syndicord tracks delivered entries for each feed and destination to pick up new
-posts on the next poll.
+**Reading updates?** Just follow the Discord channel. You need no syndicord
+account or software. **Managing updates?** Use the web editor or CLI; both save
+to the same installation, and changes need no code deployment.
 
-Messages carry titles, links, and descriptions from the feeds themselves, so
-readers can follow updates in Discord and open the original posts for the full
-story.
+## Start here
 
-The first poll records a baseline without posting a backlog. Delivery state is
-stored in D1, so destinations can retry independently. Each scheduled run checks
-one feed and sends a bounded batch of pending entries.
+| I want to…                                      | Read                                                                    |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| Add feeds or choose which channels receive them | [Manage feeds and channels](docs/OPERATIONS.md)                         |
+| Host syndicord for my community                 | [First deployment](docs/SETUP.md)                                       |
+| Give people access to manage it                 | [Sign-in and access](docs/WEB.md) · [Scoped roles](docs/PERMISSIONS.md) |
+| Check why updates have stopped                  | [Status](docs/STATUS.md) · [Troubleshooting](docs/RECOVERY.md)          |
+| Work on the code                                | [Development](docs/DEVELOPMENT.md)                                      |
 
-Use the [Discord-authenticated web interface](docs/WEB.md) or
-[CLI](docs/OPERATIONS.md) to add feeds and webhooks and choose where each feed
-goes. [Scoped role grants](docs/PERMISSIONS.md) separate feed administration
-from routing to approved channels across Discord servers. Both clients use the
-same API and can be used interchangeably. Feeds and routing live in Cloudflare
-D1; webhook URLs are encrypted with a separate Worker secret. Run the CLI
-directly from the repository or install it through npm to manage an installation
-without a checkout. The same code can serve separate accounts or Workers, each
-with its own database and configuration.
+## How it fits together
 
-Start with [setup](docs/SETUP.md), then [enable the web interface](docs/WEB.md).
-For CLI changes, [add or change feeds](docs/OPERATIONS.md#add-or-change-a-feed)
-or [add or change webhooks](docs/OPERATIONS.md#add-or-change-webhooks). See
-[optional automatic deployment](docs/DEPLOYMENT.md) for GitHub Actions and
-[relay behavior](docs/BEHAVIOR.md) for delivery semantics.
+A **feed** is an RSS or Atom source. A **destination** is a Discord webhook that
+posts to a channel. A **route** (or **subscription**) connects the two: one feed
+can reach several channels, and one channel can receive several feeds.
 
-Use the [operational status command](docs/STATUS.md) to inspect feed health,
-pending deliveries, and suspended destinations.
+Each installation has a Cloudflare Worker and a D1 database. D1 holds
+configuration and delivery history; webhook URLs are encrypted with a separate
+Worker secret. Discord roles control who can edit feeds and destinations.
+Hosting access is separate from editing access.
 
-## Development
+The first successful check of a new route quietly records existing entries; **it
+does not post the old backlog**. Subsequent checks send new entries. By default,
+one feed is checked each minute and destinations retry independently. See
+[delivery behavior](docs/BEHAVIOR.md) for timing, limits, and retry details.
 
-See the [development guide](docs/DEVELOPMENT.md) for local setup, project
-layout, and checks.
+[All documentation](docs/README.md) includes operator references, optional
+GitHub deployment, architecture, and contribution guidance.
 
 ## License
 

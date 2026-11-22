@@ -1,7 +1,18 @@
 # Troubleshooting and recovery
 
-See [setup](SETUP.md) for the first-delivery check, [operations](OPERATIONS.md)
-for feeds and webhooks, and [deployment](DEPLOYMENT.md) for CI configuration.
+**For installation operators.** Start with [status](STATUS.md), then follow the
+row that matches the symptom. Everyday feed edits are in
+[manage feeds and channels](OPERATIONS.md).
+
+| Symptom or task                          | Start here                                                            |
+| ---------------------------------------- | --------------------------------------------------------------------- |
+| No messages just after adding a feed     | [Verify delivery](SETUP.md#verify-delivery): the first poll is silent |
+| Sign-in or access denied                 | [Sign-in troubleshooting](WEB.md#troubleshooting-and-acceptance)      |
+| Feed errors, delays, or missing messages | [Inspect a run](#inspect-a-run)                                       |
+| Destination suspended                    | [Resume a destination](#resume-a-suspended-destination)               |
+| Deploy failed or its outcome is unclear  | [Failed deployment](#failed-deployment)                               |
+| Stop sends or return to earlier code     | [Pause and roll back](#pause-and-roll-back)                           |
+| Recover lost or damaged data             | [Restore D1](#restore-d1)                                             |
 
 Select the installation as described in
 [Cloudflare operations](OPERATIONS.md#select-a-cloudflare-installation). Feed
@@ -15,21 +26,42 @@ export GH_REPO='YOUR_OWNER/YOUR_REPOSITORY'
 
 ## Inspect a run
 
+**Dashboard:** Open **Workers & Pages → your Worker → Logs → Live**. Use
+**Metrics** to check invocation failures and CPU time.
+[Cloudflare live-log reference](https://developers.cloudflare.com/workers/observability/logs/real-time-logs/)
+
+**CLI:** Stream events from the same Worker:
+
 ```sh
 npm run syndicord -- cf observability tail --worker "$SYNDICORD_WORKER_NAME"
 ```
 
-| Event                   | Meaning / action                                                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `feed_failed`           | Fetch or parse failed. The log gives the zero-based index in `npm run syndicord -- feeds get` and a sanitized reason; the baseline is unchanged. |
-| `relay_busy`            | Another invocation owns the lease. After a terminated run, the lease expires within two minutes.                                                 |
-| `delivery_deferred`     | Delivery will retry with backoff, from one minute to six hours, or a longer delay requested by Discord.                                          |
-| `destination_suspended` | Discord returned 401, 403, or 404. Repair or replace the webhook.                                                                                |
+| Event                   | Meaning / action                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `feed_failed`           | Fetch or parse failed. The log gives the relay feed index and a sanitized reason; the baseline is unchanged. |
+| `relay_busy`            | Another invocation owns the lease. After a terminated run, the lease expires within two minutes.             |
+| `delivery_deferred`     | Delivery will retry with backoff, from one minute to six hours, or a longer delay requested by Discord.      |
+| `destination_suspended` | Discord returned 401, 403, or 404. Repair or replace the webhook.                                            |
 
 Discord rate limits affect the destination, or all destinations for a global
 limit. Pending deliveries remain available after fetch or delivery failures.
 
-To inspect hosted delivery counts without reading message payloads:
+Feed indices refer to the zero-based active route list, not catalog IDs. In
+single-role mode, inspect it with `npm run syndicord -- feeds get`. In scoped
+mode, an operator can inspect `relay_configuration` in **Cloudflare → Storage &
+databases → D1 → your database → Console**: `feeds` contains the active route
+list; `catalog` maps source URLs and each destination's `deliveryKey` to catalog
+IDs and labels. These fields can contain private feed URLs; do not share their
+raw contents. Scoped list commands intentionally hide source URLs and do not
+expose delivery keys.
+
+To inspect hosted delivery counts without reading message payloads, run this SQL
+in that D1 console, or use the CLI command below:
+
+```sql
+SELECT destination, state, COUNT(*) AS count
+FROM relay_deliveries GROUP BY destination, state;
+```
 
 ```sh
 export SYNDICORD_DATABASE_ID='your-existing-database-uuid'
@@ -40,13 +72,14 @@ Add `--local` to inspect local development state instead.
 
 ## Resume a suspended destination
 
-[Replace its webhook](OPERATIONS.md#add-or-change-webhooks) through the web
-editor or the CLI, and update its backup. A changed URL clears suspension and
-its destination cooldown on the next poll; pending entries retain their retry
-times.
+[Rotate the webhook](OPERATIONS.md#change-or-remove-something) in scoped mode,
+or [replace its URL](OPERATIONS.md#add-or-change-webhooks) in single-role mode,
+and update its backup. A changed URL clears suspension and its destination
+cooldown on the next poll; pending entries retain their retry times.
 
 If you repaired permissions without changing the URL, save this as `resume.sql`,
-replacing `updates` with the destination name:
+replacing `updates` with the exact **Destination** key printed by `status`. For
+scoped catalogs this is a delivery key, not necessarily its label or ID:
 
 ```sql
 UPDATE relay_destinations
@@ -58,7 +91,8 @@ SET next_attempt_ms = 0
 WHERE destination = 'updates' AND state = 'pending';
 ```
 
-Apply it to the intended hosted database:
+**Dashboard:** Run the two statements in the intended D1 database's **Console**.
+**CLI:** Apply the same file to that database:
 
 ```sh
 npm run syndicord -- cf d1 raw "$SYNDICORD_DATABASE_ID" --sql @resume.sql
@@ -76,7 +110,9 @@ verification still fails, the error includes the last observed version ID when
 available, without printing remote annotations or secret values.
 
 If an upload or readback was ambiguous, inspect the active deployment before
-retrying; uploading can succeed before a later step fails:
+retrying; uploading can succeed before a later step fails. In the dashboard,
+open **Workers & Pages → your Worker → Deployments** and inspect the active
+version and traffic allocation. In the CLI:
 
 ```sh
 npm run syndicord -- cf workers deployments list --worker "$SYNDICORD_WORKER_NAME"
@@ -107,15 +143,16 @@ version's configuration. Do not suppress an unexplained conflict with `--force`.
 Operators using a custom source build keep their intended runtime settings in
 `cloudflare.config.ts`. Hosted feeds and secrets are preserved.
 
-For optional GitHub deployment, inspect the failed run instead of uploading a
-local checkout, replacing `FAILED_RUN_ID` with its numeric ID:
+For optional GitHub deployment, inspect the failed run in **GitHub → Actions →
+Check → failed run → failed job**, or use the CLI below with its numeric ID.
+Repair and rerun that workflow instead of uploading a local checkout:
 
 ```sh
 gh run view FAILED_RUN_ID --log-failed
 ```
 
 After checking the active deployment and addressing the failure, start CI for
-current `main`:
+current `main`: in **Actions → Check → Run workflow**, select **main**, or run:
 
 ```sh
 gh workflow run check.yml --ref main
@@ -161,7 +198,8 @@ npm run syndicord -- feeds set --file .feeds.json
 ```
 
 If GitHub manages deployments, disable the workflow and wait for any active run
-to finish before a manual rollback:
+to finish before a manual rollback. In **Actions → Check**, use the **…** menu's
+**Disable workflow**, then inspect the run list; or run:
 
 ```sh
 gh workflow disable check.yml
@@ -177,7 +215,8 @@ rollback reverses neither D1 migrations, stored routing, nor Discord messages.
 Check that the selected version can read the current database schema.
 
 Prefer reverting the faulty code commit and deploying the revert. Resume CI when
-`main` contains the code you intend to deploy:
+`main` contains the code you intend to deploy: choose **Enable workflow**, then
+**Run workflow** on **main** in Actions, or run:
 
 ```sh
 gh workflow enable check.yml
@@ -187,13 +226,13 @@ gh workflow run check.yml --ref main
 ## Restore D1
 
 [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
-retains seven days on Workers Free. A restore overwrites the database. First, in
-Cloudflare open **Workers & Pages → your Worker → Settings → Triggers → Cron
-Triggers**. Record the current schedule, then remove it temporarily. Prevent
-concurrent deployments and allow up to 15 minutes for trigger changes to
-propagate, plus time for running invocations to finish. The pinned CLI has no
-direct cron-management command. A pause stored as `[]` is insufficient:
-restoring D1 also restores the old feed configuration.
+retains seven days on Workers Free and thirty days on Workers Paid. A restore
+overwrites the database. First, in Cloudflare open **Workers & Pages → your
+Worker → Settings → Triggers → Cron Triggers**. Record the current schedule,
+then remove it temporarily. Prevent concurrent deployments and allow up to 15
+minutes for trigger changes to propagate, plus time for running invocations to
+finish. The pinned CLI has no direct cron-management command. A pause stored as
+`[]` is insufficient: restoring D1 also restores the old feed configuration.
 
 Record the current bookmark, then look up the intended restore point:
 
