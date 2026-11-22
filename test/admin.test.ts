@@ -215,6 +215,45 @@ test('administration requires configured Discord OAuth and signed-out pages show
   }
 });
 
+test('branding bindings reach the editor and every access state without invalidating sessions', async () => {
+  const { env, dispose, handleAdmin, request, setRoles } = await fixture();
+  try {
+    const branded = {
+      ...env,
+      ADMIN_NAME: 'Community relay',
+      ADMIN_HEADER_COLOR: '#eeeeee',
+    };
+    const responses = [
+      (await handleAdmin(request('/admin'), branded))!,
+      (await handleAdmin(new Request(origin + '/admin'), branded))!,
+      (await handleAdmin(request('/admin?auth=cancelled'), branded))!,
+      (await handleAdmin(request('/admin'), {
+        ...branded,
+        DISCORD_CLIENT_ID: '',
+      }))!,
+    ];
+    setRoles([]);
+    responses.push((await handleAdmin(request('/admin'), branded))!);
+    assert.deepEqual(
+      responses.map((response) => response.status),
+      [200, 200, 200, 503, 403],
+    );
+    for (const response of responses) {
+      const page = await response.text();
+      assert.match(
+        page,
+        /<span class="installation-name">Community relay<\/span>/,
+      );
+      assert.match(
+        page,
+        /--header: #eeeeee;[^}]*background: var\(--header\); color: #000000/,
+      );
+    }
+  } finally {
+    await dispose();
+  }
+});
+
 test('role removal blocks editor, direct reads, and writes; Discord failures never authorize configuration', async () => {
   const {
     env,
