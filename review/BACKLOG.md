@@ -16,11 +16,6 @@ they cover. Each finding maps to at most one entry. Follow the
 
 ## Unprioritized
 
-- [RELAY] `bound-xml-prevalidation` — **Bound XML preprocessing for malformed documents.** Repeated unterminated comment or CDATA openers cause quadratic CPU work before rejection.
-  - Source: [Full review, 2026-11-21](2026-11-21-1240-full.md), 2026-11-21
-  - Starting point: `src/feed.ts:308` and `test/feed.test.ts`; use forward scans and adversarial scaling probes under the existing byte limit, preserving declaration rejection and valid comment/CDATA behavior.
-  - Findings: `quadratic-xml-prevalidation`
-
 - [RELAY] `preserve-webhooks-during-admin-upgrade` — **Preserve delivery when upgrading pre-web-admin configuration.** Populated D1 routes survive migration but their existing WEBHOOKS secret is no longer consumed.
   - Source: [Full review, 2026-11-21](2026-11-21-1240-full.md), 2026-11-21
   - Starting point: `migrations/0004_web_admin.sql`, `src/admin-store.ts`, deployment entrypoints and setup guidance; provide a validated transition or preflight before replacing a working runtime, and verify existing routes remain deliverable without exposing secrets.
