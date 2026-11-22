@@ -133,7 +133,15 @@ Use `gh run view NEW_RUN_ID --web` if you prefer the browser summary.
 
 ## Pause and roll back
 
-Save the current feed configuration first:
+For scoped catalogs, save `subscriptions list` and remove the relevant
+subscriptions through the editor or
+`subscriptions remove FEED_ID DESTINATION_ID`. Restore them with
+`subscriptions add FEED_ID DESTINATION_ID`. Each destination requires its own
+authorized administrator; removing all subscriptions pauses relay work.
+Operators can also pause the Worker cron in Cloudflare’s dashboard. Do not use
+the whole-configuration commands below for scoped catalogs.
+
+For single-role installations, save the current feed configuration first:
 
 ```sh
 npm run syndicord -- feeds get > .feeds.json

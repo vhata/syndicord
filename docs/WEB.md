@@ -2,9 +2,12 @@
 
 Open **`/admin`** on your Worker's HTTPS address and choose **Sign in with
 Discord** to manage feeds, webhooks, and routing. Access requires membership in
-one configured Discord server and its configured administrator role. The
-[syndicord CLI](OPERATIONS.md) signs in through the browser and edits the same
-configuration through the same API. Changes apply on the next scheduled poll.
+an operator-configured Discord role. Use [scoped permissions](PERMISSIONS.md) to
+combine roles across servers and delegate individual destination channels.
+Without a policy, one configured server/role pair administers all configuration.
+The [syndicord CLI](OPERATIONS.md) signs in through the browser and edits the
+same configuration through the same API. Changes apply on the next scheduled
+poll.
 
 ## Enable administration
 
@@ -54,8 +57,8 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 | `DISCORD_CLIENT_ID`     | Application's numeric client ID                                          |
 | `DISCORD_CLIENT_SECRET` | Application's client secret                                              |
 | `DISCORD_REDIRECT_URI`  | Exact registered `/admin/auth/callback` URL                              |
-| `DISCORD_GUILD_ID`      | Numeric server ID                                                        |
-| `DISCORD_ROLE_ID`       | Numeric required role ID in that server                                  |
+| `DISCORD_GUILD_ID`      | Numeric server ID for the single-role mode                               |
+| `DISCORD_ROLE_ID`       | Numeric required role ID for the single-role mode                        |
 
 - **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
   Variables and Secrets**. Add each setting as a **Secret** using the names
@@ -79,6 +82,10 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
   npm run syndicord -- cf workers secrets update DISCORD_ROLE_ID \
     --worker "$SYNDICORD_WORKER_NAME" --type secret_text
   ```
+
+For scoped access, configure
+[`DISCORD_AUTH_POLICY`](PERMISSIONS.md#configure-access) instead of the two
+single-role settings. All other settings remain required.
 
 For the [npm-installed CLI](SETUP.md#optional-npm-installation), substitute
 `npx --no-install syndicord` for `npm run syndicord --`.
@@ -177,6 +184,10 @@ together for recovery.
 
 ## Add feeds and routing
 
+With `DISCORD_AUTH_POLICY`, use the
+[catalog and subscription controls](PERMISSIONS.md#feeds-and-subscriptions). The
+following whole-configuration flow applies only to single-role installations.
+
 1. In Discord, open the destination channel's **Edit Channel → Integrations →
    Webhooks**, create a webhook, and copy its URL.
 2. In syndicord, add that webhook with a short destination name.
@@ -205,7 +216,7 @@ them atomically. Deployments preserve configuration and secrets.
 
 | Symptom                             | Check                                                                                               |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Administration disabled             | All six Worker settings, numeric IDs, callback origin/path, and applied migrations                  |
+| Administration disabled             | OAuth/key settings, valid policy or server/role pair, callback origin/path, and migrations          |
 | Discord rejects the callback        | The exact registered redirect matches `DISCORD_REDIRECT_URI` and the origin used in the browser/CLI |
 | Access denied                       | The signed-in account belongs to the configured server and has the exact configured role ID         |
 | Sign-in expired or already used     | Start sign-in again; callbacks and CLI grants are single use                                        |
@@ -241,7 +252,7 @@ advertises S256 support. It queries
 [the current user's guild membership](https://docs.discord.com/developers/resources/user#get-current-user-guild-member)
 with the user's access token and checks role IDs. See
 [Discord OAuth2](https://docs.discord.com/developers/topics/oauth2) for the
-scopes and flow. These references were checked on 2026-11-21.
+scopes and flow. These references were checked on 2026-11-22.
 
 Syndicord owns revocable D1 sessions with opaque tokens, bounded lifetimes, and
 Secure HttpOnly SameSite cookies in production. Discord access tokens are

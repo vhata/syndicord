@@ -1,6 +1,7 @@
 # Relay behavior
 
-Each configured RSS or Atom feed has one or more named Discord destinations.
+Each subscribed RSS or Atom feed has one or more Discord destinations. A scoped
+catalog can also retain feeds without subscriptions; those feeds are not polled.
 Webhook URLs are secrets. Each new entry produces one message per destination,
 containing the original title, link, and a short description.
 
@@ -37,12 +38,20 @@ entry with the same identity do not send another message.
 Pending deliveries retain their message data even after entries disappear from a
 feed. Destinations succeed and retry independently. Removed feeds and
 destinations stop receiving deliveries; restoring the same configuration resumes
-their pending deliveries. A renamed destination starts a new baseline.
+their pending deliveries. In single-role mode, a renamed destination starts a
+new baseline. Scoped destination labels can change without affecting their
+immutable delivery keys. Scoped feed URLs cannot change; a replacement source
+needs a separate feed and explicit subscriptions.
 
 Invalid or inaccessible webhooks (HTTP 401, 403, or 404) suspend their
 destination. Replacing its webhook or explicitly resuming it restores delivery;
 pending entries retain their retry times. Rate limits postpone the affected
 destination, or all destinations when Discord reports a global limit.
+
+Scoped delivery verifies the webhook’s current server/channel before sending.
+Lookup failures or changed bindings defer pending messages without sending them.
+See [destination verification](PERMISSIONS.md#destinations-and-webhook-rotation)
+for the separate-request race and recovery behavior.
 
 A durable lease prevents ordinary overlapping polling runs. Delivery records
 change only while the run owns that lease. Failed or ambiguous webhook requests

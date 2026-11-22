@@ -377,6 +377,7 @@ test(
           CONFIG_ENCRYPTION_KEY: Buffer.alloc(32, index + 1).toString('base64'),
         };
         let hasRole = true;
+        let policy: string | undefined;
         const runtimeOptions = (redirectUri: string) =>
           convertV4MiniflareOptions({
             modules: true,
@@ -395,7 +396,11 @@ test(
             host: '127.0.0.1',
             port: 0,
             d1Databases: { DB: `package-admin-${index}` },
-            bindings: { ...authBindings, DISCORD_REDIRECT_URI: redirectUri },
+            bindings: {
+              ...authBindings,
+              DISCORD_REDIRECT_URI: redirectUri,
+              ...(policy ? { DISCORD_AUTH_POLICY: policy } : {}),
+            },
             outboundService: async (request) => {
               if (request.url === 'https://discord.com/api/oauth2/token') {
                 const body = new URLSearchParams(await request.text());
@@ -420,6 +425,19 @@ test(
               )
                 return Response.json({
                   roles: hasRole ? [authBindings.DISCORD_ROLE_ID] : [],
+                });
+              const webhook = /^\/api\/v10\/webhooks\/(\d+)\//.exec(
+                new URL(request.url).pathname,
+              );
+              if (policy && webhook && request.method === 'GET')
+                return Response.json({
+                  id: webhook[1],
+                  type: 1,
+                  guild_id: authBindings.DISCORD_GUILD_ID,
+                  channel_id:
+                    webhook[1] === '100000000000000099'
+                      ? '100000000000000007'
+                      : '100000000000000006',
                 });
               outboundRequests++;
               return new Response(
@@ -547,6 +565,86 @@ test(
         });
         assert.equal(denied.status, 403);
         hasRole = true;
+        if (index === 1) {
+          policy = JSON.stringify({
+            version: 1,
+            grants: [
+              {
+                guildId: authBindings.DISCORD_GUILD_ID,
+                roleId: authBindings.DISCORD_ROLE_ID,
+                addFeeds: true,
+                channelIds: ['100000000000000006', '100000000000000007'],
+              },
+            ],
+          });
+          await runtime.setOptions({
+            ...runtimeOptions(`${adminOrigin}/admin/auth/callback`),
+            port: Number(new URL(adminOrigin).port),
+          });
+          const scopedBrowser = await installedLogin(
+            executable,
+            hostile,
+            apiEnvironment,
+          );
+          await admin(['catalog', 'initialize']);
+          await admin(['catalog', 'add', '--file', '-'], {
+            input: JSON.stringify({
+              label: 'Private catalog source',
+              url: 'https://catalog.example/feed?secret=package-private-source',
+            }),
+          });
+          const catalog = JSON.parse(
+            (await admin(['catalog', 'list'])).stdout,
+          ) as { id: string }[];
+          assert.equal(catalog.length, 1);
+          assert.doesNotMatch(
+            JSON.stringify(catalog),
+            /package-private-source|catalog\.example/,
+          );
+          await admin(['destinations', 'register', '--file', '-'], {
+            input: JSON.stringify({
+              label: 'Scoped target',
+              webhookUrl:
+                'https://discord.com/api/webhooks/100000000000000099/scoped-package-token',
+            }),
+          });
+          const destinations = JSON.parse(
+            (await admin(['destinations', 'list'])).stdout,
+          ) as { id: string; label: string }[];
+          const scopedTarget = destinations.find(
+            (value) => value.label === 'Scoped target',
+          )!;
+          assert.ok(scopedTarget);
+          await admin([
+            'subscriptions',
+            'add',
+            catalog[0]!.id,
+            scopedTarget.id,
+          ]);
+          assert.deepEqual(
+            JSON.parse((await admin(['subscriptions', 'list'])).stdout),
+            [{ feedId: catalog[0]!.id, destinationId: scopedTarget.id }],
+          );
+          const scopedSnapshot = await scopedBrowser('/admin/api/catalog');
+          assert.equal(scopedSnapshot.status, 200);
+          assert.doesNotMatch(
+            await scopedSnapshot.text(),
+            /package-private-source|scoped-package-token/,
+          );
+          assert.match(
+            (
+              await admin(['feeds', 'set', '--file', '-'], {
+                input: '[]',
+                status: 2,
+              })
+            ).stderr,
+            /catalog|scoped/i,
+          );
+          hasRole = false;
+          assert.equal((await scopedBrowser('/admin/api/catalog')).status, 403);
+          await admin(['catalog', 'list'], { status: 2 });
+          hasRole = true;
+        }
       }
       assert.deepEqual(
         JSON.parse(

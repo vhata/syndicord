@@ -82,12 +82,15 @@ fresh installation has no feeds, so polling remains idle until configured.
 ## Enable configuration access
 
 Follow [administration setup](WEB.md#enable-administration) to register the
-Discord application, choose the allowed server and role, and configure OAuth and
-the encryption key. Choose the Cloudflare dashboard steps or CLI commands in
-that guide. Keep the key in your password manager; it is needed to read the
-encrypted webhook URLs in D1.
+Discord application, choose [scoped role grants](PERMISSIONS.md) or one
+administrator server/role pair, and configure OAuth and the encryption key.
+Choose the Cloudflare dashboard steps or CLI commands in that guide. Keep the
+key in your password manager; it is needed to read the encrypted webhook URLs in
+D1.
 
-Use either client, or switch between them at any time:
+For scoped role grants, initialize the catalog and follow the
+[feed and subscription flow](PERMISSIONS.md#feeds-and-subscriptions). For a
+single-role installation, use either client:
 
 - **Web interface:** open the Worker's `/admin` address, sign in with Discord,
   add webhook destinations and feeds, then save.
