@@ -40,9 +40,22 @@ bash scripts/setup.sh
 
 For a queued task, use its existing slug and `todo` or `review` instead of
 `task`. Work in that worktree, update the relevant docs, and commit coherent
-changes. Open a draft PR through GitHub's **Pull requests → New pull request**
-(select **Create draft pull request**) or `gh pr create --draft`. Follow the PR
-template; its title and description become the squash commit message.
+changes. Publish the branch before opening a PR:
+
+- **With repository write access:** run `git push -u origin HEAD`.
+- **Without write access:** choose **Fork** on GitHub, then run
+  `git remote add fork https://github.com/YOUR_USERNAME/syndicord.git`.
+  Alternatively, `gh repo fork --remote --remote-name fork` creates the fork and
+  adds that remote. Then publish with `git push -u fork HEAD`.
+
+On the upstream repository, choose **Pull requests → New pull request**, select
+`main` as the base and your published branch as the compare branch, then
+**Create draft pull request**. For a fork, use **compare across forks** to
+select it; see
+[GitHub's fork PR guide](https://docs.github.com/en/pull-requests/how-tos/create-pull-requests/creating-a-pull-request-from-a-fork).
+Or run `gh pr create --draft --repo vhata/syndicord --base main` from the
+worktree. Follow the PR template; its title and description become the squash
+commit message.
 
 Run the checks and obtain an independent review. Resolve findings, then mark the
 PR ready for review. The repository owner handles final review, merging,
