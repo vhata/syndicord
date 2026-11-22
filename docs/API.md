@@ -177,9 +177,10 @@ Otherwise, use Discord's **Edit Channel → Integrations → Webhooks** page; th
 API alternative requires the bot credentials.
 
 The following Bash snippet creates one webhook and saves its URL under the
-`updates` destination in a new `.webhooks.json`. It refuses to overwrite an
-existing file. Bot tokens are entered without echo; the credential response is
-kept in a private temporary file and deleted afterwards:
+`updates` key in a new `.webhooks.json`, using the single-role mapping format.
+It refuses to overwrite an existing file. Bot tokens are entered without echo;
+the credential response is kept in a private temporary file and deleted
+afterwards:
 
 ```bash
 (
@@ -207,8 +208,17 @@ kept in a private temporary file and deleted afterwards:
 
 This creates a webhook but sends no Discord message. If creation has an
 uncertain outcome, inspect the channel's webhooks before repeating it. Save the
-URL in your password manager, then
-[configure the destination](OPERATIONS.md#add-or-change-webhooks) with
-`npm run syndicord -- webhooks set --file .webhooks.json`, or enter its URL in
-the web interface. Delete the temporary `.webhooks.json` afterwards.
+URL in your password manager, then choose your installation's access model:
+
+- **Single-role:**
+  [Configure the destination](OPERATIONS.md#add-or-change-webhooks) with
+  `npm run syndicord -- webhooks set --file .webhooks.json`, or enter the URL in
+  the web interface.
+- **Scoped:** Copy the URL from the file's `updates` value and
+  [register a destination](OPERATIONS.md#2-register-a-destination) in the web
+  interface or with `destinations register`. That command takes a label and
+  `webhookUrl`; scoped installations reject the single-role mapping and
+  `webhooks set` command.
+
+Delete the temporary `.webhooks.json` afterwards.
 [Discord webhook API](https://docs.discord.com/developers/resources/webhook#create-webhook)
