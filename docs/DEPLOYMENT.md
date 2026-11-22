@@ -2,7 +2,7 @@
 
 Optional: use this when you want pushes to your repository's `main` branch to
 update the running service. Complete [first deployment](SETUP.md) first. Feed
-and webhook edits use [syndicord](OPERATIONS.md) and never need a GitHub change.
+and webhook edits use [syndicord](USAGE.md) and never need a GitHub change.
 
 > **Once configured, pushes to `main` deploy automatically after checks pass.**
 > Merging a pull request into `main` therefore updates the running Worker;

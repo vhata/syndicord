@@ -1,6 +1,6 @@
 # Relay behavior
 
-[Documentation](README.md) · [Manage feeds](OPERATIONS.md) · [Status](STATUS.md)
+[Documentation](README.md) · [Manage feeds](USAGE.md) · [Status](STATUS.md)
 
 Each subscribed RSS or Atom feed has one or more Discord destinations. A scoped
 catalog can also retain feeds without subscriptions; those feeds are not polled.

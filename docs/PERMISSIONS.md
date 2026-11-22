@@ -1,12 +1,14 @@
 # Scoped Discord permissions
 
-**For operators configuring access.** To add feeds, destinations, or
-subscriptions, use the [everyday guide](OPERATIONS.md#scoped-access).
+**For the person who hosts syndicord and configures editing access.** To add
+feeds, destinations, or subscriptions, use the
+[everyday guide](USAGE.md#scoped-access).
 
-An operator can delegate the shared feed catalog and individual Discord channels
-to different roles. Sign in once; syndicord combines the grants for every
-configured server/role pair you match. The browser and CLI use the same server
-checks. Discord roles cannot edit Worker secrets or the authorization policy.
+As the installation owner, you can delegate the shared feed catalog and
+individual Discord channels to different roles. Sign in once; syndicord combines
+the grants for every configured server/role pair you match. The browser and CLI
+use the same server checks. Discord roles cannot edit Worker secrets or the
+authorization policy.
 
 ## Configure access
 
@@ -52,8 +54,8 @@ grants, 16 servers, and 64 channels per grant within 16 KiB of JSON. An empty
 2. In **Cloudflare Dashboard → Workers & Pages → your Worker → Settings →
    Variables and Secrets**, add `DISCORD_AUTH_POLICY` as a **Secret**, paste the
    JSON, and deploy the setting.
-3. Sign in to `/admin` again and choose **Verify and initialize catalog**, or
-   use the CLI with the Worker origin (without `/admin`):
+3. Sign in to the web editor again and choose **Verify and initialize catalog**,
+   or use the CLI with the Worker origin (without `/admin`):
 
    ```sh
    export SYNDICORD_ADMIN_URL='https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev'
@@ -68,14 +70,14 @@ npm run syndicord -- cf workers secrets update DISCORD_AUTH_POLICY \
   --worker "$SYNDICORD_WORKER_NAME" --type secret_text
 ```
 
-Only operators with Cloudflare access configure this secret. A present policy
-replaces the single-server gate; it never adds that gate's broad permissions.
-Invalid policy JSON disables administration. Policy changes invalidate existing
-sessions. Remove roles or server membership to revoke their grants: every read
-and mutation checks Discord, and mutations check again after uploads and webhook
-lookups. Discord outages, rate limits, or malformed membership responses block
-access until verification succeeds. Existing routes continue after management
-access is revoked.
+Configuring this secret requires access to the installation’s Cloudflare
+account. A present policy replaces the single-server gate; it never adds that
+gate's broad permissions. Invalid policy JSON disables administration. Policy
+changes invalidate existing sessions. Remove roles or server membership to
+revoke their grants: every read and mutation checks Discord, and mutations check
+again after uploads and webhook lookups. Discord outages, rate limits, or
+malformed membership responses block access until verification succeeds.
+Existing routes continue after management access is revoked.
 
 ## Initialize an existing installation
 
@@ -88,16 +90,16 @@ immediately; it does not change existing deliveries.
 imports all existing feeds, destinations, and subscriptions in one atomic save.
 This reads webhook metadata without sending messages. The initializer cannot
 supply new URLs, target claims, or replacement routes. Any signed-in account
-with a policy grant can perform this copy; only the operator can enable the
-policy itself.
+with a policy grant can perform this copy; enabling the policy itself requires
+Cloudflare access.
 
 If any webhook is unavailable, invalid, or uses `thread_id`, initialization
 fails without changing the saved configuration. Repair that configuration before
-activation; an operator may remove the policy to use the original editor while
-no catalog has been initialized. Existing relay delivery continues in that
-state. After successful initialization, removing the policy disables catalog
-administration; it never restores unrestricted access through the old API.
-Restore a valid policy to manage the catalog again.
+activation; the installation owner may remove the policy to use the original
+editor while no catalog has been initialized. Existing relay delivery continues
+in that state. After successful initialization, removing the policy disables
+catalog administration; it never restores unrestricted access through the old
+API. Restore a valid policy to manage the catalog again.
 
 Import preserves the delivery keys, baselines, pending messages, and sent
 history. Subsequent label changes also preserve those identities. Catalog
@@ -129,23 +131,24 @@ is kept in the catalog without being polled. Removing all subscriptions pauses
 polling and delivery; a run already in progress may finish using its snapshot.
 
 For the browser steps, JSON input examples, and CLI commands, see
-[manage feeds and channels](OPERATIONS.md#scoped-access). Both clients offer
-adding, renaming, deleting unused feeds, and adding/removing subscriptions.
+[manage feeds and channels](USAGE.md#scoped-access). Both clients offer adding,
+renaming, deleting unused feeds, and adding/removing subscriptions.
 Secret-bearing input files accept `--file -`; back up URLs privately and delete
 temporary files after use.
 
 ## Destinations and webhook rotation
 
-Follow [register a destination](OPERATIONS.md#2-register-a-destination) for
-browser and CLI steps, and
-[change or remove something](OPERATIONS.md#change-or-remove-something) for
-rotation, renaming, and deletion. The guarantees below explain those rules.
+Follow [register a destination](USAGE.md#2-register-a-destination) for browser
+and CLI steps, and
+[change or remove something](USAGE.md#change-or-remove-something) for rotation,
+renaming, and deletion. The guarantees below explain those rules.
 
 Syndicord uses Discord's
 [webhook-token lookup](https://docs.discord.com/developers/resources/webhook#get-webhook-with-token)
 to verify the actual server/channel. Registration succeeds only inside your
-granted channel scope. It does not send a message or require separate operator
-approval. Saved credentials remain encrypted and are never returned.
+granted channel scope. It does not send a message or require separate approval
+from the installation owner. Saved credentials remain encrypted and are never
+returned.
 
 Destinations have immutable IDs and server/channel bindings; labels are
 editable. Rotation verifies that the target is unchanged. To route to a
@@ -175,4 +178,4 @@ Automated coverage uses local D1 and synthetic Discord responses. Hosted
 acceptance needs real accounts with different grants: verify combined roles,
 unrelated-channel denials, role removal, registration and rotation, explicit
 source adoption, and a moved webhook. Deployment, real webhook messages, and
-Cloudflare changes remain operator actions.
+Cloudflare changes remain tasks for the installation owner.

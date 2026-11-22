@@ -17,8 +17,8 @@ Ordinary follow-ups live here; promoted codebase-review findings live in
 - [RELAY] `busy-feed-delivery-policy` — **Design predictable delivery for busy feeds and document the reasons for polling limits.** Bursts and sustained traffic can outpace the shared delivery budget, while longer feed rotations can miss entries before they are observed.
   - Source: User request, PR #25 and `task/docs-navigation`, 2026-11-22
   - Starting point: `docs/BEHAVIOR.md#polling-limits`, `src/runner.ts`, `src/ledger.ts`, `src/http.ts`, `src/feed.ts`, and status reporting.
-  - Decide pacing, batching or digests, ordering and fairness across feeds/destinations, retry and Discord cooldown interactions, and what happens to an excessive backlog; make any coalescing or dropped entries explicit to operators.
-  - Assess polling cadence versus source retention, configuration and feed-size bounds, request/run deadlines, provider quotas, and growth of retained identities and pending payloads. Explain which limits protect runtime resources or correctness, how operators recognize approaching them, and the trade-offs of making them configurable or retaining less history.
+  - Decide pacing, batching or digests, ordering and fairness across feeds/destinations, retry and Discord cooldown interactions, and what happens to an excessive backlog; make any coalescing or dropped entries explicit to installation owners and feed/channel administrators.
+  - Assess polling cadence versus source retention, configuration and feed-size bounds, request/run deadlines, provider quotas, and growth of retained identities and pending payloads. Explain which limits protect runtime resources or correctness, how installation owners recognize approaching them, and the trade-offs of making them configurable or retaining less history.
   - Related: `initial-feed-entries`
 
 - [RELAY] `web-admin-security` — **Review remaining administration request boundaries and secret/key lifecycle.** Discord authentication, revocable sessions, and server/role authorization are implemented; assess any additional controls separately without broadening this authentication change.

@@ -1,8 +1,8 @@
 # Set up an installation
 
 This guide is for the person hosting syndicord. If someone has already set it
-up, ask them for its `/admin` address and start with
-[managing feeds](OPERATIONS.md).
+up, ask them for a link to the web editor and start with
+[managing feeds](USAGE.md).
 
 You need a Cloudflare account, permission to manage roles and webhooks in your
 Discord server, and Node.js 26.12 or newer in the 26.x line with npm 11. An
@@ -123,9 +123,10 @@ and choose who can edit:
 
 For scoped roles,
 [configure the policy and initialize the catalog](PERMISSIONS.md#configure-access).
-For either model, open `/admin`, sign in, and follow
-[managing feeds](OPERATIONS.md) to add a destination and feed using the web
-interface or CLI.
+For either model, open the web editor using the link from
+[sign-in setup](WEB.md#configure-the-worker), sign in, and follow
+[managing feeds](USAGE.md) to add a destination and feed using the web interface
+or CLI.
 
 In Discord, create the destination webhook under **Edit Channel → Integrations →
 Webhooks**. Use a feed you can publish to for the delivery check, such as your
@@ -180,5 +181,5 @@ For an npm installation, repeat the
 Deployments preserve feeds, webhook URLs, and Worker secrets. You can also
 enable [automatic deployment from GitHub](DEPLOYMENT.md).
 
-[Documentation index](README.md) · [Manage feeds](OPERATIONS.md) ·
+[Documentation index](README.md) · [Manage feeds](USAGE.md) ·
 [Cloudflare database setup](https://developers.cloudflare.com/d1/get-started/)

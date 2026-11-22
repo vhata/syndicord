@@ -2,7 +2,7 @@
 
 Use [setup](SETUP.md) for the normal dashboard and CLI instructions. Routine
 feed and webhook edits use the [web interface](WEB.md) or
-[syndicord CLI](OPERATIONS.md).
+[syndicord CLI](USAGE.md).
 
 Use this optional reference for account-token policies and provider API tasks.
 Normal setup uses [dashboard steps and native CLI commands](SETUP.md). The API
@@ -210,12 +210,11 @@ This creates a webhook but sends no Discord message. If creation has an
 uncertain outcome, inspect the channel's webhooks before repeating it. Save the
 URL in your password manager, then choose your installation's access model:
 
-- **Single-role:**
-  [Configure the destination](OPERATIONS.md#add-or-change-webhooks) with
-  `npm run syndicord -- webhooks set --file .webhooks.json`, or enter the URL in
-  the web interface.
+- **Single-role:** [Configure the destination](USAGE.md#add-or-change-webhooks)
+  with `npm run syndicord -- webhooks set --file .webhooks.json`, or enter the
+  URL in the web interface.
 - **Scoped:** Copy the URL from the file's `updates` value and
-  [register a destination](OPERATIONS.md#2-register-a-destination) in the web
+  [register a destination](USAGE.md#2-register-a-destination) in the web
   interface or with `destinations register`. That command takes a label and
   `webhookUrl`; scoped installations reject the single-role mapping and
   `webhooks set` command.

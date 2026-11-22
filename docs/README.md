@@ -1,28 +1,32 @@
 # Documentation
 
 syndicord sends new RSS and Atom entries to Discord channels. If you only read
-those messages, there is nothing to install. To change what gets posted, ask
-your installation's operator for its `/admin` address and the required Discord
-role.
+those messages, there is nothing to install. To change what gets posted, ask the
+person who hosts syndicord for a link to the web editor and which Discord role
+you need.
 
 ## Choose your starting point
 
 | Your job                       | Start here                                           | You need                                                                 |
 | ------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------ |
-| Manage feeds and channels      | [Everyday guide](OPERATIONS.md)                      | The installation address and an authorized Discord account               |
+| Manage feeds and channels      | [Using syndicord](USAGE.md)                          | A link to the web editor and an authorized Discord account               |
 | Host an installation           | [First deployment](SETUP.md)                         | Cloudflare access, a Discord application, and a place to run the CLI     |
 | Grant or remove editing access | [Sign-in and access](WEB.md#grant-and-revoke-access) | Discord server administration; Cloudflare access to change the policy    |
 | Develop or contribute          | [Developer quick start](DEVELOPMENT.md)              | Git, the pinned Node.js version, and npm; no cloud credentials for tests |
 
 A feed administrator adds shared sources; a channel administrator chooses what
-reaches their channels. An **operator** owns the Cloudflare installation and
-sets up access. A small installation can give one Discord role all editing
-permissions; [scoped roles](PERMISSIONS.md) let several groups share it.
+reaches their channels. The **installation owner** is the person who hosts
+syndicord, manages its Cloudflare resources, and sets up access. A feed or
+channel administrator does not need Cloudflare access. A small installation can
+give one Discord role all editing permissions; [scoped roles](PERMISSIONS.md)
+let several groups share it.
 
 ## Run an installation
 
-Follow [setup](SETUP.md) once, then use [the everyday guide](OPERATIONS.md) to
-manage content. These references cover the other common jobs:
+Follow [setup](SETUP.md) once, then use [the everyday guide](USAGE.md) to manage
+content. [Running an installation](OPERATIONS.md) covers selecting its
+Cloudflare resources and finding maintenance tasks. These references cover the
+other common jobs:
 
 | Task                                                            | Guide                                       |
 | --------------------------------------------------------------- | ------------------------------------------- |

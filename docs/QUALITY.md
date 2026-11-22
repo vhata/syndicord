@@ -135,13 +135,13 @@ registry release.
   passing main run.
 
 Local tests establish neither hosted CPU headroom nor real Discord delivery.
-Those require the explicit operator checks in [setup](SETUP.md#verify-delivery)
-and [status](STATUS.md).
+Those require the checks run by the person hosting syndicord in
+[setup](SETUP.md#verify-delivery) and [status](STATUS.md).
 
 ## Review inputs
 
 Read [relay behavior](BEHAVIOR.md), the [source layout](DEVELOPMENT.md#layout),
-and the operator guides for [setup](SETUP.md), [configuration](OPERATIONS.md),
+and the guides for [setup](SETUP.md), [configuration](USAGE.md),
 [deployment](DEPLOYMENT.md), [status](STATUS.md), and [recovery](RECOVERY.md).
 
 Focus on these boundaries:

@@ -1,8 +1,9 @@
 # Operational status
 
-**For operators with Cloudflare access.** If you manage feeds through Discord
-roles, ask the operator to run this check. For live logs and CPU errors, use
-**Cloudflare → Workers & Pages → your Worker → Logs → Live** and **Metrics**, or
+**Requires access to the installation’s Cloudflare account.** If you only manage
+feeds or channels, ask the person who hosts syndicord to run this check. For
+live logs and CPU errors, use **Cloudflare → Workers & Pages → your Worker →
+Logs → Live** and **Metrics**, or
 [tail events in the CLI](RECOVERY.md#inspect-a-run). The status report below
 summarizes saved D1 health; it is not a live delivery test.
 
@@ -28,8 +29,8 @@ resumes a suspended destination.
 
 Deployment applies migrations. A fresh installation has no feeds and reports
 `disabled`. Add configuration through [the web interface](WEB.md) or
-[CLI](OPERATIONS.md). Until the Worker records completed polls, active feeds
-have status `unknown`; older delivery history does not establish current health.
+[CLI](USAGE.md). Until the Worker records completed polls, active feeds have
+status `unknown`; older delivery history does not establish current health.
 
 ## Reading the report
 
@@ -64,7 +65,7 @@ single-role mode, this is `npm run syndicord -- feeds get`. In scoped mode,
 unrouted feeds are omitted and these indices are **not catalog IDs**; the bulk
 `feeds get` command is unavailable. Destination names in this report are ledger
 keys, which may differ from scoped labels and IDs. Use the
-[operator recovery notes](RECOVERY.md#inspect-a-run) when matching records. Only
+[recovery notes](RECOVERY.md#inspect-a-run) when matching records. Only
 hostnames are printed; feed paths/query strings, webhook URLs, fingerprints, and
 message payloads are not included.
 

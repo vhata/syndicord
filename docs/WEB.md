@@ -1,15 +1,14 @@
 # Configure Discord sign-in
 
-For installation owners. To use an existing installation, start with
-[managing feeds](OPERATIONS.md). [First deployment](SETUP.md) brings you here
-once the Worker is running.
+For the person who hosts syndicord and manages its Cloudflare resources. To use
+an existing installation, start with [managing feeds](USAGE.md).
+[First deployment](SETUP.md) brings you here once the Worker is running.
 
-People open **`/admin`** on the Worker's HTTPS address and sign in with Discord.
-Access requires membership in an operator-configured Discord role. Use
-[scoped permissions](PERMISSIONS.md) to combine roles across servers and
-delegate individual destination channels. Without a policy, one configured
-server/role pair administers all configuration. The
-[syndicord CLI](OPERATIONS.md) signs in through the browser and edits the same
+People sign in to the web editor with Discord. You choose which Discord roles
+can edit feeds and channels. Use [scoped permissions](PERMISSIONS.md) to combine
+roles across servers and delegate individual destination channels. Without a
+policy, one configured server/role pair administers all configuration. The
+[syndicord CLI](USAGE.md) signs in through the browser and edits the same
 configuration through the same API. Changes apply on the next scheduled poll.
 
 ## Enable administration
@@ -110,10 +109,15 @@ For scoped access, use `DISCORD_AUTH_POLICY` instead of `DISCORD_GUILD_ID` and
 For the [npm-installed CLI](SETUP.md#optional-npm-installation), substitute
 `npx syndicord` for `npm run syndicord --`.
 
-Visit the Worker's `/admin` address and sign in. Its Cloudflare overview shows
-its HTTPS address. An authorized account sees its Discord identity, a **Sign
-out** control, and the editor. An account without the configured membership or
-role receives an explanation and can sign out or try another Discord account.
+Open **Cloudflare Dashboard → Workers & Pages → your Worker** and copy its HTTPS
+address. Add `/admin` to make the web-editor link, for example
+`https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev/admin`. Share this complete link
+with the people who will manage feeds and channels.
+
+Open the link in your browser and sign in. An authorized account sees its
+Discord identity, a **Sign out** control, and the editor. An account without the
+configured membership or role receives an explanation and can sign out or try
+another Discord account.
 
 ## CLI login
 
@@ -176,8 +180,8 @@ together for recovery.
 
 ## Add feeds and routing
 
-Use [managing feeds](OPERATIONS.md) for the web and CLI steps in either access
-model. Feed changes apply on the next scheduled poll without a deployment. New
+Use [managing feeds](USAGE.md) for the web and CLI steps in either access model.
+Feed changes apply on the next scheduled poll without a deployment. New
 feed/destination pairs establish a silent baseline before delivering posts. See
 [delivery behavior](BEHAVIOR.md) for retries and configuration changes.
 
@@ -273,5 +277,5 @@ callback queries. Browser writes require the same origin; CLI writes
 authenticate with the CLI's separate bearer session. Server-side authorization
 covers both the editor and the shared configuration API.
 
-[Documentation index](README.md) · [Manage feeds](OPERATIONS.md) ·
+[Documentation index](README.md) · [Manage feeds](USAGE.md) ·
 [Scoped permissions](PERMISSIONS.md)

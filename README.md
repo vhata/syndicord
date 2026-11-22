@@ -7,7 +7,7 @@
 <p align="center"><strong>Your feeds. In the conversation.</strong><br>RSS and Atom updates, delivered to Discord.</p>
 
 <p align="center">
-  <a href="docs/OPERATIONS.md">Use syndicord</a> ·
+  <a href="docs/USAGE.md">Use syndicord</a> ·
   <a href="docs/SETUP.md">Host an installation</a> ·
   <a href="docs/DEVELOPMENT.md">Development</a>
 </p>
@@ -24,7 +24,7 @@ to the same installation, and changes need no code deployment.
 
 | I want to…                                      | Read                                                                    |
 | ----------------------------------------------- | ----------------------------------------------------------------------- |
-| Add feeds or choose which channels receive them | [Manage feeds and channels](docs/OPERATIONS.md)                         |
+| Add feeds or choose which channels receive them | [Manage feeds and channels](docs/USAGE.md)                              |
 | Host syndicord for my community                 | [First deployment](docs/SETUP.md)                                       |
 | Give people access to manage it                 | [Sign-in and access](docs/WEB.md) · [Scoped roles](docs/PERMISSIONS.md) |
 | Check why updates have stopped                  | [Status](docs/STATUS.md) · [Troubleshooting](docs/RECOVERY.md)          |
@@ -46,7 +46,7 @@ does not post the old backlog**. Subsequent checks send new entries. By default,
 one feed is checked each minute and destinations retry independently. See
 [delivery behavior](docs/BEHAVIOR.md) for timing, limits, and retry details.
 
-See the [documentation index](docs/README.md) for operator references, optional
+See the [documentation index](docs/README.md) for hosting references, optional
 GitHub deployment, architecture, and contribution guidance.
 
 ## License

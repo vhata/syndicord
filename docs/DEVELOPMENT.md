@@ -138,8 +138,8 @@ npm run syndicord -- login
 ```
 
 The browser editor and CLI both connect to the development Worker and edit the
-same local D1 database. Use [the feed-management guide](OPERATIONS.md) to add
-feeds and destinations.
+same local D1 database. Use [the feed-management guide](USAGE.md) to add feeds
+and destinations.
 
 `npm run db:migrate:local` always passes `--local`, even if invoked in CI. The
 CI test job also uses local fixtures. Production deployment uses a separate
@@ -190,7 +190,7 @@ with the earlier commands. Keep the encryption key that belongs to each dataset.
 | `src/config-store.ts`         | Installation configuration in D1                        |
 | `src/admin.ts`                | Authorized configuration HTTP endpoints                 |
 | `src/admin-auth.ts`           | Discord OAuth, role checks, and application sessions    |
-| `src/admin-policy.ts`         | Operator-owned grants and exact channel scopes          |
+| `src/admin-policy.ts`         | Authorization grants and exact channel scopes           |
 | `src/catalog-store.ts`        | Scoped catalog operations and atomic relay projection   |
 | `src/webhook-verification.ts` | Bounded Discord destination verification                |
 | `src/admin-store.ts`          | Encrypted webhook configuration and atomic API saves    |

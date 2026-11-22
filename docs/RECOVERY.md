@@ -1,8 +1,8 @@
 # Troubleshooting and recovery
 
-**For installation operators.** Start with [status](STATUS.md), then follow the
-row that matches the symptom. Everyday feed edits are in
-[manage feeds and channels](OPERATIONS.md).
+**For the person who hosts syndicord and manages its Cloudflare resources.**
+Start with [status](STATUS.md), then follow the row that matches the symptom.
+Everyday feed edits are in [manage feeds and channels](USAGE.md).
 
 | Symptom or task                          | Start here                                                            |
 | ---------------------------------------- | --------------------------------------------------------------------- |
@@ -17,8 +17,8 @@ row that matches the symptom. Everyday feed edits are in
 Select the installation as described in
 [Cloudflare operations](OPERATIONS.md#select-a-cloudflare-installation). Feed
 and webhook commands also need the
-[configuration API selection](OPERATIONS.md#select-an-installation). For
-optional GitHub deployment commands, select its repository:
+[configuration API selection](USAGE.md#select-an-installation). For optional
+GitHub deployment commands, select its repository:
 
 ```sh
 export GH_REPO='YOUR_OWNER/YOUR_REPOSITORY'
@@ -48,12 +48,12 @@ limit. Pending deliveries remain available after fetch or delivery failures.
 
 Feed indices refer to the zero-based active route list, not catalog IDs. In
 single-role mode, inspect it with `npm run syndicord -- feeds get`. In scoped
-mode, an operator can inspect `relay_configuration` in **Cloudflare → Storage &
-databases → D1 → your database → Console**: `feeds` contains the active route
-list; `catalog` maps source URLs and each destination's `deliveryKey` to catalog
-IDs and labels. These fields can contain private feed URLs; do not share their
-raw contents. Scoped list commands intentionally hide source URLs and do not
-expose delivery keys.
+mode, someone with Cloudflare access can inspect `relay_configuration` in
+**Cloudflare → Storage & databases → D1 → your database → Console**: `feeds`
+contains the active route list; `catalog` maps source URLs and each
+destination's `deliveryKey` to catalog IDs and labels. These fields can contain
+private feed URLs; do not share their raw contents. Scoped list commands
+intentionally hide source URLs and do not expose delivery keys.
 
 To inspect hosted delivery counts without reading message payloads, run this SQL
 in that D1 console, or use the CLI command below:
@@ -72,10 +72,10 @@ Add `--local` to inspect local development state instead.
 
 ## Resume a suspended destination
 
-[Rotate the webhook](OPERATIONS.md#change-or-remove-something) in scoped mode,
-or [replace its URL](OPERATIONS.md#add-or-change-webhooks) in single-role mode,
-and update its backup. A changed URL clears suspension and its destination
-cooldown on the next poll; pending entries retain their retry times.
+[Rotate the webhook](USAGE.md#change-or-remove-something) in scoped mode, or
+[replace its URL](USAGE.md#add-or-change-webhooks) in single-role mode, and
+update its backup. A changed URL clears suspension and its destination cooldown
+on the next poll; pending entries retain their retry times.
 
 If you repaired permissions without changing the URL, save this as `resume.sql`,
 replacing `updates` with the exact **Destination** key printed by `status`. For
