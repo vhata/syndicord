@@ -4,6 +4,10 @@ Optional: use this when you want pushes to your repository's `main` branch to
 update the running service. Complete [first deployment](SETUP.md) first. Feed
 and webhook edits use [syndicord](OPERATIONS.md) and never need a GitHub change.
 
+> **Once configured, pushes to `main` deploy automatically after checks pass.**
+> Merging a pull request into `main` therefore updates the running Worker;
+> subsequent updates need no separate manual deployment command.
+
 The included **CI** workflow (`.github/workflows/check.yml`) checks pull
 requests and deploys checked `main` commits using a GitHub environment named
 `production`. These runs consume GitHub Actions and Cloudflare usage under your
@@ -115,7 +119,7 @@ gh run view RUN_ID --web
 Confirm **Check**, **Queue and PR hygiene**, and **Deploy production** succeed.
 The summary's **Deployed commit** and **Worker version** should identify the
 expected deployment. If the summary says **Skipped** because `main` advanced,
-inspect the newer run. Subsequent pushes to `main` deploy automatically.
+inspect the newer run.
 
 For terminal logs, use `gh run view RUN_ID --log`, or `--log-failed` for a
 failed run. Missing credentials or identifiers stop deployment with setup

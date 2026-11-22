@@ -14,11 +14,19 @@ bash scripts/check.sh
 bash docket/scripts/ci.sh
 ```
 
-Setup installs pinned dependencies, builds the CLI and Worker, and installs
-commit hooks. The checks cover formatting, lint, types, tests, npm installation,
-and documentation links. They use fixture feeds, fake Discord responses, and
-local databases: **no Cloudflare account or Discord credentials are needed**.
-They require npm registry access and permission to bind local loopback ports.
+- `scripts/setup.sh` installs pinned dependencies, builds the CLI and Worker,
+  and installs commit hooks.
+- `scripts/check.sh` checks formatting, lint, types, source/runtime tests, and
+  npm installation.
+- `docket/scripts/ci.sh` checks the TODO and review queues for valid entries and
+  checks relative documentation links and anchors. On GitHub pull requests, it
+  also checks the PR description's queue markers. When run locally as above,
+  `no PR set, markers skipped` is expected; it runs the local checks without
+  starting a GitHub Actions run or deploying.
+
+The tests use fixture feeds, fake Discord responses, and local databases: **no
+Cloudflare account or Discord credentials are needed**. They require npm
+registry access and permission to bind local loopback ports.
 
 Run setup again when dependencies change, and in each new worktree. Use
 `npm test` for the source/runtime tests while working; run both check scripts
@@ -33,8 +41,28 @@ directly requested change, replace `my-change` with a descriptive name:
 
 ```sh
 bash docket/scripts/claim-check.sh my-change
+```
+
+`claim-check.sh` looks for work already using that name in branches, worktrees,
+and open or merged PRs, so contributors do not duplicate or conflict with work
+already underway or completed. Continue when it reports **no existing claims
+found**. If it finds a claim, coordinate with its owner first; a merged PR may
+mean the work is already done. If it reports **PRs NOT checked**,
+[install GitHub CLI](https://github.com/cli/cli#installation) if needed, sign in
+with `gh auth login`, and rerun it. Resolve any reported errors before
+continuing.
+
+Once the name is free, `start-work.sh` repeats the claim check and creates the
+branch `task/my-change` and its separate working directory (a Git worktree) at
+`.worktrees/task-my-change`. It starts from `origin/main` when available,
+otherwise local `main`, and prints the base and path it used. Enter that
+directory, recheck for competing claims with `--self` (which ignores your own
+branch and worktree), then install its dependencies:
+
+```sh
 bash docket/scripts/start-work.sh task my-change
 cd .worktrees/task-my-change
+bash docket/scripts/claim-check.sh --self my-change
 bash scripts/setup.sh
 ```
 
