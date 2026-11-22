@@ -280,11 +280,11 @@ Each independent installation has its own Worker and D1 database. Check that the
 admin URL and Cloudflare identifiers refer to the intended installation when
 switching between configuration and infrastructure commands.
 
-| Setting                                                          | Authoritative location   |
-| ---------------------------------------------------------------- | ------------------------ |
-| Feed URLs, routing, encrypted webhook URLs                       | D1 `relay_configuration` |
-| Discord OAuth settings, authorization policy, and encryption key | Worker secrets           |
-| Baselines, pending deliveries, and health                        | D1 delivery ledger       |
+| Setting                                                          | Authoritative location    |
+| ---------------------------------------------------------------- | ------------------------- |
+| Feed URLs, routing, encrypted webhook URLs                       | D1 `relay_configuration`  |
+| Discord OAuth settings, authorization policy, and encryption key | Cloudflare Worker secrets |
+| Baselines, pending deliveries, and health                        | D1 delivery ledger        |
 
 ## Polling limits
 

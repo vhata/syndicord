@@ -76,9 +76,9 @@ an existing installation, reuse its database ID and skip creation.
 
 Choose one way to create the database:
 
-- **Dashboard:** Open **Storage & databases → D1 SQL database → Create
-  Database**, name it `syndicord` (or your chosen Worker name), and copy its
-  UUID from the database's page.
+- **Cloudflare Dashboard:** Open **Storage & databases → D1 SQL database →
+  Create Database**, name it `syndicord` (or your chosen Worker name), and copy
+  its UUID from the database's page.
 - **CLI:** Run:
 
   ```sh
@@ -131,7 +131,7 @@ stored values.
 
 Watch the Worker using either method:
 
-- **Dashboard:** Open **Workers & Pages → your Worker → Logs → Live**
+- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Logs → Live**
   ([real-time logs](https://developers.cloudflare.com/workers/observability/logs/real-time-logs/)).
 - **CLI:** Start a live tail:
 

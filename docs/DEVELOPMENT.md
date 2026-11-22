@@ -93,22 +93,41 @@ and review evidence; the contract covers the full workflow.
 ## Run locally
 
 Tests above are the quickest way to exercise the project. For an interactive
-editor, you also need a development Discord application and role:
+editor with Discord sign-in, first follow
+[Register a Discord application](WEB.md#register-a-discord-application) using a
+development application and role. Those steps show where to get the client ID,
+client secret, server ID, and role ID. At the redirect step, register
+`http://localhost:8787/admin/auth/callback` for this local preview.
+
+Then create the private settings file:
 
 ```sh
 cp .dev.vars.example .dev.vars
 ```
 
-Fill in the OAuth settings and a base64-encoded 32-byte `CONFIG_ENCRYPTION_KEY`
-in that private file. Follow
-[administration setup](WEB.md#enable-administration) and register
-`http://localhost:8787/admin/auth/callback` as described in
-[local preview](WEB.md#local-preview). Then start the local database and server:
+Open `.dev.vars` and paste the Discord values you just collected into the
+matching settings. Keep the local callback URL already shown there. Run the
+key-generation command in the file's comments and paste its output into
+`CONFIG_ENCRYPTION_KEY`. Keep that key when reusing the same local database so
+its saved webhooks remain readable. These local settings stay in `.dev.vars`;
+the hosted Worker secret commands in the sign-in guide are for deployments.
+
+The Cloudflare CLI runs a local D1 database on your machine and saves its data
+under `.cloudflare/state/` in this checkout. The migration command below creates
+its tables; the development Worker uses that database for feeds, webhooks,
+sessions, and delivery history. Start with the default local database:
 
 ```sh
+unset SYNDICORD_DATABASE_ID
 npm run db:migrate:local
 npm run dev
 ```
+
+The unset variable selects the built-in ID
+`00000000-0000-4000-8000-000000000001`. This is a fixed identifier for the local
+database; you do not need to create a Cloudflare database or obtain an ID from
+the dashboard. Its data persists between development runs and is separate from
+hosted data and the automated tests' temporary databases.
 
 Open `http://localhost:8787/admin` and sign in. For the CLI, use a second
 terminal in the same checkout:
@@ -118,15 +137,14 @@ export SYNDICORD_ADMIN_URL='http://localhost:8787'
 npm run syndicord -- login
 ```
 
-Both clients edit this local database; use
-[the feed-management guide](OPERATIONS.md) to configure it. Local state lives in
-`.cloudflare/state/`, separately from hosted state and the automated tests'
-temporary databases.
+The browser editor and CLI both connect to the development Worker and edit the
+same local D1 database. Use [the feed-management guide](OPERATIONS.md) to add
+feeds and destinations.
 
-The migration command always uses `--local`. It uses the exported
-`SYNDICORD_DATABASE_ID`, or the built-in local placeholder when absent. Set a
-custom database ID in the shell, not a dotenv file, so migrations and the Worker
-select the same database.
+`npm run db:migrate:local` always passes `--local`, even if invoked in CI. The
+CI test job also uses local fixtures. Production deployment uses a separate
+command to migrate the configured hosted D1 database; see
+[deployment and migration behavior](DEPLOYMENT.md#deployment-and-migration-behavior).
 
 To trigger a local poll, open `http://localhost:8787/cdn-cgi/local/scheduled` in
 a browser, or run:
@@ -138,6 +156,27 @@ curl -fsS 'http://localhost:8787/cdn-cgi/local/scheduled'
 **This uses real feeds and Discord webhooks.** The first successful poll records
 a silent baseline; later polls can send messages. The scheduled-event route is
 provided by the local runtime. Hosted delivery is driven by cron.
+
+### Optional: use a different local database
+
+The default is enough for normal development. To keep a separate local dataset
+in this checkout, stop the development server and choose another UUID, for
+example the one below. Export it in the same terminal before running both
+commands:
+
+```sh
+export SYNDICORD_DATABASE_ID='00000000-0000-4000-8000-000000000002'
+npm run db:migrate:local
+npm run dev
+```
+
+Keep the chosen ID to reopen that dataset later. It identifies another database
+in the local emulator and does not need to match a hosted D1 ID. Set it in the
+shell rather than `.dev.vars` or `.env`: the migration script reads the shell
+variable, and the Worker configuration must receive the same value. Use that
+same export for `npm run syndicord -- status --local` in another terminal. To
+return to the default dataset, stop the server, unset the variable, and restart
+with the earlier commands. Keep the encryption key that belongs to each dataset.
 
 ## Layout
 

@@ -18,7 +18,7 @@ plans.
 Use your own repository, such as a fork, with repository administration access.
 Have the account, database, and Worker identifiers from setup ready.
 
-**Dashboard:** In **your repository → Settings → Environments**, create
+**GitHub Dashboard:** In **your repository → Settings → Environments**, create
 `production`. Under **Deployment branches and tags**, choose **Selected branches
 and tags** and add a **Branch** rule for `main`. Leave **Required reviewers**
 unset if you want automatic deployment. Under **Environment variables**, add:
@@ -64,9 +64,9 @@ Administrator), plus the product permissions you will grant. Choose one path:
 
 ### Create through the dashboard
 
-Open **Manage account → Account API tokens → Create Token**. Select Workers
-**Editor** and D1 **Edit**, and limit the token to the deployment account.
-Create it and copy its complete value.
+In the **Cloudflare Dashboard**, open **Manage account → Account API tokens →
+Create Token**. Select Workers **Editor** and D1 **Edit**, and limit the token
+to the deployment account. Create it and copy its complete value.
 
 ### Create through the CLI
 
@@ -82,8 +82,9 @@ uses native `cf` commands and a JSON policy file. The pinned CLI grants
 
 ## Store the token in GitHub
 
-- **Dashboard:** Under **Settings → Environments → production → Environment
-  secrets → Add secret**, name it `CLOUDFLARE_API_TOKEN` and paste its value.
+- **GitHub Dashboard:** In your repository, under **Settings → Environments →
+  production → Environment secrets → Add secret**, name it
+  `CLOUDFLARE_API_TOKEN` and paste its value.
 - **CLI:** With `GH_REPO` set to your repository, use the hidden value prompt:
 
   ```sh
@@ -97,9 +98,9 @@ uses no local secrets file.
 
 ## Run and inspect deployment
 
-**Dashboard:** Open **Actions → CI** in your repository. Enable workflows if
-prompted, choose **Run workflow**, select `main`, and run it. Open that run to
-see its job logs and summary.
+**GitHub Dashboard:** Open **Actions → CI** in your repository. Enable workflows
+if prompted, choose **Run workflow**, select `main`, and run it. Open that run
+to see its job logs and summary.
 
 **CLI:** With `GH_REPO` set to your repository:
 

@@ -52,6 +52,13 @@ server-administration actions.
 
 ### Configure the Worker
 
+Use the values collected in
+[Register a Discord application](#register-a-discord-application) above. The
+`DISCORD_*` settings below name those same values; `CONFIG_ENCRYPTION_KEY` is a
+separate key you generate here. Save these runtime settings on the Cloudflare
+Worker. GitHub's `production` environment holds the deployment credentials
+described in [automatic deployment](DEPLOYMENT.md).
+
 For CLI commands,
 [select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation)
 first. Choose one way to save the settings below.
@@ -66,11 +73,11 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 | Setting                 | Value                                                                    |
 | ----------------------- | ------------------------------------------------------------------------ |
 | `CONFIG_ENCRYPTION_KEY` | Base64-encoded 32-byte key for saved webhooks and Discord session tokens |
-| `DISCORD_CLIENT_ID`     | Application's numeric client ID                                          |
-| `DISCORD_CLIENT_SECRET` | Application's client secret                                              |
-| `DISCORD_REDIRECT_URI`  | Exact registered `/admin/auth/callback` URL                              |
-| `DISCORD_GUILD_ID`      | Numeric server ID for the single-role mode                               |
-| `DISCORD_ROLE_ID`       | Numeric required role ID for the single-role mode                        |
+| `DISCORD_CLIENT_ID`     | Client ID copied from Discord Developer Portal → OAuth2 (step 2)         |
+| `DISCORD_CLIENT_SECRET` | Client Secret copied from Discord Developer Portal → OAuth2 (step 2)     |
+| `DISCORD_REDIRECT_URI`  | Exact callback URL saved under OAuth2 → Redirects (step 3)               |
+| `DISCORD_GUILD_ID`      | Server ID copied in Discord (step 4), for single-role mode               |
+| `DISCORD_ROLE_ID`       | Role ID copied in Discord (step 4), for single-role mode                 |
 
 - **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
   Variables and Secrets**. Add each setting as a **Secret** using the names
@@ -133,9 +140,10 @@ npm run syndicord -- logout
 
 ## Grant and revoke access
 
-- **Grant:** Invite the person to a configured server separately, then assign
-  its configured role in **Server Settings → Members**. Have them sign in. With
-  a scoped policy, their matching roles combine the corresponding grants.
+- **Grant:** Invite the person to a configured Discord server separately, then
+  assign its configured role in **Discord → Server Settings → Members**. Have
+  them sign in. With a scoped policy, their matching roles combine the
+  corresponding grants.
 - **Revoke:** Remove that role, or remove the person from the server. Both the
   editor and configuration API check Discord membership and role; every
   configuration write requires a fresh check. Already loaded pages may remain
@@ -152,7 +160,9 @@ Expired or revoked credentials require another login. Discord outages and rate
 limits block access until the check can succeed; no alternative login is used.
 
 To disable administration without stopping the relay, delete
-`DISCORD_CLIENT_SECRET` in **Variables and Secrets**, or run:
+`DISCORD_CLIENT_SECRET` in **Cloudflare Dashboard → Workers & Pages → your
+Worker → Settings → Variables and Secrets**, then deploy that settings change.
+Alternatively, use the Cloudflare CLI command:
 
 ```sh
 npm run syndicord -- cf workers secrets delete DISCORD_CLIENT_SECRET \
@@ -217,10 +227,13 @@ npm run syndicord -- cf workers secrets update ADMIN_HEADER_COLOR \
 
 For local development, set these values in `.dev.vars`. Reload the page after
 changing them. An absent or blank name shows only syndicord; an absent or
-invalid colour uses the default dark green header. Remove either setting from
-**Variables and Secrets**, or use `cf workers secrets delete ADMIN_NAME` or
-`cf workers secrets delete ADMIN_HEADER_COLOR` with the same Worker selection,
-to restore its default. Custom logos and page-wide themes are not supported.
+invalid colour uses the default dark green header. To restore a hosted
+installation's defaults, remove the setting in **Cloudflare Dashboard → Workers
+& Pages → your Worker → Settings → Variables and Secrets** and deploy the
+change, or use `cf workers secrets delete ADMIN_NAME` or
+`cf workers secrets delete ADMIN_HEADER_COLOR` with the same Worker selection.
+For local development, remove the setting from `.dev.vars`. Custom logos and
+page-wide themes are not supported.
 
 ## Local preview
 

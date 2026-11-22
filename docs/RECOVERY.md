@@ -26,8 +26,8 @@ export GH_REPO='YOUR_OWNER/YOUR_REPOSITORY'
 
 ## Inspect a run
 
-**Dashboard:** Open **Workers & Pages → your Worker → Logs → Live**. Use
-**Metrics** to check invocation failures and CPU time.
+**Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Logs → Live**.
+Use **Metrics** to check invocation failures and CPU time.
 [Cloudflare live-log reference](https://developers.cloudflare.com/workers/observability/logs/real-time-logs/)
 
 **CLI:** Stream events from the same Worker:
@@ -91,8 +91,8 @@ SET next_attempt_ms = 0
 WHERE destination = 'updates' AND state = 'pending';
 ```
 
-**Dashboard:** Run the two statements in the intended D1 database's **Console**.
-**CLI:** Apply the same file to that database:
+**Cloudflare Dashboard:** Run the two statements under **Storage & databases →
+D1 → your database → Console**. **CLI:** Apply the same file to that database:
 
 ```sh
 npm run syndicord -- cf d1 raw "$SYNDICORD_DATABASE_ID" --sql @resume.sql
@@ -110,9 +110,9 @@ verification still fails, the error includes the last observed version ID when
 available, without printing remote annotations or secret values.
 
 If an upload or readback was ambiguous, inspect the active deployment before
-retrying; uploading can succeed before a later step fails. In the dashboard,
-open **Workers & Pages → your Worker → Deployments** and inspect the active
-version and traffic allocation. In the CLI:
+retrying; uploading can succeed before a later step fails. In the Cloudflare
+dashboard, open **Workers & Pages → your Worker → Deployments** and inspect the
+active version and traffic allocation. In the CLI:
 
 ```sh
 npm run syndicord -- cf workers deployments list --worker "$SYNDICORD_WORKER_NAME"
