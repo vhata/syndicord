@@ -339,3 +339,107 @@ test('catalog parsing strips nonpublic fields and rejects invalid references', (
   ])
     assert.throws(() => catalogSnapshot(value), /invalid response/);
 });
+
+test('scoped CLI reads and acknowledges a valid catalog with expanded multi-role permissions above 128 KiB', async () => {
+  const grants = Array.from({ length: 11 }, (_, role) => ({
+    guildId: '100000000000000001',
+    roleId: String(200000000000000000n + BigInt(role)),
+    addFeeds: true,
+    channelIds: Array.from({ length: 64 }, (_, channel) =>
+      String(300000000000000000n + BigInt(role * 64 + channel)),
+    ),
+  }));
+  assert.ok(
+    Buffer.byteLength(JSON.stringify({ version: 1, grants })) < 16 * 1024,
+  );
+  const document = {
+    version: 1,
+    feeds: Array.from({ length: 546 }, (_, index) => ({
+      id: `f_${String(index).padStart(36, '0')}`,
+      label: 'L'.repeat(100),
+      url: `http://x/${index}`,
+    })),
+    destinations: [],
+    subscriptions: [],
+  };
+  assert.ok(
+    Buffer.byteLength(
+      JSON.stringify({ catalog: document, feeds: [], webhooks: {} }),
+    ) <
+      96 * 1024,
+  );
+  const large: CatalogSnapshot = {
+    ...snapshot,
+    permissions: {
+      addFeeds: true,
+      channels: grants.flatMap((grant) =>
+        grant.channelIds.map((channelId) => ({
+          guildId: grant.guildId,
+          channelId,
+        })),
+      ),
+    },
+    feeds: document.feeds.map(({ id, label }) => ({ id, label })),
+    destinations: [],
+    subscriptions: [],
+  };
+  assert.ok(Buffer.byteLength(JSON.stringify(large)) > 128 * 1024);
+  assert.ok(Buffer.byteLength(JSON.stringify(large)) < 256 * 1024);
+  const { calls, fetcher } = fixture({ initial: large });
+  const listed = await runCli(['catalog', 'list'], env, {
+    adminFetch: fetcher,
+  });
+  assert.equal(listed.code, 0, listed.stderr);
+  assert.equal(JSON.parse(listed.stdout).length, 546);
+  const renamed = await runCli(
+    ['catalog', 'rename', large.feeds[0]!.id, 'Renamed'],
+    env,
+    { adminFetch: fetcher },
+  );
+  assert.equal(renamed.code, 0, renamed.stderr);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2]!.method, 'POST');
+});
+
+test('scoped response allowance remains bounded at 256 KiB without changing request or legacy limits', async () => {
+  const oversized = { ...snapshot, padding: 'x'.repeat(256 * 1024) };
+  let calls = 0;
+  const read = await runCli(['catalog', 'list'], env, {
+    adminFetch: async () => {
+      calls++;
+      return Response.json(oversized);
+    },
+  });
+  assert.equal(read.code, 2);
+  assert.equal(calls, 1);
+  const write = fixture({ write: () => Response.json(oversized) });
+  const rejected = await runCli(
+    ['catalog', 'rename', 'f_original', 'Renamed'],
+    env,
+    { adminFetch: write.fetcher },
+  );
+  assert.equal(rejected.code, 2);
+  assert.match(rejected.stderr, /not retried/);
+  assert.equal(write.calls.length, 2);
+  const legacy = await runCli(['feeds', 'get'], env, {
+    adminFetch: async () =>
+      Response.json({
+        feeds: [],
+        destinations: [],
+        revision: 'r',
+        padding: 'x'.repeat(129 * 1024),
+      }),
+  });
+  assert.equal(legacy.code, 2);
+  const request = fixture();
+  const tooLarge = await runCli(['catalog', 'add', '--file', '-'], env, {
+    adminFetch: request.fetcher,
+    readInput: async () => ({
+      label: 'Feed',
+      url: `https://example.com/?secret=${'x'.repeat(129 * 1024)}`,
+    }),
+  });
+  assert.equal(tooLarge.code, 2);
+  assert.match(tooLarge.stderr, /128 KiB/);
+  assert.deepEqual(request.calls, [{ method: 'GET' }]);
+});

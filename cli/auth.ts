@@ -58,9 +58,10 @@ export function adminEndpoint(env: Environment) {
 export async function readAdminResponse(
   response: Response,
   signal: AbortSignal,
+  maxBytes = MAX_BYTES,
 ): Promise<unknown> {
   if (
-    Number(response.headers.get('content-length')) > MAX_BYTES ||
+    Number(response.headers.get('content-length')) > maxBytes ||
     !response.body
   )
     throw new Error(INVALID_RESPONSE);
@@ -78,7 +79,7 @@ export async function readAdminResponse(
       if (signal.aborted) throw new Error(INVALID_RESPONSE);
       if (part.done) break;
       size += part.value.byteLength;
-      if (size > MAX_BYTES) throw new Error(INVALID_RESPONSE);
+      if (size > maxBytes) throw new Error(INVALID_RESPONSE);
       chunks.push(part.value);
     }
   } finally {

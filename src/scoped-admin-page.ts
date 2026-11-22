@@ -200,6 +200,32 @@ export const scopedScript = String.raw`
     byId('subscription-form').hidden = false;
     announce(''); updateControls(); byId('subscription-feed').focus();
   }
+  function publicSnapshot(value) {
+    const record = (item) => typeof item === 'object' && item !== null && !Array.isArray(item);
+    const id = (item) => typeof item === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(item);
+    const snowflake = (item) => typeof item === 'string' && /^\d{1,20}$/.test(item);
+    const scope = (item) => record(item) && snowflake(item.guildId) && snowflake(item.channelId);
+    const entity = (item) => record(item) && id(item.id) && typeof item.label === 'string' && item.label.trim() && item.label.length <= 100;
+    if (!record(value) || value.mode !== 'scoped' || typeof value.initialized !== 'boolean' ||
+        typeof value.revision !== 'string' || !value.revision || value.revision.length > 256 ||
+        !record(value.permissions) || typeof value.permissions.addFeeds !== 'boolean' ||
+        !Array.isArray(value.permissions.channels) || !value.permissions.channels.every(scope) ||
+        !Array.isArray(value.feeds) || !value.feeds.every(entity) ||
+        !Array.isArray(value.destinations) || !value.destinations.every((item) => entity(item) && scope(item)) ||
+        !Array.isArray(value.subscriptions) || !Number.isSafeInteger(value.maxBytes) || value.maxBytes <= 0) throw new Error();
+    const feedIds = new Set(value.feeds.map((item) => item.id));
+    const destinationIds = new Set(value.destinations.map((item) => item.id));
+    if (feedIds.size !== value.feeds.length || destinationIds.size !== value.destinations.length ||
+        !value.subscriptions.every((item) => record(item) && feedIds.has(item.feedId) && destinationIds.has(item.destinationId)) ||
+        new Set(value.subscriptions.map((item) => item.feedId + ':' + item.destinationId)).size !== value.subscriptions.length) throw new Error();
+    return {
+      mode: 'scoped', initialized: value.initialized, revision: value.revision, maxBytes: value.maxBytes,
+      permissions: { addFeeds: value.permissions.addFeeds, channels: value.permissions.channels.map(({guildId, channelId}) => ({guildId, channelId})) },
+      feeds: value.feeds.map(({id, label}) => ({id, label})),
+      destinations: value.destinations.map(({id, label, guildId, channelId}) => ({id, label, guildId, channelId})),
+      subscriptions: value.subscriptions.map(({feedId, destinationId}) => ({feedId, destinationId})),
+    };
+  }
   async function responseConfig(response) {
     let result;
     try { result = await response.json(); } catch { result = null; }
@@ -214,11 +240,11 @@ export const scopedScript = String.raw`
       if (response.status >= 500) stale = true;
       throw new Error(result && typeof result.error === 'string' ? result.error : 'The change could not be confirmed. Reload and inspect the catalog before retrying.');
     }
-    if (!result || result.mode !== 'scoped' || typeof result.initialized !== 'boolean' || typeof result.revision !== 'string' || !Array.isArray(result.feeds) || !Array.isArray(result.destinations) || !Array.isArray(result.subscriptions) || !result.permissions || typeof result.permissions.addFeeds !== 'boolean' || !Array.isArray(result.permissions.channels)) {
+    try { return publicSnapshot(result); }
+    catch {
       stale = true;
       throw new Error('The server returned an unexpected response. Reload and inspect the catalog before retrying.');
     }
-    return result;
   }
   async function load() {
     if (busy || (editor && !window.confirm('Reload configuration and discard the unsaved form?'))) return;

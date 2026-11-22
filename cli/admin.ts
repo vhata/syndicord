@@ -48,6 +48,7 @@ export function adminTransport<T>(
   fetcher: AdminFetch,
   path: '/admin/api/config' | '/admin/api/catalog',
   parse: (value: unknown) => T,
+  maxResponseBytes = MAX_BYTES,
 ) {
   const destination = adminEndpoint(env);
   const endpoint = new URL(path, destination.origin).href;
@@ -94,7 +95,11 @@ export function adminTransport<T>(
       let diagnostic: Record<string, unknown> | undefined;
       if ([400, 403].includes(response.status)) {
         try {
-          const value = await readAdminResponse(response, controller.signal);
+          const value = await readAdminResponse(
+            response,
+            controller.signal,
+            maxResponseBytes,
+          );
           if (
             typeof value === 'object' &&
             value !== null &&
@@ -150,7 +155,13 @@ export function adminTransport<T>(
             : `The administration API is unavailable (HTTP ${response.status}). Check that web administration is enabled at SYNDICORD_ADMIN_URL.`,
         );
       try {
-        return parse(await readAdminResponse(response, controller.signal));
+        return parse(
+          await readAdminResponse(
+            response,
+            controller.signal,
+            maxResponseBytes,
+          ),
+        );
       } catch {
         throw new Error(
           method !== 'GET'

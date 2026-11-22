@@ -107,6 +107,7 @@ export function catalogClient(env: Environment, fetcher: AdminFetch = fetch) {
     fetcher,
     '/admin/api/catalog',
     catalogSnapshot,
+    256 * 1024,
   );
   return {
     read: () => request('GET'),

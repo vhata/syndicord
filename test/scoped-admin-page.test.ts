@@ -341,3 +341,43 @@ test('revoked scope exposes sign-in recovery and labels remain text', async () =
   assert.equal(page.byId('add-feed').disabled, true);
   assert.match(page.byId('notice').textContent, /Role revoked/);
 });
+
+test('malformed nested success responses preserve the form and require reload before another write', async () => {
+  for (const invalid of [
+    { ...initial, feeds: [null] },
+    {
+      ...initial,
+      destinations: [{ ...initial.destinations[0], channelId: null }],
+    },
+    {
+      ...initial,
+      subscriptions: [{ feedId: 'missing', destinationId: 'd_updates' }],
+    },
+    { ...initial, permissions: { addFeeds: true, channels: [null] } },
+  ]) {
+    const page = await editor(initial, () => Response.json(invalid));
+    page.byId('add-feed').trigger();
+    page.byId('feed-label').value = 'Keep this draft';
+    page.byId('feed-url').value = 'https://example.com/feed?token=private';
+    page.byId('feed-form').trigger('submit');
+    await page.settle();
+    assert.equal(page.writes.length, 1);
+    assert.equal(page.byId('feed-form').hidden, false);
+    assert.equal(page.byId('feed-label').value, 'Keep this draft');
+    assert.equal(
+      page.byId('feed-url').value,
+      'https://example.com/feed?token=private',
+    );
+    assert.equal(page.byId('save-feed').disabled, true);
+    assert.equal(page.byId('add-feed').disabled, true);
+    assert.equal(page.byId('reload').hidden, false);
+    assert.match(
+      page.byId('notice').textContent,
+      /unexpected response.*Reload/,
+    );
+    page.byId('reload').trigger();
+    await page.settle();
+    assert.equal(page.byId('feed-form').hidden, true);
+    assert.equal(page.byId('add-feed').disabled, false);
+  }
+});
