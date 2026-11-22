@@ -74,31 +74,51 @@ response bodies.
 ## Polling limits
 
 The default one-minute cron checks one feed and attempts at most five deliveries
-per run. With N feeds, each is checked about every N minutes. There is no fixed
-limit on the number of feeds or feed/destination pairs; a feed sent to two
+per run across the whole installation, including retries. These small batches
+bound network, parsing, and database work per invocation and spread delivery
+bursts across runs. They are application limits, not Cloudflare or Discord
+quotas, and do not guarantee five successful sends per minute. Sending one entry
+to two destinations takes two deliveries.
+
+With N subscribed feeds, each is checked about every N minutes. There is no
+fixed limit on the number of feeds or feed/destination pairs; a feed sent to two
 destinations uses two pairs. Larger installations take longer to revisit each
-feed, and delivery backlogs grow if new messages arrive faster than five per
-minute. Entries must remain in the source feed until its next poll to be
-observed; longer rotations can miss entries removed between polls.
+feed, and delivery backlogs grow when arrivals outpace successful sends. Entries
+must remain in the source feed until its next poll to be observed; longer
+rotations can miss entries removed between polls.
 
 Each save is limited to 96 KiB of normalized JSON for the complete feed list and
 webhook map, including unused saved destinations. Scoped catalogs include all
 catalog metadata and unrouted feeds in this bound; only subscribed feeds enter
-the polling rotation. Requests and single-role responses are limited to 128 KiB.
-Scoped responses allow 256 KiB for expanded channel permissions. Remove unused
-destinations or shorten feed URLs if a save reaches this size. Existing larger
-configurations remain readable so they can be reduced.
+the polling rotation. API requests are limited to 128 KiB. The CLI accepts
+single-role responses up to 128 KiB and scoped responses up to 256 KiB for
+expanded channel permissions. Remove unused destinations or shorten feed URLs if
+a save reaches this size. Existing larger configurations remain readable so they
+can be reduced. These byte bounds limit configuration parsing and storage work;
+the 96 KiB save limit leaves room for revisions and metadata in the API
+envelope.
 
 Installation capacity also depends on
 [Cloudflare Workers CPU limits](https://developers.cloudflare.com/workers/platform/limits/),
 [D1 database quotas](https://developers.cloudflare.com/d1/platform/limits/), and
 Discord rate limits.
 
-Runs stop starting deliveries after 30 seconds; HTTP requests have six-second
-deadlines. Leases, retries, and Discord cooldowns can delay work further. Feeds
-must be UTF-8 XML, at most 256 KiB and 200 entries, with at most three redirects
-and no HTTPS downgrade. Malformed or unsupported XML does not change a baseline.
+Runs use a 30-second delivery budget and stop starting deliveries early enough
+to reserve time for a send, plus webhook verification in scoped mode. This is
+not a hard timeout for the whole run. Feed fetches, webhook verification, and
+sends have six-second deadlines so a slow remote server cannot hold each request
+open indefinitely. A feed fetch's deadline includes redirects and reading the
+body. Leases, retries, and Discord cooldowns can delay work further.
+
+Feeds must be UTF-8 XML, at most 256 KiB and 200 entries. These bounds limit
+untrusted parsing and database ingestion work; oversized feeds are rejected, not
+truncated to a subset of entries. At most three redirects are followed to bound
+redirect chains, and HTTPS downgrades are rejected to preserve encrypted
+transport. Malformed or unsupported XML does not change a baseline.
 
 D1 retains entry identities indefinitely and clears pending payloads after
-successful delivery. Monitor database growth for busy feeds. See
-[relay behavior](BEHAVIOR.md) for identity and retry semantics.
+successful delivery. Keeping identities prevents old entries from being sent
+again if they reappear in a feed; keeping pending payloads allows retries after
+an entry leaves the source feed. Both can grow the database for busy feeds.
+Monitor database growth and use [status](STATUS.md) to inspect pending delivery
+counts and ages.
