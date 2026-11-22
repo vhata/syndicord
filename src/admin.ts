@@ -14,7 +14,10 @@ import {
 } from './admin-store.ts';
 import { ConfigurationError } from './config-store.ts';
 
-export type AdminEnv = AuthEnv;
+export interface AdminEnv extends AuthEnv {
+  ADMIN_NAME?: string;
+  ADMIN_HEADER_COLOR?: string;
+}
 
 const MAX_BODY_BYTES = 128 * 1024;
 
@@ -122,6 +125,10 @@ export async function handleAdmin(
   env: AdminEnv,
   fetcher: typeof fetch = fetch,
 ): Promise<Response | null> {
+  const appearance = {
+    name: env.ADMIN_NAME,
+    headerColor: env.ADMIN_HEADER_COLOR,
+  };
   const url = new URL(request.url);
   const api = url.pathname === '/admin/api/config';
   const page = ['/', '/admin', '/admin/'].includes(url.pathname);
@@ -137,11 +144,15 @@ export async function handleAdmin(
         ? json({ error: message }, 503)
         : html(
             (nonce) =>
-              renderAccessPage(nonce, {
-                title: 'Administration is disabled',
-                message,
-                allowLogin: false,
-              }),
+              renderAccessPage(
+                nonce,
+                {
+                  title: 'Administration is disabled',
+                  message,
+                  allowLogin: false,
+                },
+                appearance,
+              ),
             503,
           );
     }
@@ -154,16 +165,20 @@ export async function handleAdmin(
     if (page && signInMessage)
       return html(
         (nonce) =>
-          renderAccessPage(nonce, {
-            title: 'Discord sign-in was not completed',
-            message:
-              signInMessage +
-              ' The account shown is still signed in. Sign out to switch accounts, or try signing in again.',
-            user,
-            allowLogin: true,
-            showLogout: true,
-            retry: true,
-          }),
+          renderAccessPage(
+            nonce,
+            {
+              title: 'Discord sign-in was not completed',
+              message:
+                signInMessage +
+                ' The account shown is still signed in. Sign out to switch accounts, or try signing in again.',
+              user,
+              allowLogin: true,
+              showLogout: true,
+              retry: true,
+            },
+            appearance,
+          ),
         200,
       );
     const key = await configurationKey(env.CONFIG_ENCRYPTION_KEY);
@@ -195,7 +210,7 @@ export async function handleAdmin(
       await requireAdmin(request, env, fetcher);
       return json(await saveAdminConfiguration(env, key, input));
     }
-    return html((nonce) => renderAdminPage(nonce, user), 200);
+    return html((nonce) => renderAdminPage(nonce, user, appearance), 200);
   } catch (error) {
     const status = error instanceof AdminError ? error.status : 503;
     const message =
@@ -211,21 +226,25 @@ export async function handleAdmin(
     const signedOut = error instanceof AuthError && status === 401;
     return html(
       (nonce) =>
-        renderAccessPage(nonce, {
-          title: signedOut
-            ? 'Sign in to syndicord'
-            : status === 403
-              ? 'Your account does not have access'
-              : 'Administration is unavailable',
-          message: signedOut
-            ? (signInMessage ??
-              'Sign in with your Discord account to manage feeds, webhooks, and routing.')
-            : message,
-          user: error instanceof AuthError ? error.user : undefined,
-          allowLogin: true,
-          showLogout: true,
-          retry: Boolean(signInMessage) || !signedOut,
-        }),
+        renderAccessPage(
+          nonce,
+          {
+            title: signedOut
+              ? 'Sign in to syndicord'
+              : status === 403
+                ? 'Your account does not have access'
+                : 'Administration is unavailable',
+            message: signedOut
+              ? (signInMessage ??
+                'Sign in with your Discord account to manage feeds, webhooks, and routing.')
+              : message,
+            user: error instanceof AuthError ? error.user : undefined,
+            allowLogin: true,
+            showLogout: true,
+            retry: Boolean(signInMessage) || !signedOut,
+          },
+          appearance,
+        ),
       signedOut ? 200 : status,
       extra,
     );

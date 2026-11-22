@@ -40,6 +40,10 @@ const script = String.raw`
         control.disabled = busy || (control.type === 'submit' && stale);
       });
     }
+    if (config) {
+      byId('feed-empty').hidden = config.feeds.length !== 0 || editor === 'feed';
+      byId('webhook-empty').hidden = config.destinations.length !== 0 || editor === 'webhook';
+    }
     webhookName.readOnly = editingWebhook !== null;
     byId('reload').disabled = busy;
     byId('reload').hidden = !stale && config !== null;
@@ -67,17 +71,13 @@ const script = String.raw`
 
   function render() {
     const pairCount = config.feeds.reduce((total, feed) => total + feed.destinations.length, 0);
-    byId('feed-count').textContent = String(config.feeds.length);
-    byId('webhook-count').textContent = String(config.destinations.length);
     byId('route-count').textContent = String(pairCount);
     byId('route-limit').textContent = String(config.maxRoutes);
     byId('feed-total').textContent = String(config.feeds.length);
     byId('webhook-total').textContent = String(config.destinations.length);
-    byId('feed-empty').hidden = config.feeds.length !== 0;
-    byId('webhook-empty').hidden = config.destinations.length !== 0;
     byId('feed-empty-copy').textContent = config.destinations.length
-      ? 'Add an RSS or Atom feed, then choose the channels it should reach.'
-      : 'Start by adding a Discord webhook. Then connect your first feed to it.';
+      ? 'Add an RSS or Atom feed and select its destinations.'
+      : 'Add a webhook before adding a feed.';
     byId('pause-note').hidden = config.feeds.length !== 0;
     const feeds = byId('feed-list');
     feeds.replaceChildren();
@@ -109,7 +109,7 @@ const script = String.raw`
       const item = node('li', 'webhook-row');
       const content = node('div', 'row-content');
       content.append(node('h3', 'webhook-title', '# ' + name));
-      content.append(node('p', 'muted small-copy', count ? count + (count === 1 ? ' feed connected' : ' feeds connected') : 'Ready to connect'));
+      content.append(node('p', 'muted small-copy', count + (count === 1 ? ' feed' : ' feeds')));
       const controls = node('div', 'row-actions');
       controls.append(
         action('Change URL', 'text-button', () => openWebhook(name), {
@@ -126,6 +126,7 @@ const script = String.raw`
     }
     byId('loading').hidden = true;
     byId('workspace').hidden = false;
+    byId('route-usage').hidden = false;
     updateControls();
   }
 
@@ -134,7 +135,7 @@ const script = String.raw`
     editor = 'feed';
     editingFeed = index;
     const feed = index === null ? null : config.feeds[index];
-    byId('feed-form-title').textContent = feed ? 'Edit feed & routing' : 'Add a feed';
+    byId('feed-form-title').textContent = feed ? 'Edit feed' : 'Add feed';
     byId('save-feed').textContent = feed ? 'Save feed' : 'Add feed';
     feedUrl.value = feed ? feed.url : '';
     const choices = byId('destination-choices');
@@ -161,11 +162,11 @@ const script = String.raw`
     editingWebhook = name;
     webhookName.value = name || '';
     webhookUrl.value = '';
-    byId('webhook-form-title').textContent = name ? 'Change webhook URL' : 'Add a webhook';
+    byId('webhook-form-title').textContent = name ? 'Change webhook URL' : 'Add webhook';
     byId('save-webhook').textContent = name ? 'Save URL' : 'Add webhook';
     byId('name-help').textContent = name
-      ? 'The destination name stays the same, so existing routes keep working.'
-      : 'A short label for this channel. Start with a letter; use letters, numbers, underscores or hyphens.';
+      ? 'The name cannot be changed. Existing routes use this name.'
+      : 'Start with a letter. Use up to 64 letters, numbers, underscores or hyphens.';
     webhookForm.hidden = false;
     announce('');
     updateControls();
@@ -208,7 +209,7 @@ const script = String.raw`
       stale = false;
       closeEditor();
       render();
-      announce('Configuration is up to date.');
+      announce('');
     } catch (error) {
       byId('loading').textContent = 'Configuration could not be loaded.';
       announce(error.message, true);
@@ -305,6 +306,38 @@ export interface AdminIdentity {
   name: string;
 }
 
+export interface AdminBranding {
+  name?: string | undefined;
+  headerColor?: string | undefined;
+}
+
+function branding(options: AdminBranding) {
+  const name = options.name?.trim().slice(0, 80) || '';
+  const color = /^#[0-9a-f]{6}$/i.test(options.headerColor ?? '')
+    ? options.headerColor!
+    : '#233c37';
+  // Choose black or white by relative luminance, keeping header text readable
+  // even when an operator selects a very light or saturated background.
+  const channels = [1, 3, 5].map((offset) => {
+    const value = parseInt(color.slice(offset, offset + 2), 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance =
+    channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722;
+  return {
+    name: escapeHtml(name),
+    title: escapeHtml(name ? `${name} · syndicord` : 'syndicord'),
+    color,
+    foreground: luminance > 0.179 ? '#000000' : '#ffffff',
+  };
+}
+
+const brandMark = `<svg viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M64 28h128a36 36 0 0 1 36 36v104a36 36 0 0 1-36 36h-28l-44 28v-28H64a36 36 0 0 1-36-36V64a36 36 0 0 1 36-36Z"/><g fill="none" stroke="var(--header)" stroke-linecap="round" stroke-width="18"><path d="M80 76a84 84 0 0 1 84 84"/><path d="M80 116a44 44 0 0 1 44 44"/></g><circle cx="80" cy="160" r="12" fill="var(--header)"/></svg>`;
+
+function brandLabel(brand: ReturnType<typeof branding>): string {
+  return `${brandMark}<span>syndicord</span>${brand.name ? `<span class="installation-name">${brand.name}</span>` : ''}`;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -314,103 +347,97 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
-export function renderAdminPage(nonce: string, user: AdminIdentity): string {
+export function renderAdminPage(
+  nonce: string,
+  user: AdminIdentity,
+  options: AdminBranding = {},
+): string {
   const safeNonce = escapeHtml(nonce);
+  const brand = branding(options);
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>syndicord · Feeds & routing</title>
+  <title>Feeds and webhooks · ${brand.title}</title>
   <style nonce="${safeNonce}">
-    :root { color-scheme: light; --ink: #202c2b; --muted: #5e6a67; --paper: #f6f5f0; --panel: #fffefa; --line: #dadfd7; --accent: #176d61; --accent-soft: #e8f1e9; --danger: #a23c35; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-synthesis: none; }
+    :root { color-scheme: light; --ink: #202c2b; --muted: #596562; --paper: #f5f6f5; --panel: #ffffff; --line: #dce1df; --accent: #176d61; --danger: #a23c35; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-synthesis: none; }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
-    body { margin: 0; color: var(--ink); background: var(--paper); font-size: 15px; line-height: 1.55; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font-size: 14px; line-height: 1.5; }
     button, input { font: inherit; }
     button { cursor: pointer; }
-    button:disabled { cursor: not-allowed; opacity: .46; }
-    :focus-visible { outline: 3px solid #bd8149; outline-offset: 4px; }
+    button:disabled { cursor: not-allowed; opacity: .5; }
+    :focus-visible { outline: 3px solid #176d61; outline-offset: 3px; }
     h1, h2, h3, p { margin: 0; }
     .skip-link { position: absolute; top: -60px; left: 20px; z-index: 5; padding: 10px; background: white; color: var(--ink); }
     .skip-link:focus { top: 12px; }
-    .topbar { background: #233c37; color: #fffefa; }
-    .topbar-inner { max-width: 1200px; margin: auto; padding: 19px 36px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-    .brand { display: flex; align-items: center; gap: 11px; font-size: 22px; font-weight: 750; letter-spacing: -.8px; }
-    .brand svg { width: 34px; height: 34px; }
-    .account { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: flex-end; font-size: 12px; }
+    .topbar { --header: ${brand.color}; background: var(--header); color: ${brand.foreground}; }
+    .topbar :focus-visible { outline-color: currentColor; }
+    .topbar-inner { max-width: 1160px; margin: auto; padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 650; min-width: 0; }
+    .installation-name { border-left: 1px solid currentColor; padding-left: 12px; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
+    .brand svg { width: 28px; height: 28px; flex-shrink: 0; }
+    .account { display: flex; gap: 16px; align-items: center; justify-content: flex-end; font-size: 12px; }
     .account p { overflow-wrap: anywhere; }
-    .account form { margin: 0; }
-    .account button { background: transparent; border: 1px solid #9bb9aa; border-radius: 6px; color: inherit; padding: 6px 10px; }
-    .workspace-label { color: #d5e3d8; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
-    main { max-width: 1200px; margin: auto; padding: 48px 36px 32px; }
-    .eyebrow { color: var(--accent); font-size: 11px; font-weight: 750; letter-spacing: .17em; text-transform: uppercase; }
-    h1 { margin-top: 9px; font-size: clamp(29px, 4vw, 42px); line-height: 1.14; font-weight: 650; letter-spacing: -1.5px; }
-    .intro { max-width: 590px; color: var(--muted); margin-top: 14px; font-size: 16px; }
-    .overview { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 30px; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .stats { display: flex; gap: 34px; }
-    .stat { display: flex; align-items: baseline; gap: 9px; }
-    .stat strong { font-size: 27px; font-weight: 550; letter-spacing: -.8px; }
-    .stat > span { color: var(--muted); font-size: 13px; }
-    .poll-note { max-width: 245px; font-size: 12px; color: var(--muted); }
-    .feedback { min-height: 67px; display: flex; gap: 14px; align-items: center; padding: 14px 0; }
+    .account form { margin: 0; flex-shrink: 0; }
+    .account button { background: transparent; border: 1px solid currentColor; border-radius: 5px; color: inherit; padding: 8px 12px; }
+    main { max-width: 1160px; margin: auto; padding: 30px 28px; }
+    .page-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; margin-bottom: 20px; }
+    h1 { font-size: 26px; line-height: 1.25; font-weight: 650; letter-spacing: -.6px; }
+    .route-usage { color: var(--muted); font-size: 13px; }
+    .feedback { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .notice:not(:empty), .feedback .button:not([hidden]) { margin-bottom: 16px; }
     .notice { font-size: 13px; color: var(--accent); }
     .notice.error { color: var(--danger); }
-    .feedback .button { flex-shrink: 0; }
-    .grid { margin-top: 26px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; align-items: start; }
-    .panel { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; overflow: hidden; box-shadow: 0 3px 0 #203c3410; }
-    .panel-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 23px 24px 20px; }
-    .section-title { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
-    h2 { font-size: 18px; font-weight: 650; letter-spacing: -.4px; }
-    .count { background: #eef0e9; color: var(--muted); border-radius: 6px; min-width: 24px; padding: 1px 6px; text-align: center; font-size: 12px; }
-    .panel-subtitle { color: var(--muted); font-size: 12px; margin-top: 4px; }
-    .button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--accent); background: var(--accent); color: white; border-radius: 7px; padding: 8px 12px; min-height: 38px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+    .panel { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; }
+    .panel-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; }
+    .section-title { display: flex; align-items: baseline; gap: 8px; }
+    h2 { font-size: 17px; font-weight: 650; }
+    .count { color: var(--muted); font-size: 13px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--accent); background: var(--accent); color: white; border-radius: 5px; padding: 8px 12px; min-height: 38px; font-size: 13px; font-weight: 600; text-decoration: none; }
     .button:hover:not(:disabled) { background: #11564c; border-color: #11564c; }
-    .button.secondary { background: transparent; border-color: #c4cdc3; color: var(--ink); }
-    .button.secondary:hover:not(:disabled) { background: #edf0e8; }
-    .button.small { min-height: 32px; padding: 4px 11px; font-size: 12px; }
-    .text-button { border: 0; padding: 5px 0; background: transparent; color: var(--accent); font-size: 12px; font-weight: 550; text-align: left; }
+    .button.secondary { background: transparent; border-color: #bfc9c4; color: var(--ink); }
+    .button.secondary:hover:not(:disabled) { background: #f0f3f1; }
+    .button.small { min-height: 34px; padding: 5px 11px; }
+    .text-button { border: 0; padding: 7px 0; min-height: 34px; background: transparent; color: var(--accent); font-size: 13px; text-align: left; }
     .text-button:hover:not(:disabled) { text-decoration: underline; }
     .text-button.danger { color: var(--danger); }
-    .empty { padding: 37px 28px 43px; border-top: 1px solid var(--line); text-align: center; }
-    .empty-symbol { display: inline-grid; place-items: center; width: 46px; height: 46px; border: 1px solid #cbd9cb; border-radius: 12px; color: var(--accent); margin-bottom: 15px; font-size: 24px; font-weight: 400; background: #edf3e9; }
-    .empty h3 { font-size: 16px; font-weight: 600; }
-    .empty p { max-width: 330px; margin: 8px auto 0; color: var(--muted); font-size: 13px; }
+    .empty { padding: 22px 20px; border-top: 1px solid var(--line); }
+    .empty h3 { font-size: 14px; font-weight: 600; }
+    .empty p { margin-top: 4px; color: var(--muted); font-size: 13px; }
     .rows { list-style: none; margin: 0; padding: 0; }
-    .feed-row, .webhook-row { padding: 20px 24px; border-top: 1px solid var(--line); display: flex; gap: 20px; align-items: flex-start; }
+    .feed-row, .webhook-row { padding: 18px 20px; border-top: 1px solid var(--line); display: flex; gap: 16px; align-items: flex-start; }
     .row-content { min-width: 0; flex: 1; }
     .feed-title, .webhook-title { font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
-    .feed-address { margin-top: 5px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; line-height: 1.5; }
-    .destinations { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 13px; }
-    .destination-tag { display: inline-block; padding: 3px 8px; background: var(--accent-soft); color: #295e4f; border-radius: 5px; font-size: 11px; font-weight: 550; overflow-wrap: anywhere; max-width: 100%; }
-    .row-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; flex-shrink: 0; }
+    .feed-address { margin-top: 4px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .destinations { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .destination-tag { padding: 2px 7px; background: #f0f3f1; color: #41534b; border-radius: 4px; font-size: 12px; overflow-wrap: anywhere; max-width: 100%; }
+    .row-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex-shrink: 0; }
     .muted { color: var(--muted); }
-    .small-copy { font-size: 12px; margin-top: 3px; }
-    .panel-footnote { padding: 14px 24px; border-top: 1px solid var(--line); background: #fafaf4; font-size: 11px; line-height: 1.6; color: var(--muted); }
-    .editor { padding: 23px 24px 24px; background: #eef3eb; border-top: 1px solid #d0ddcc; }
-    .editor h3 { font-size: 16px; margin-bottom: 19px; font-weight: 650; }
-    .field { margin-top: 17px; }
-    .field-label, legend { display: block; font-size: 12px; font-weight: 650; margin-bottom: 7px; }
-    input[type="url"], input[type="text"], input[type="password"] { display: block; width: 100%; min-width: 0; background: #fffefa; color: var(--ink); border: 1px solid #b5c3b5; border-radius: 6px; padding: 10px 11px; font-size: 14px; }
-    input[readonly] { background: #e4ebe1; color: #566054; }
-    input::placeholder { color: #7b847b; }
-    .field-help { font-size: 11px; color: #52624f; margin-top: 7px; line-height: 1.6; }
-    fieldset { min-width: 0; margin: 19px 0 0; padding: 0; border: 0; }
+    .small-copy { font-size: 12px; margin-top: 4px; }
+    .panel-footnote { padding: 12px 20px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+    .editor { padding: 20px; background: #f8faf9; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; }
+    .editor h3 { font-size: 16px; font-weight: 650; }
+    .field { margin-top: 18px; }
+    .field-label, legend { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    input[type="url"], input[type="text"], input[type="password"] { display: block; width: 100%; min-width: 0; background: white; color: var(--ink); border: 1px solid #aebbb4; border-radius: 5px; padding: 10px; font-size: 16px; }
+    input[readonly] { background: #edf1ee; color: var(--muted); }
+    input::placeholder { color: #6a756f; }
+    .field-help { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    fieldset { min-width: 0; margin: 18px 0 0; padding: 0; border: 0; }
     .destination-choices { display: flex; flex-wrap: wrap; gap: 8px; }
-    .destination-choice { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; background: #fffefa; border: 1px solid #cbd7c6; border-radius: 6px; font-size: 12px; max-width: 100%; cursor: pointer; }
+    .destination-choice { display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; background: white; border: 1px solid #bfc9c4; border-radius: 5px; font-size: 13px; max-width: 100%; cursor: pointer; }
     .destination-choice span { overflow-wrap: anywhere; }
-    input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; margin: 2px 0 0; }
-    .form-actions { display: flex; gap: 12px; margin-top: 23px; align-items: center; }
-    .form-actions .text-button { font-size: 13px; padding: 8px; }
-    .how-it-works { margin-top: 27px; border-left: 2px solid #b9c9b8; padding-left: 15px; max-width: 700px; font-size: 12px; color: var(--muted); }
-    .how-it-works strong { color: var(--ink); font-weight: 600; }
-    footer { margin-top: 44px; display: flex; justify-content: space-between; gap: 18px; color: #68776e; font-size: 11px; }
-    #loading { padding: 28px 0; color: var(--muted); }
+    input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; margin: 2px 0 0; }
+    .form-actions { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 20px; align-items: center; }
+    .operations-note { margin-top: 20px; font-size: 12px; color: var(--muted); }
+    #loading { padding: 20px 0; color: var(--muted); }
     noscript { display: block; padding: 20px; border: 1px solid var(--line); color: var(--danger); }
-    @media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } .poll-note { max-width: 215px; } }
-    @media (max-width: 560px) { .topbar-inner { padding: 16px 20px; } .workspace-label { font-size: 10px; } main { padding: 31px 20px 25px; } h1 { letter-spacing: -1px; } .intro { font-size: 14px; } .overview { display: block; margin-top: 24px; padding: 15px 0; } .stats { justify-content: space-between; gap: 12px; } .stat { display: block; } .stat > span { display: block; font-size: 11px; } .poll-note { margin-top: 14px; max-width: none; font-size: 11px; } .feedback { flex-wrap: wrap; gap: 8px; } .panel-header { padding: 20px 18px 17px; gap: 9px; } h2 { font-size: 16px; } .panel-header .button { padding: 7px 9px; font-size: 12px; } .feed-row, .webhook-row { padding: 18px; gap: 13px; } .editor { padding: 20px 18px; } .panel-footnote { padding: 12px 18px; } footer { flex-direction: column; gap: 3px; } }
-    @media (prefers-reduced-motion: no-preference) { button { transition: background-color .15s ease, opacity .15s ease; } }
+    @media (max-width: 800px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+    @media (max-width: 560px) { .topbar-inner { padding: 16px; flex-wrap: wrap; gap: 14px; } .account { width: 100%; justify-content: space-between; } main { padding: 24px 16px; } h1 { font-size: 23px; } .panel-header, .feed-row, .webhook-row, .editor { padding: 16px; } .panel-footnote { padding: 12px 16px; } }
   </style>
 </head>
 <body>
@@ -418,16 +445,13 @@ export function renderAdminPage(nonce: string, user: AdminIdentity): string {
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <svg viewBox="0 0 256 256" aria-hidden="true"><path fill="#77baa0" d="M64 28h128a36 36 0 0 1 36 36v104a36 36 0 0 1-36 36h-28l-44 28v-28H64a36 36 0 0 1-36-36V64a36 36 0 0 1 36-36Z"/><g fill="none" stroke="#233c37" stroke-linecap="round" stroke-width="18"><path d="M80 76a84 84 0 0 1 84 84"/><path d="M80 116a44 44 0 0 1 44 44"/></g><circle cx="80" cy="160" r="12" fill="#233c37"/></svg>
-        <span>syndicord</span>
+        ${brandLabel(brand)}
       </div>
       <div class="account"><p>Signed in as <strong>${escapeHtml(user.name)}</strong><br><span>Discord ID ${escapeHtml(user.id)}</span></p><form action="/admin/auth/logout" method="post"><button type="submit">Sign out</button></form></div>
     </div>
   </header>
   <main id="main">
-    <p class="eyebrow">Feeds & routing</p>
-    <h1>From feed to channel.</h1>
-    <p class="intro">Bring the updates you follow into Discord. Add your feeds, connect your webhooks, and choose where each story goes.</p>
+    <div class="page-heading"><h1>Feeds and webhooks</h1><p class="route-usage" id="route-usage" hidden><span id="route-count">0</span> / <span id="route-limit">20</span> routes used</p></div>
     <div class="feedback">
       <p id="notice" class="notice" role="status" aria-live="polite" aria-atomic="true"></p>
       <button id="reload" class="button small secondary" type="button">Reload configuration</button>
@@ -436,49 +460,40 @@ export function renderAdminPage(nonce: string, user: AdminIdentity): string {
     <noscript>Enable JavaScript to manage your feeds, webhooks, and routing.</noscript>
     <p id="loading">Loading configuration…</p>
     <div id="workspace" hidden>
-      <div class="overview">
-        <div class="stats" aria-label="Configuration summary">
-          <div class="stat"><strong id="feed-count">0</strong><span>feeds</span></div>
-          <div class="stat"><strong id="webhook-count">0</strong><span>webhooks</span></div>
-          <div class="stat"><strong id="route-count">0</strong><span>of <span id="route-limit">20</span> routes</span></div>
-        </div>
-        <p class="poll-note">One feed is checked each minute. Saved changes apply on the next poll.</p>
-      </div>
       <div class="grid">
         <section class="panel" aria-labelledby="feeds-heading">
           <div class="panel-header">
-            <div><div class="section-title"><h2 id="feeds-heading" tabindex="-1">Feeds & routing</h2><span class="count" id="feed-total">0</span></div><p class="panel-subtitle">What to follow, and where it goes.</p></div>
-            <button id="add-feed" class="button" type="button" data-open="feed" disabled><span aria-hidden="true">+</span> Add feed</button>
+            <div class="section-title"><h2 id="feeds-heading" tabindex="-1">Feeds</h2><span class="count" id="feed-total">0</span></div>
+            <button id="add-feed" class="button" type="button" data-open="feed" disabled>Add feed</button>
           </div>
-          <div class="empty" id="feed-empty" hidden><span class="empty-symbol" aria-hidden="true">↗</span><h3>Your next discovery starts here</h3><p id="feed-empty-copy"></p></div>
+          <div class="empty" id="feed-empty" hidden><h3>No feeds</h3><p id="feed-empty-copy"></p></div>
           <ul id="feed-list" class="rows" aria-label="Configured feeds"></ul>
           <form id="feed-form" class="editor" hidden aria-labelledby="feed-form-title">
-            <h3 id="feed-form-title">Add a feed</h3>
+            <h3 id="feed-form-title">Add feed</h3>
             <div class="field"><label class="field-label" for="feed-url">Feed URL</label><input id="feed-url" type="url" placeholder="https://example.com/feed.xml" required maxlength="2048" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="feed-url-help"><p class="field-help" id="feed-url-help">The direct RSS or Atom feed address.</p></div>
-            <fieldset><legend>Send updates to</legend><div id="destination-choices" class="destination-choices"></div><p class="field-help">Choose one or more destinations. Each selection uses one route.</p></fieldset>
+            <fieldset><legend>Destinations</legend><div id="destination-choices" class="destination-choices"></div><p class="field-help">Choose one or more destinations. Each selection uses one route.</p></fieldset>
             <div class="form-actions"><button class="button" type="submit" id="save-feed">Add feed</button><button class="text-button" type="button" id="cancel-feed">Cancel</button></div>
           </form>
-          <p class="panel-footnote" id="pause-note" hidden>No feeds configured. Polling and delivery are paused.</p>
+          <p class="panel-footnote" id="pause-note" hidden>Polling and delivery are paused.</p>
         </section>
         <section class="panel" aria-labelledby="webhooks-heading">
           <div class="panel-header">
-            <div><div class="section-title"><h2 id="webhooks-heading" tabindex="-1">Webhooks</h2><span class="count" id="webhook-total">0</span></div><p class="panel-subtitle">Your Discord destinations.</p></div>
-            <button id="add-webhook" class="button secondary" type="button" data-open="webhook" disabled><span aria-hidden="true">+</span> Add webhook</button>
+            <div class="section-title"><h2 id="webhooks-heading" tabindex="-1">Webhooks</h2><span class="count" id="webhook-total">0</span></div>
+            <button id="add-webhook" class="button secondary" type="button" data-open="webhook" disabled>Add webhook</button>
           </div>
-          <div class="empty" id="webhook-empty" hidden><span class="empty-symbol" aria-hidden="true">#</span><h3>Give your feeds a home</h3><p>Add a Discord webhook for each channel you want to send updates to.</p></div>
+          <div class="empty" id="webhook-empty" hidden><h3>No webhooks</h3><p>Add a Discord webhook for each destination channel.</p></div>
           <ul id="webhook-list" class="rows" aria-label="Configured webhooks"></ul>
           <form id="webhook-form" class="editor" hidden aria-labelledby="webhook-form-title">
-            <h3 id="webhook-form-title">Add a webhook</h3>
+            <h3 id="webhook-form-title">Add webhook</h3>
             <div class="field"><label class="field-label" for="webhook-name">Destination name</label><input id="webhook-name" type="text" placeholder="updates" required pattern="[A-Za-z][A-Za-z0-9_\\-]{0,63}" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="name-help"><p class="field-help" id="name-help"></p></div>
             <div class="field"><label class="field-label" for="webhook-url">Discord webhook URL</label><input id="webhook-url" type="password" placeholder="https://discord.com/api/webhooks/…" required maxlength="2048" autocomplete="new-password" autocapitalize="none" spellcheck="false" aria-describedby="webhook-url-help"><p class="field-help" id="webhook-url-help">Copy it from Discord: Channel settings → Integrations → Webhooks. Saved URLs stay hidden.</p></div>
             <div class="form-actions"><button class="button" type="submit" id="save-webhook">Add webhook</button><button class="text-button" type="button" id="cancel-webhook">Cancel</button></div>
           </form>
-          <p class="panel-footnote">A destination can receive several feeds. To remove one, disconnect it from its feeds first.</p>
+          <p class="panel-footnote">Remove a webhook from its feeds before deleting it.</p>
         </section>
       </div>
-      <p class="how-it-works"><strong>Fresh starts, without the backlog.</strong> A new feed or route starts with a quiet first check. Only entries discovered after that are sent to Discord.</p>
+      <p class="operations-note">One feed is checked each minute. Changes apply on the next poll. New routes only deliver entries found after their first check.</p>
     </div>
-    <footer><span>syndicord · Your feeds. In the conversation.</span><span>RSS & Atom → Discord</span></footer>
   </main>
   <script nonce="${safeNonce}">${script}</script>
 </body>
@@ -495,21 +510,25 @@ export function renderAccessPage(
     showLogout?: boolean;
     retry?: boolean;
   },
+  appearance: AdminBranding = {},
 ): string {
+  const brand = branding(appearance);
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>${escapeHtml(options.title)} · syndicord</title>
+  <title>${escapeHtml(options.title)} · ${brand.title}</title>
   <style nonce="${escapeHtml(nonce)}">
-    :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #202c2b; background: #f6f5f0; line-height: 1.55; }
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #202c2b; background: #f5f6f5; line-height: 1.5; }
     * { box-sizing: border-box; }
     body { margin: 0; }
-    header { padding: 20px max(24px, calc((100% - 1128px) / 2)); background: #233c37; color: #fffefa; font-size: 23px; font-weight: 750; }
-    main { max-width: 650px; margin: 80px auto; padding: 32px; }
-    h1 { font-size: clamp(27px, 5vw, 36px); letter-spacing: -1px; line-height: 1.2; }
+    header { --header: ${brand.color}; display: flex; align-items: center; gap: 10px; padding: 16px max(16px, calc((100% - 1104px) / 2)); background: var(--header); color: ${brand.foreground}; font-size: 19px; font-weight: 650; }
+    header svg { width: 28px; height: 28px; flex-shrink: 0; }
+    .installation-name { border-left: 1px solid currentColor; padding-left: 12px; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
+    main { max-width: 650px; margin: 40px auto; padding: 32px; }
+    h1 { font-size: 26px; letter-spacing: -.6px; line-height: 1.2; }
     p { margin: 18px 0; overflow-wrap: anywhere; }
     .account { padding: 14px 18px; border: 1px solid #cbd9cb; border-radius: 8px; background: #fffefa; }
     .actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 26px 0; }
@@ -517,13 +536,13 @@ export function renderAccessPage(
     .button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; background: #176d61; color: white; border: 1px solid #176d61; border-radius: 7px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
     .button.secondary { background: transparent; color: #202c2b; border-color: #aab8ad; }
     .button:hover { background: #11564c; color: white; }
-    :focus-visible { outline: 3px solid #bd8149; outline-offset: 4px; }
+    :focus-visible { outline: 3px solid #176d61; outline-offset: 4px; }
     .help { color: #5e6a67; font-size: 13px; }
     @media (max-width: 560px) { main { margin: 35px auto; padding: 24px; } }
   </style>
 </head>
 <body>
-  <header>syndicord</header>
+  <header>${brandLabel(brand)}</header>
   <main>
     <h1>${escapeHtml(options.title)}</h1>
     ${options.user ? `<p class="account">Signed in as <strong>${escapeHtml(options.user.name)}</strong><br>Discord ID ${escapeHtml(options.user.id)}</p>` : ''}

@@ -88,6 +88,38 @@ its HTTPS address. An authorized account sees its Discord identity, a **Sign
 out** control, and the editor. An account without the configured membership or
 role receives an explanation and can sign out or try another Discord account.
 
+## Installation name and colour
+
+The admin editor and its sign-in and access pages can show an installation name
+beside the syndicord mark and use a custom header colour. The name also appears
+in the browser tab. Both settings are optional:
+
+| Setting              | Value                                                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `ADMIN_NAME`         | Installation name, for example `Community updates`. Surrounding spaces are removed; at most 80 characters are shown. |
+| `ADMIN_HEADER_COLOR` | Six-digit hex colour, for example `#304B70`. Header text automatically uses black or white for contrast.             |
+
+In **Cloudflare Dashboard → Workers & Pages → your Worker → Settings → Variables
+and Secrets**, add either setting as a **Secret** and deploy the changes. These
+values are visible on the page; using the Secret type preserves them during code
+deployments, like the other installation settings.
+
+Alternatively, use the CLI's value prompts:
+
+```sh
+npm run syndicord -- cf workers secrets update ADMIN_NAME \
+  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+npm run syndicord -- cf workers secrets update ADMIN_HEADER_COLOR \
+  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+```
+
+For local development, set these values in `.dev.vars`. Reload the page after
+changing them. An absent or blank name shows only syndicord; an absent or
+invalid colour uses the default dark green header. Remove either setting from
+**Variables and Secrets**, or use `cf workers secrets delete ADMIN_NAME` or
+`cf workers secrets delete ADMIN_HEADER_COLOR` with the same Worker selection,
+to restore its default. Custom logos and page-wide themes are not supported.
+
 ## CLI login
 
 ```sh

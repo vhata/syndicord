@@ -1,10 +1,10 @@
 import { handleAdmin } from './admin.ts';
-import type { AuthEnv } from './admin-auth.ts';
+import type { AdminEnv } from './admin.ts';
 import { readRelayConfiguration } from './admin-store.ts';
 import { ConfigurationError } from './config-store.ts';
 import { runRelay } from './runner.ts';
 
-export type WorkerEnv = AuthEnv;
+export type WorkerEnv = AdminEnv;
 
 export default {
   scheduled(_event, env, ctx) {
