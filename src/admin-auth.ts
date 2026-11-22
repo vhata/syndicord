@@ -456,11 +456,15 @@ async function checkSession(
   config: AuthConfiguration,
   fetcher: DiscordFetch,
 ) {
+  const now = Date.now();
+  if (session.retry_at_ms > now) {
+    const error = retryError(
+      String(Math.ceil((session.retry_at_ms - now) / 1000)),
+    );
+    error.user = { id: session.user_id, name: session.user_name };
+    throw error;
+  }
   try {
-    if (session.retry_at_ms > Date.now())
-      throw retryError(
-        String(Math.ceil((session.retry_at_ms - Date.now()) / 1000)),
-      );
     await membership(
       config,
       await open(session, await configurationKey(env.CONFIG_ENCRYPTION_KEY)),
