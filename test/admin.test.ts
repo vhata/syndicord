@@ -9,6 +9,10 @@ import {
   saveAdminConfiguration,
 } from '../src/admin-store.ts';
 import { WRITE_CONFIGURATION_SQL } from '../src/config-store.ts';
+import {
+  CONFIGURATION_SIZE_ERROR,
+  MAX_CONFIGURATION_BYTES,
+} from '../src/config.ts';
 import { createTestDatabase } from './helpers/d1.ts';
 
 const origin = 'https://syndicord.example';
@@ -21,6 +25,122 @@ const feeds = [
     destinations: ['updates'],
   },
 ];
+
+test('large route configurations save and round-trip through the authenticated API', async () => {
+  const { env, dispose, handleAdmin, request, put } = await fixture();
+  try {
+    const initial = await readAdminConfiguration(
+      env,
+      await configurationKey(key),
+    );
+    const names = Array.from({ length: 30 }, (_, index) => `d${index}`);
+    const expanded = Array.from({ length: 30 }, (_, index) => ({
+      url: `https://example.com/feed/${index}`,
+      destinations: names,
+    }));
+    const webhooks = Object.fromEntries(
+      names.map((name, index) => [
+        name,
+        `https://discord.com/api/webhooks/${index + 1}/token`,
+      ]),
+    );
+    const response = (await handleAdmin(
+      put({
+        revision: initial.revision,
+        feeds: expanded,
+        webhooks,
+      }),
+    ))!;
+    assert.equal(response.status, 200, await response.clone().text());
+    const saved = (await response.json()) as {
+      maxRoutes: null;
+      feeds: unknown;
+    };
+    assert.equal(saved.maxRoutes, null);
+    assert.deepEqual(saved.feeds, expanded);
+    const read = (await handleAdmin(request()))!;
+    assert.equal(read.status, 200);
+    assert.deepEqual(await read.json(), saved);
+    assert.deepEqual((await readRelayConfiguration(env)).feeds, expanded);
+  } finally {
+    await dispose();
+  }
+});
+
+test('merged saves preserve the old maximum URL range and reject cumulative size growth atomically', async () => {
+  const { db, dispose } = await createTestDatabase();
+  const env = { DB: db, CONFIG_ENCRYPTION_KEY: key };
+  const encryptionKey = await configurationKey(key);
+  const longWebhook = (index: number) => {
+    const prefix = `https://discord.com/api/webhooks/${index + 1}/`;
+    return prefix + 'x'.repeat(2048 - prefix.length);
+  };
+  try {
+    let current = await readAdminConfiguration(env, encryptionKey);
+    const longFeeds = Array.from({ length: 20 }, (_, index) => {
+      const prefix = `https://example.com/${index}/`;
+      return {
+        url: prefix + 'x'.repeat(2048 - prefix.length),
+        destinations: [`d${index}`],
+      };
+    });
+    const oldWebhooks = Object.fromEntries(
+      Array.from({ length: 20 }, (_, index) => [
+        `d${index}`,
+        longWebhook(index),
+      ]),
+    );
+    const size = Buffer.byteLength(
+      JSON.stringify({ feeds: longFeeds, webhooks: oldWebhooks }),
+    );
+    assert.ok(size > 64 * 1024 && size < MAX_CONFIGURATION_BYTES);
+    current = await saveAdminConfiguration(env, encryptionKey, {
+      revision: current.revision,
+      feeds: longFeeds,
+      webhooks: oldWebhooks,
+    });
+    const largerWebhooks = Object.fromEntries(
+      Array.from({ length: 47 }, (_, index) => [
+        `d${index}`,
+        longWebhook(index),
+      ]),
+    );
+    current = await saveAdminConfiguration(env, encryptionKey, {
+      revision: current.revision,
+      feeds: [],
+      webhooks: largerWebhooks,
+    });
+    const extra = {
+      revision: current.revision,
+      feeds: [],
+      webhooks: { d47: longWebhook(47) },
+    };
+    assert.ok(Buffer.byteLength(JSON.stringify(extra)) < 4096);
+    await assert.rejects(saveAdminConfiguration(env, encryptionKey, extra), {
+      message: CONFIGURATION_SIZE_ERROR,
+    });
+    assert.deepEqual(await readAdminConfiguration(env, encryptionKey), current);
+
+    // Earlier versions allowed accumulated webhook maps to grow without a
+    // total-size bound. Such configurations can still be read and reduced.
+    await db
+      .prepare('UPDATE relay_configuration SET feeds = ? WHERE id = 1')
+      .bind(JSON.stringify(longFeeds))
+      .run();
+    const legacy = await readAdminConfiguration(env, encryptionKey);
+    assert.deepEqual(legacy.feeds, longFeeds);
+    assert.deepEqual((await readRelayConfiguration(env)).feeds, longFeeds);
+    const reduced = await saveAdminConfiguration(env, encryptionKey, {
+      revision: legacy.revision,
+      feeds: [],
+      webhooks: {},
+    });
+    assert.deepEqual(reduced.feeds, []);
+    assert.deepEqual(reduced.destinations, current.destinations);
+  } finally {
+    await dispose();
+  }
+});
 async function fixture() {
   const database = await createTestDatabase();
   const env: AdminEnv = {

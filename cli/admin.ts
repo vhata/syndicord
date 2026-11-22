@@ -1,4 +1,4 @@
-import { loadFeeds } from '../src/config.ts';
+import { CONFIGURATION_SIZE_ERROR, loadFeeds } from '../src/config.ts';
 import type { FeedRoute } from '../src/types.ts';
 import type { Environment } from './cloudflare.ts';
 import { adminEndpoint, readAdminResponse, readSession } from './auth.ts';
@@ -116,7 +116,8 @@ export function adminClient(env: Environment, fetcher: AdminFetch = fetch) {
         }
         if (
           typeof message === 'string' &&
-          (message === 'Each destination must have a distinct webhook URL' ||
+          (message === CONFIGURATION_SIZE_ERROR ||
+            message === 'Each destination must have a distinct webhook URL' ||
             /^Missing webhook for destination [A-Za-z][A-Za-z0-9_-]{0,63}$/.test(
               message,
             ))

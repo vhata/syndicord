@@ -184,10 +184,12 @@ together for recovery.
 
 For terminal equivalents, use [`webhooks set` and `feeds set`](OPERATIONS.md). A
 feed can send to several destinations, and a destination can receive several
-feeds. At most 20 feed/destination pairs are supported. Each feed needs at least
-one destination. Remove a feed to stop its routes; remove all feeds to pause
-polling. New routes silently establish a baseline before delivering new posts. A
-poll already in progress may finish using its earlier configuration.
+feeds. There is no fixed feed or route count limit; see
+[polling and configuration-size limits](OPERATIONS.md#polling-limits). Each feed
+needs at least one destination. Remove a feed to stop its routes; remove all
+feeds to pause polling. New routes silently establish a baseline before
+delivering new posts. A poll already in progress may finish using its earlier
+configuration.
 
 Saved webhook URLs stay hidden. To rotate one, replace its URL under the same
 destination name. Remove its routes before deleting the webhook. Deleting it in

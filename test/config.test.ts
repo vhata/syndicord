@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   loadConfig,
+  MAX_CONFIGURATION_BYTES,
+  validateConfigurationSize,
   validateWebhooks,
   webhookFingerprints,
 } from '../src/config.ts';
@@ -78,16 +80,52 @@ test('configuration rejects missing, duplicate and malformed routing without rev
       two: hook,
     }),
   );
-  assert.throws(() =>
+});
+
+test('configuration supports hundreds of feeds and destinations without a route count cap', () => {
+  const manyFeeds = Array.from({ length: 500 }, (_, index) => ({
+    url: `https://example.com/feed/${index}`,
+    destinations: ['updates'],
+  }));
+  const manyDestinations = Object.fromEntries(
+    Array.from({ length: 500 }, (_, index) => [
+      `d${index}`,
+      `https://discord.com/api/webhooks/${index + 1}/token`,
+    ]),
+  );
+  for (const config of [
+    loadConfig(manyFeeds, { updates: hook }),
     loadConfig(
-      [
-        {
-          ...feeds[0],
-          destinations: Array.from({ length: 21 }, (_, i) => `d${i}`),
-        },
-      ],
-      {},
+      [{ ...feeds[0], destinations: Object.keys(manyDestinations) }],
+      manyDestinations,
     ),
+  ]) {
+    assert.equal(
+      config.feeds.reduce((count, feed) => count + feed.destinations.length, 0),
+      500,
+    );
+    assert.doesNotThrow(() =>
+      validateConfigurationSize(config.feeds, config.webhooks),
+    );
+  }
+});
+
+test('complete configuration size counts normalized JSON bytes with an inclusive boundary', () => {
+  const overhead = Buffer.byteLength(
+    JSON.stringify({ feeds: [], webhooks: { unused: '' } }),
+  );
+  const webhooks = { unused: 'x'.repeat(MAX_CONFIGURATION_BYTES - overhead) };
+  assert.doesNotThrow(() => validateConfigurationSize([], webhooks));
+  assert.throws(
+    () => validateConfigurationSize([], { unused: `${webhooks.unused}x` }),
+    /Saved configuration exceeds 96 KiB/,
+  );
+  assert.throws(
+    () =>
+      validateConfigurationSize([], {
+        unused: webhooks.unused.replace(/x$/, 'é'),
+      }),
+    /Saved configuration exceeds 96 KiB/,
   );
 });
 

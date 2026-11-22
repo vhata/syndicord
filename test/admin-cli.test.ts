@@ -16,6 +16,7 @@ import {
 } from './helpers/auth.ts';
 import { handleAdmin } from '../src/admin.ts';
 import { readRelayConfiguration } from '../src/admin-store.ts';
+import { CONFIGURATION_SIZE_ERROR } from '../src/config.ts';
 import { createTestDatabase } from './helpers/d1.ts';
 
 const environment = {
@@ -34,11 +35,56 @@ const initial = {
   feeds,
   destinations: ['updates'],
   revision: 'initial-revision',
-  maxRoutes: 20,
+  maxRoutes: null,
 };
 const noCloudflare = async () => {
   throw new Error('must not invoke Cloudflare');
 };
+
+test('CLI saves and reads more than twenty feeds through the shared API', async () => {
+  const { browser, fetcher, dispose } = await fixture();
+  try {
+    await browser.write(await browser.read(), [], { updates: webhook });
+    const expanded = Array.from({ length: 50 }, (_, index) => ({
+      url: `https://example.com/feed/${index}`,
+      destinations: ['updates'],
+    }));
+    const dependencies = { cf: noCloudflare, adminFetch: fetcher };
+    const saved = await runCli(['feeds', 'set', '--file', '-'], environment, {
+      ...dependencies,
+      readInput: async () => expanded,
+    });
+    assert.equal(saved.code, 0, saved.stderr);
+    const read = await runCli(['feeds', 'get'], environment, dependencies);
+    assert.equal(read.code, 0, read.stderr);
+    assert.deepEqual(JSON.parse(read.stdout), expanded);
+    assert.deepEqual((await browser.read()).feeds, expanded);
+  } finally {
+    await dispose();
+  }
+});
+
+test('CLI reports the fixed aggregate size error without reflecting arbitrary server text', async () => {
+  for (const [message, expected] of [
+    [
+      CONFIGURATION_SIZE_ERROR,
+      /Configuration rejected: Saved configuration exceeds 96 KiB/,
+    ],
+    [`${CONFIGURATION_SIZE_ERROR} private-webhook-token`, /HTTP 400/],
+  ] as const) {
+    const result = await runCli(['feeds', 'set', '--file', '-'], environment, {
+      cf: noCloudflare,
+      readInput: async () => feeds,
+      adminFetch: async (_url, init) =>
+        init.method === 'PUT'
+          ? Response.json({ error: message }, { status: 400 })
+          : Response.json(initial),
+    });
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, expected);
+    assert.doesNotMatch(result.stderr, /private-webhook-token/);
+  }
+});
 
 const testToken = 'private-session-token-'.padEnd(43, 't');
 async function saveProfile(

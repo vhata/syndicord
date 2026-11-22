@@ -1,7 +1,7 @@
 import {
   loadConfig,
   loadFeeds,
-  MAX_ROUTES,
+  validateConfigurationSize,
   validateWebhooks,
 } from './config.ts';
 import type { RelayConfig } from './config.ts';
@@ -137,7 +137,7 @@ function publicSnapshot(value: ConfigurationSnapshot) {
     feeds: value.feeds,
     destinations: Object.keys(value.webhooks).sort(),
     revision: value.revision,
-    maxRoutes: MAX_ROUTES,
+    maxRoutes: null,
   };
 }
 
@@ -191,6 +191,7 @@ export async function saveAdminConfiguration(
     }
     webhooks = validateWebhooks(merged);
     loadConfig(feeds, webhooks);
+    validateConfigurationSize(feeds, webhooks);
   } catch (error) {
     // These validators return fixed messages or already validated destination names.
     throw new AdminError(

@@ -18,6 +18,53 @@ const rss = (ids: string[]) =>
   `<rss version="2.0"><channel><title>News</title>${ids.map((id) => `<item><guid isPermaLink="false">${id}</guid><title>${id}</title><link>https://example.com/${id}</link></item>`).join('')}</channel></rss>`;
 const quiet = () => {};
 
+test('more than twenty feeds rotate fully and preserve baselines and bounded delivery', async () => {
+  const { db, dispose } = await createTestDatabase();
+  try {
+    const expanded = loadConfig(
+      Array.from({ length: 30 }, (_, index) => ({
+        url: `${feed}/${index}`,
+        destinations: ['alpha'],
+      })),
+      { alpha: hookA },
+    );
+    const seen: string[] = [];
+    let ids = ['old'];
+    let sends = 0;
+    const fetcher: Fetcher = async (url) => {
+      if (url.startsWith(feed)) {
+        seen.push(url);
+        return new Response(rss(ids));
+      }
+      sends++;
+      return Response.json({ id: '123456' });
+    };
+    for (let index = 0; index < expanded.feeds.length; index++) {
+      const result = await runRelay(expanded, db, { fetcher, log: quiet });
+      assert.equal(result.baselined, 1);
+      assert.equal(result.sent, 0);
+    }
+    assert.deepEqual(
+      seen,
+      expanded.feeds.map((route) => route.url),
+    );
+    ids = ['old', 'new'];
+    for (let index = 0; index < expanded.feeds.length; index++) {
+      const result = await runRelay(expanded, db, { fetcher, log: quiet });
+      assert.equal(result.queued, 1);
+      assert.equal(result.sent, 1);
+    }
+    assert.equal(sends, 30);
+    assert.deepEqual(seen.slice(30), seen.slice(0, 30));
+    assert.equal(
+      (await runRelay(expanded, db, { fetcher, log: quiet })).sent,
+      0,
+    );
+  } finally {
+    await dispose();
+  }
+});
+
 test('end-to-end baselines then delivers new entries once to each destination', async () => {
   const { db, dispose } = await createTestDatabase();
   try {
