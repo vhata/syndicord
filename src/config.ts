@@ -6,7 +6,9 @@ export interface RelayConfig {
 }
 
 const NAME = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
-export const MAX_ROUTES = 20;
+export const MAX_CONFIGURATION_BYTES = 96 * 1024;
+export const CONFIGURATION_SIZE_ERROR =
+  'Saved configuration exceeds 96 KiB; remove unused destinations or shorten feed URLs';
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -90,14 +92,10 @@ export function validateWebhooks(value: unknown): Record<string, string> {
 }
 
 export function loadFeeds(feeds: unknown): FeedRoute[] {
-  if (!Array.isArray(feeds) || feeds.length > MAX_ROUTES) {
-    throw new Error(
-      `Feed configuration must be an array with at most ${MAX_ROUTES} feeds`,
-    );
-  }
+  if (!Array.isArray(feeds))
+    throw new Error('Feed configuration must be an array');
   const routes: FeedRoute[] = [];
   const urls = new Set<string>();
-  let routeCount = 0;
   for (const raw of feeds) {
     if (
       !record(raw) ||
@@ -113,27 +111,31 @@ export function loadFeeds(feeds: unknown): FeedRoute[] {
     if (urls.has(url)) throw new Error('Each feed URL must appear only once');
     urls.add(url);
     const names: string[] = [];
+    const usedNames = new Set<string>();
     for (const name of raw.destinations) {
-      if (
-        typeof name !== 'string' ||
-        !NAME.test(name) ||
-        names.includes(name)
-      ) {
+      if (typeof name !== 'string' || !NAME.test(name) || usedNames.has(name)) {
         throw new Error(
           'Destination names must be unique letters, digits, underscores or hyphens, starting with a letter',
         );
       }
       names.push(name);
-    }
-    routeCount += names.length;
-    if (routeCount > MAX_ROUTES) {
-      throw new Error(
-        `At most ${MAX_ROUTES} feed/destination pairs are supported`,
-      );
+      usedNames.add(name);
     }
     routes.push({ url, destinations: names });
   }
   return routes;
+}
+
+// Bound the complete normalized save, including omitted webhook changes.
+// Leave room within the 128 KiB API envelopes for revisions and metadata.
+// Reads remain available for older configurations so operators can shrink them.
+export function validateConfigurationSize(
+  feeds: readonly FeedRoute[],
+  webhooks: Readonly<Record<string, string>>,
+): void {
+  const bytes = new TextEncoder().encode(JSON.stringify({ feeds, webhooks }));
+  if (bytes.byteLength > MAX_CONFIGURATION_BYTES)
+    throw new Error(CONFIGURATION_SIZE_ERROR);
 }
 
 export function loadConfig(feeds: unknown, values: unknown): RelayConfig {

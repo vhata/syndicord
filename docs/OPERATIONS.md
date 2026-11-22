@@ -139,8 +139,17 @@ switching between configuration and infrastructure commands.
 ## Polling limits
 
 The default one-minute cron checks one feed and attempts at most five deliveries
-per run. With N feeds, each is checked about every N minutes. The limit is 20
-feed/destination pairs; a feed sent to two destinations uses two pairs.
+per run. With N feeds, each is checked about every N minutes. There is no fixed
+limit on the number of feeds or feed/destination pairs; a feed sent to two
+destinations uses two pairs. Larger installations take longer to revisit each
+feed, and delivery backlogs grow if new messages arrive faster than five per
+minute.
+
+Each save is limited to 96 KiB of normalized JSON for the complete feed list and
+webhook map, including unused saved destinations. This leaves room for API
+metadata within the 128 KiB request and response limits. Remove unused
+destinations or shorten feed URLs if a save reaches this size. Existing larger
+configurations remain readable so they can be reduced.
 
 Runs stop starting deliveries after 30 seconds; HTTP requests have six-second
 deadlines. Leases, retries, and Discord cooldowns can delay work further. Feeds

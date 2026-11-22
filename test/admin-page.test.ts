@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
 import { renderAccessPage, renderAdminPage } from '../src/admin-page.ts';
 
 test('installation branding is escaped and shared by the editor and access pages', () => {
@@ -77,6 +78,103 @@ test('branding defaults and invalid CSS values keep a readable header', () => {
   );
   assert.match(bounded, /<span class="installation-name">a{80}<\/span>/);
   assert.doesNotMatch(bounded, /a{81}/);
+});
+
+test('editor loads an uncapped configuration and saves beyond twenty routes', async () => {
+  class Element {
+    children: Element[] = [];
+    events = new Map<string, (event: { preventDefault(): void }) => void>();
+    textContent = '';
+    value = '';
+    hidden = true;
+    checked = false;
+    tag: string;
+
+    constructor(tag = 'div') {
+      this.tag = tag;
+    }
+    append(...children: Element[]) {
+      this.children.push(...children);
+    }
+    replaceChildren() {
+      this.children = [];
+    }
+    setAttribute() {}
+    focus() {}
+    reset() {}
+    addEventListener(
+      name: string,
+      listener: (event: { preventDefault(): void }) => void,
+    ) {
+      this.events.set(name, listener);
+    }
+    querySelectorAll(selector: string): Element[] {
+      const descendants = this.children.flatMap((child) => [
+        child,
+        ...child.querySelectorAll('*'),
+      ]);
+      return selector === 'input:checked'
+        ? descendants.filter((child) => child.tag === 'input' && child.checked)
+        : selector === '*'
+          ? descendants
+          : [];
+    }
+  }
+  const html = renderAdminPage('nonce', { id: '123', name: 'Test admin' });
+  const elements = new Map(
+    [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => [
+      match[1]!,
+      new Element(),
+    ]),
+  );
+  const byId = (id: string) => {
+    const element = elements.get(id);
+    assert.ok(element, `missing editor element ${id}`);
+    return element;
+  };
+  const script = html.match(/<script nonce="nonce">([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script);
+  let config = {
+    feeds: Array.from({ length: 30 }, (_, index) => ({
+      url: `https://example.com/${index}`,
+      destinations: ['updates'],
+    })),
+    destinations: ['updates'],
+    revision: 'first',
+    maxRoutes: null,
+  };
+  const saves: unknown[] = [];
+  runInNewContext(script, {
+    URL,
+    document: {
+      getElementById: byId,
+      createElement: (tag: string) => new Element(tag),
+      querySelectorAll: () => [],
+    },
+    window: { addEventListener() {}, confirm: () => true },
+    fetch: async (_url: string, init: RequestInit) => {
+      if (init.method === 'PUT') {
+        const body = JSON.parse(String(init.body));
+        saves.push(body);
+        config = { ...config, feeds: body.feeds, revision: 'second' };
+      }
+      return Response.json(config);
+    },
+  });
+  const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
+  await settle();
+  assert.equal(byId('workspace').hidden, false, byId('notice').textContent);
+  assert.equal(byId('route-count').textContent, '30');
+  assert.equal(byId('route-limit').textContent, 'routes');
+  byId('add-feed').events.get('click')!({ preventDefault() {} });
+  byId('feed-url').value = 'https://example.com/added';
+  byId('feed-form').events.get('submit')!({ preventDefault() {} });
+  await settle();
+  assert.equal(saves.length, 1, byId('notice').textContent);
+  assert.equal(config.feeds.length, 31);
+  assert.equal(config.feeds[30]!.url, 'https://example.com/added');
+  assert.equal(byId('route-count').textContent, '31');
+  assert.match(byId('notice').textContent, /Feed added/);
 });
 
 test('sign-in and denied-access pages provide account recovery without rendering the editor', () => {

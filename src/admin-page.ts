@@ -72,7 +72,8 @@ const script = String.raw`
   function render() {
     const pairCount = config.feeds.reduce((total, feed) => total + feed.destinations.length, 0);
     byId('route-count').textContent = String(pairCount);
-    byId('route-limit').textContent = String(config.maxRoutes);
+    byId('route-limit').textContent = config.maxRoutes === null
+      ? 'routes' : 'of ' + config.maxRoutes + ' routes';
     byId('feed-total').textContent = String(config.feeds.length);
     byId('webhook-total').textContent = String(config.destinations.length);
     byId('feed-empty-copy').textContent = config.destinations.length
@@ -189,7 +190,8 @@ const script = String.raw`
       throw new Error(result && typeof result.error === 'string' ? result.error : 'Could not save or load configuration. Please try again.');
     }
     if (!result || !Array.isArray(result.feeds) || !Array.isArray(result.destinations) ||
-        typeof result.revision !== 'string' || !Number.isInteger(result.maxRoutes)) {
+        typeof result.revision !== 'string' ||
+        (result.maxRoutes !== null && !Number.isInteger(result.maxRoutes))) {
       throw new Error('The server returned an unexpected response. Reload and try again.');
     }
     return result;
@@ -222,7 +224,7 @@ const script = String.raw`
   async function save(feeds, webhooks, message, focusId) {
     if (busy || stale || !config) return;
     const count = feeds.reduce((total, feed) => total + feed.destinations.length, 0);
-    if (count > config.maxRoutes) {
+    if (config.maxRoutes !== null && count > config.maxRoutes) {
       announce('This would use ' + count + ' routes. You can connect up to ' + config.maxRoutes + ' feed and destination pairs.', true);
       return;
     }
@@ -451,7 +453,7 @@ export function renderAdminPage(
     </div>
   </header>
   <main id="main">
-    <div class="page-heading"><h1>Feeds and webhooks</h1><p class="route-usage" id="route-usage" hidden><span id="route-count">0</span> / <span id="route-limit">20</span> routes used</p></div>
+    <div class="page-heading"><h1>Feeds and webhooks</h1><p class="route-usage" id="route-usage" hidden><span id="route-count">0</span> <span id="route-limit">routes</span></p></div>
     <div class="feedback">
       <p id="notice" class="notice" role="status" aria-live="polite" aria-atomic="true"></p>
       <button id="reload" class="button small secondary" type="button">Reload configuration</button>
