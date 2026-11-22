@@ -20,6 +20,7 @@ test('normalizes RSS IDs, relative links, HTML, entities, and undated content', 
       id: 'id:post-1',
       title: 'First & best',
       link: 'https://example.test/posts/one',
+      presentationLink: 'https://example.test/posts/one',
       description: 'Hello © world.\n\nNext 🚀.',
       publishedAt: '2026-11-18T12:00:00.000Z',
       feedTitle: 'News & Notes',
@@ -28,6 +29,7 @@ test('normalizes RSS IDs, relative links, HTML, entities, and undated content', 
       id: 'link:https://example.test/feeds/posts/two',
       title: 'Untitled',
       link: 'https://example.test/feeds/posts/two',
+      presentationLink: null,
       description: 'Undated content.',
       publishedAt: null,
       feedTitle: 'News & Notes',
@@ -46,6 +48,7 @@ test('normalizes Atom text constructs, xml:base, alternate links, and dates', as
       id: 'id:urn:post:one',
       title: 'First & best',
       link: 'https://example.test/blog/posts/one',
+      presentationLink: 'https://example.test/blog/posts/one',
       description: 'Hello & goodbye.',
       publishedAt: '2026-11-17T11:00:00.000Z',
       feedTitle: 'Example updates',
@@ -54,11 +57,92 @@ test('normalizes Atom text constructs, xml:base, alternate links, and dates', as
       id: 'id:urn:post:two',
       title: 'Two',
       link: null,
+      presentationLink: null,
       description: 'Plain <text> stays readable.',
       publishedAt: null,
       feedTitle: 'Example updates',
     },
   ]);
+});
+
+test('keeps private feed bases out of RSS presentation links without changing identities', async () => {
+  const privateFeed =
+    'https://example.test/private-path-token/feed.xml?token=private-query-token';
+  for (const [supplied, resolved, presentation] of [
+    ['#post', `${privateFeed}#post`, null],
+    ['./post', 'https://example.test/private-path-token/post', null],
+    [
+      '?page=2',
+      'https://example.test/private-path-token/feed.xml?page=2',
+      null,
+    ],
+    [
+      '/public/post?lang=en#section',
+      'https://example.test/public/post?lang=en#section',
+      'https://example.test/public/post?lang=en#section',
+    ],
+    [
+      'https://example.test/private-path-token/public-post',
+      'https://example.test/private-path-token/public-post',
+      'https://example.test/private-path-token/public-post',
+    ],
+    [
+      'https://other.test/post',
+      'https://other.test/post',
+      'https://other.test/post',
+    ],
+  ] as const) {
+    const feed = await parseFeedDocument(
+      rss(`<item><link>${supplied}</link></item>`),
+      privateFeed,
+    );
+    assert.equal(feed.entries[0]?.id, `link:${resolved}`);
+    assert.equal(feed.entries[0]?.link, resolved);
+    assert.equal(feed.entries[0]?.presentationLink, presentation);
+  }
+  const guid = 'https://example.test/private-path-token/public-post';
+  const feed = await parseFeedDocument(
+    rss(`<item><guid>${guid}</guid></item>`),
+    privateFeed,
+  );
+  assert.equal(feed.entries[0]?.id, `id:${guid}`);
+  assert.equal(feed.entries[0]?.presentationLink, guid);
+});
+
+test('tracks public Atom XML bases at feed, entry, and link scope', async () => {
+  const privateFeed =
+    'https://example.test/private%2Dpath-token/feed.xml?token=private-query-token';
+  for (const scope of ['feed', 'entry', 'link']) {
+    for (const [base, expected, presentation] of [
+      [
+        'nested/',
+        'https://example.test/private%2Dpath-token/nested/post',
+        null,
+      ],
+      [
+        '/public/',
+        'https://example.test/public/post',
+        'https://example.test/public/post',
+      ],
+      [
+        'https://other.test/public/',
+        'https://other.test/public/post',
+        'https://other.test/public/post',
+      ],
+    ] as const) {
+      const xmlBase = (name: string) =>
+        scope === name ? ` xml:base="${base}"` : '';
+      const xml = `<a:feed xmlns:a="http://www.w3.org/2005/Atom"${xmlBase('feed')}><a:title>Test</a:title><a:entry${xmlBase('entry')}><a:link href="post"${xmlBase('link')}/></a:entry></a:feed>`;
+      const feed = await parseFeedDocument(xml, privateFeed);
+      assert.equal(
+        feed.entries[0]?.id,
+        `link:${expected}`,
+        `${scope}: ${base}`,
+      );
+      assert.equal(feed.entries[0]?.link, expected);
+      assert.equal(feed.entries[0]?.presentationLink, presentation);
+    }
+  }
 });
 
 test('retains RSS paragraphs without changing legacy content fingerprints', async () => {

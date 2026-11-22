@@ -7,14 +7,19 @@ containing the original title, link, and a short description.
 Messages show the feed name above a linked entry title, with a teal accent and a
 source footer. A missing feed name falls back to the feed's hostname. The
 feed-name link uses only the site's origin, keeping the configured feed path and
-query private. Entry titles keep their supplied HTTP(S) links; missing or unsafe
-links, and links matching the configured feed URL, use the same origin. Polling
-and delivery identity still use the complete configured feed URL. The
-description preserves paragraph breaks and shows up to three paragraphs within a
-700-character excerpt. A repeated opening title is removed when it forms a
-complete paragraph; ordinary prose beginning with the same words is preserved.
-Long excerpts end with an ellipsis. The entry's publication time appears when
-the feed provides a valid date.
+query private. Entry titles keep supplied HTTP(S) links that resolve without
+inheriting the feed URL's path or query. Absolute links, root-relative links,
+and links using an explicit public XML base retain their targets. Links that
+need the private feed base, missing or unsafe links, and links matching the
+configured feed URL (with or without a fragment) use the source origin. Queued
+entries without presentation-link metadata also use the origin because their
+original link base, including any redirect, is unknown. Polling and delivery
+identity still use the complete configured feed URL and original resolved entry
+link. The description preserves paragraph breaks and shows up to three
+paragraphs within a 700-character excerpt. A repeated opening title is removed
+when it forms a complete paragraph; ordinary prose beginning with the same words
+is preserved. Long excerpts end with an ellipsis. The entry's publication time
+appears when the feed provides a valid date.
 
 Feed HTML is reduced to text and message mentions are disabled. Feed names are
 stored with pending entries so retries retain their source attribution.

@@ -2,6 +2,8 @@ export interface FeedEntry {
   id: string;
   title: string;
   link: string | null;
+  // Absent on older persisted entries; null means the link needs the private feed base.
+  presentationLink?: string | null;
   description: string;
   publishedAt: string | null;
   feedTitle?: string;

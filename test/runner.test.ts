@@ -67,6 +67,10 @@ test('failed destination retries persisted content after source disappears witho
         JSON.parse(String(init?.body)).embeds[0].author.name,
         'News',
       );
+      assert.equal(
+        JSON.parse(String(init?.body)).embeds[0].url,
+        'https://example.com/new',
+      );
       if (url.startsWith(hookA) && fail) throw new Error(`sensitive ${hookA}`);
       delivered.push(url);
       return Response.json({ id: '123456' });
@@ -152,6 +156,65 @@ test('paragraph formatting does not resend an existing fingerprinted baseline', 
     const result = await runRelay(config, db, { fetcher, log: quiet });
     assert.equal(result.queued, 0);
     assert.equal(result.sent, 0);
+  } finally {
+    await dispose();
+  }
+});
+
+test('pending entries without link provenance use the source origin and retain their identities', async () => {
+  const { db, dispose } = await createTestDatabase();
+  try {
+    const ledger = new DeliveryLedger(db);
+    const legacyConfig = loadConfig([{ url: feed, destinations: ['alpha'] }], {
+      alpha: hookA,
+    });
+    const links = [
+      'https://feeds.example/private-path-token/feed?token=private-query-token#post',
+      'https://redirected.test/private%2Dpath-token/post',
+      'https://example.test/public-post',
+    ];
+    await ledger.acquire('old-version');
+    await ledger.ingest('old-version', legacyConfig.feeds[0]!, []);
+    await ledger.ingest(
+      'old-version',
+      legacyConfig.feeds[0]!,
+      links.map((link) => ({
+        id: `link:${link}`,
+        title: 'Pending post',
+        link,
+        description: 'Still waiting to be delivered.',
+        publishedAt: null,
+      })),
+    );
+    await ledger.release('old-version');
+    let posts = 0;
+    const fetcher: Fetcher = async (url, init) => {
+      if (url === feed) return new Response(null, { status: 500 });
+      const body = String(init?.body);
+      assert.doesNotMatch(body, /private(?:%2D|-)(?:path|query)-token/);
+      assert.equal(JSON.parse(body).embeds[0].url, 'https://feeds.example/');
+      posts += 1;
+      return Response.json({ id: '123456' });
+    };
+    assert.equal(
+      (await runRelay(legacyConfig, db, { fetcher, log: quiet })).sent,
+      3,
+    );
+    assert.equal(posts, 3);
+    const delivered = await db
+      .prepare(
+        "SELECT DISTINCT entry_id FROM relay_deliveries WHERE state='sent' ORDER BY entry_id",
+      )
+      .all<{ entry_id: string }>();
+    assert.deepEqual(
+      delivered.results.map((row) => row.entry_id),
+      links.map((link) => `link:${link}`).sort(),
+    );
+    assert.equal(
+      (await runRelay(legacyConfig, db, { fetcher, log: quiet })).sent,
+      0,
+    );
+    assert.equal(posts, 3);
   } finally {
     await dispose();
   }

@@ -82,6 +82,23 @@ function messageLink(value: string | null): string | null {
   }
 }
 
+function publicEntryLink(entry: FeedEntry, source: URL | null): string | null {
+  // Older queued entries have no provenance, including the final feed URL
+  // after redirects. Their resolved identity link cannot safely be published.
+  const link = messageLink(entry.presentationLink ?? null);
+  if (!link || !source) return link;
+  const target = new URL(link);
+  if (target.origin !== source.origin) return link;
+  // A fragment must not bypass the existing configured-feed-URL fallback.
+  const sourceWithoutFragment = new URL(source);
+  sourceWithoutFragment.hash = '';
+  const targetWithoutFragment = new URL(target);
+  targetWithoutFragment.hash = '';
+  if (targetWithoutFragment.href === sourceWithoutFragment.href) return null;
+
+  return link;
+}
+
 export function buildMessage(
   entry: FeedEntry,
   feedUrl: string,
@@ -110,8 +127,7 @@ export function buildMessage(
   if (sourceUrl) embed.author.url = sourceUrl;
   const description = excerpt(entry);
   if (description) embed.description = description;
-  const entryUrl = messageLink(entry.link);
-  const url = entryUrl && entryUrl !== configuredFeedUrl ? entryUrl : sourceUrl;
+  const url = publicEntryLink(entry, source) ?? sourceUrl;
   if (url) embed.url = url;
   if (entry.publishedAt && Number.isFinite(Date.parse(entry.publishedAt))) {
     embed.timestamp = new Date(entry.publishedAt).toISOString();
