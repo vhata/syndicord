@@ -31,11 +31,6 @@ they cover. Each finding maps to at most one entry. Follow the
   - Starting point: `migrations/0004_web_admin.sql`, `src/admin-store.ts`, deployment entrypoints and setup guidance; provide a validated transition or preflight before replacing a working runtime, and verify existing routes remain deliverable without exposing secrets.
   - Findings: `legacy-webhook-configuration-upgrade`
 
-- [RELAY] `preserve-authentication-cooldown-deadline` — **Let cached Discord authentication cooldowns expire at their original deadline.** Repeated requests currently extend the stored delay after the provider recovers.
-  - Source: [Full review, 2026-11-21](2026-11-21-1240-full.md), 2026-11-21
-  - Starting point: `src/admin-auth.ts:453` and `test/admin-auth.test.ts`; distinguish cached cooldown responses from fresh provider 429s and verify repeated requests cannot move the deadline.
-  - Findings: `authentication-cooldown-slides-on-retry`
-
 - [RELAY] `normalize-atom-html-mime-content` — **Normalize Atom HTML content expressed with MIME types.** Valid content currently displays literal markup in Discord excerpts.
   - Source: [Full review, 2026-11-20](2026-11-20-1045-full.md), 2026-11-20
   - Starting point: `src/feed.ts` and `test/feed.test.ts`; cover `text/html`, `application/xhtml+xml`, and plain text while preserving existing fallback identities.
