@@ -154,8 +154,9 @@ See [permissions and verification](PERMISSIONS.md) for the exact rules.
 ## Single-role access
 
 Everyone with the configured role can edit the whole configuration. Add a
-webhook first, then select it when adding a feed. Use only this section's
-`feeds` / `webhooks` commands in this mode; scoped installations reject them.
+webhook first, then select it when adding a feed. Each feed needs at least one
+destination. Use only this section's `feeds` / `webhooks` commands in this mode;
+scoped installations reject them.
 
 ### Add or change webhooks
 

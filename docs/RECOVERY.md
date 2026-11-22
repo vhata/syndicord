@@ -144,15 +144,15 @@ Operators using a custom source build keep their intended runtime settings in
 `cloudflare.config.ts`. Hosted feeds and secrets are preserved.
 
 For optional GitHub deployment, inspect the failed run in **GitHub → Actions →
-Check → failed run → failed job**, or use the CLI below with its numeric ID.
-Repair and rerun that workflow instead of uploading a local checkout:
+CI → failed run → failed job**, or use the CLI below with its numeric ID. Repair
+and rerun that workflow instead of uploading a local checkout:
 
 ```sh
 gh run view FAILED_RUN_ID --log-failed
 ```
 
 After checking the active deployment and addressing the failure, start CI for
-current `main`: in **Actions → Check → Run workflow**, select **main**, or run:
+current `main`: in **Actions → CI → Run workflow**, select **main**, or run:
 
 ```sh
 gh workflow run check.yml --ref main
@@ -198,7 +198,7 @@ npm run syndicord -- feeds set --file .feeds.json
 ```
 
 If GitHub manages deployments, disable the workflow and wait for any active run
-to finish before a manual rollback. In **Actions → Check**, use the **…** menu's
+to finish before a manual rollback. In **Actions → CI**, use the **…** menu's
 **Disable workflow**, then inspect the run list; or run:
 
 ```sh

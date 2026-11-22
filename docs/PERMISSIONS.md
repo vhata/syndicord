@@ -53,9 +53,10 @@ grants, 16 servers, and 64 channels per grant within 16 KiB of JSON. An empty
    Variables and Secrets**, add `DISCORD_AUTH_POLICY` as a **Secret**, paste the
    JSON, and deploy the setting.
 3. Sign in to `/admin` again and choose **Verify and initialize catalog**, or
-   use the CLI:
+   use the CLI with the Worker origin (without `/admin`):
 
    ```sh
+   export SYNDICORD_ADMIN_URL='https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev'
    npm run syndicord -- login
    npm run syndicord -- catalog initialize
    ```
