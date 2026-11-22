@@ -251,6 +251,57 @@ test('keeps Atom plaintext paragraphs and existing fingerprints', async () => {
   );
 });
 
+test('XML preprocessing stays bounded for incomplete and completed literals', async (t) => {
+  for (const [pattern, valid] of [
+    ['<!--', false],
+    ['<![CDATA[', false],
+    ['<!--<![CDATA[', false],
+    ['<!--x-->', true],
+    ['<![CDATA[x]]>', true],
+    ['<!--x--><![CDATA[x]]>', true],
+  ] as const) {
+    await t.test(JSON.stringify(pattern), () => {
+      // Child timeouts catch synchronous stalls. CPU ceilings cover the
+      // algorithm under the fetch size limit, not hosted Worker headroom.
+      const child = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import assert from 'node:assert/strict';
+          import { parseFeedDocument } from ${JSON.stringify(new NodeURL('../src/feed.ts', import.meta.url).href)};
+          const pattern = ${JSON.stringify(pattern)};
+          const valid = ${valid};
+          const results = [];
+          for (const size of [16_000, 64_000, 240_000]) {
+            const body = pattern.repeat(Math.floor(size / pattern.length));
+            const xml = '<rss version="2.0"><channel><title>Test</title>' +
+              body + '<item><guid isPermaLink="false">stable</guid></item></channel></rss>';
+            assert.ok(Buffer.byteLength(xml) < 256 * 1024);
+            const before = process.cpuUsage();
+            for (let i = 0; i < 4; i++) {
+              const parsed = parseFeedDocument(xml, 'https://example.test/feed');
+              if (valid) assert.equal((await parsed).entries[0].id, 'id:stable');
+              else await assert.rejects(parsed, /XML is malformed/);
+            }
+            const cpu = process.cpuUsage(before);
+            results.push({ size, cpuMs: (cpu.user + cpu.system) / 1000 });
+          }
+          console.log(JSON.stringify(results));`,
+        ],
+        { encoding: 'utf8', timeout: 8_000 },
+      );
+      assert.equal(child.status, 0, child.error?.message ?? child.stderr);
+      const results: { size: number; cpuMs: number }[] = JSON.parse(
+        child.stdout,
+      );
+      assert.equal(results.length, 3);
+      for (const { size, cpuMs } of results)
+        assert.ok(cpuMs < 750, `${pattern}: ${size} bytes took ${cpuMs}ms CPU`);
+    });
+  }
+});
+
 test('bounds feed titles stored with entries and omits missing names', async () => {
   const long = await parseFeedDocument(
     rss('<item><guid>one</guid></item>').replace(
@@ -321,6 +372,46 @@ test('declaration examples inside CDATA and comments remain ordinary feed conten
   );
   assert.equal(feed.entries.length, 1);
   assert.match(feed.entries[0]!.description, /An example\./);
+});
+
+test('XML literals preserve nested opener text and expose declarations outside their bounds', async () => {
+  const feed = await parseFeedDocument(
+    rss(
+      '<!-- <![CDATA[ <!DOCTYPE ignored> -->' +
+        '<item><guid>one</guid><description><![CDATA[<!-- <!DOCTYPE hidden> --> <p>Visible.</p>]]></description></item>' +
+        '<item><guid>two</guid><description><![CDATA[Literal <![CDATA[ opener.]]></description></item>',
+    ),
+    url,
+  );
+  assert.equal(feed.entries[0]?.description, 'Visible.');
+  assert.equal(feed.entries[1]?.description, 'Literal <![CDATA[ opener.');
+  for (const xml of [
+    '<!-- harmless --> <!DOCTYPE rss SYSTEM "https://example.test/dtd">' +
+      rss(''),
+    rss('<description><![CDATA[safe]]></description><!ENTITY x "value">'),
+  ]) {
+    await assert.rejects(
+      parseFeedDocument(xml, url),
+      /declarations are not supported/,
+    );
+  }
+});
+
+test('XML literal removal preserves real Atom link bases and ignores literal examples', async () => {
+  const feed = await parseFeedDocument(
+    `<feed xmlns="http://www.w3.org/2005/Atom">
+      <!-- <![CDATA[ xml:base="https://wrong.example/" -->
+      <entry><id>one</id><content type="text"><![CDATA[xml:base="https://wrong.example/" <!DOCTYPE sample>]]></content>
+        <link xml:base="https://public.example/posts/" href="one"/>
+      </entry>
+    </feed>`,
+    url,
+  );
+  assert.equal(feed.entries[0]?.link, 'https://public.example/posts/one');
+  assert.equal(
+    feed.entries[0]?.description,
+    'xml:base="https://wrong.example/" <!DOCTYPE sample>',
+  );
 });
 
 test('rejects unsafe XML bases rather than resolving links against the wrong parent', async () => {
