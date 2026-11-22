@@ -324,6 +324,23 @@ async function normalize(candidate: Candidate): Promise<FeedEntry | null> {
   };
 }
 
+function xmlMarkup(value: string): string {
+  const parts: string[] = [];
+  const opening = /<!\[CDATA\[|<!--/g;
+  let cursor = 0;
+  for (let match = opening.exec(value); match; match = opening.exec(value)) {
+    const closing = match[0] === '<!--' ? '-->' : ']]>';
+    const end = value.indexOf(closing, opening.lastIndex);
+    // No later opener can close this literal. Leave the unfinished suffix
+    // for XML validation instead of searching it again at every opener.
+    if (end === -1) break;
+    parts.push(value.slice(cursor, match.index));
+    cursor = end + closing.length;
+    opening.lastIndex = cursor;
+  }
+  return parts.join('') + value.slice(cursor);
+}
+
 export async function parseFeedDocument(
   xml: string,
   feedUrl: string,
@@ -337,7 +354,7 @@ export async function parseFeedDocument(
     identity: configuredBase,
     public: new URL(configuredBase).origin + '/',
   };
-  const markup = xml.replace(/<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->/g, '');
+  const markup = xmlMarkup(xml);
   if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(markup)) {
     throw new Error('Feed document declarations are not supported');
   }
