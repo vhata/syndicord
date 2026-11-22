@@ -267,18 +267,20 @@ export class DeliveryLedger {
       );
     }
     if (limit === 0) return [];
-    const active = routes.flatMap((route) =>
-      route.destinations.map((destination) => ({
-        url: route.url,
-        destination,
-      })),
-    );
     const { results } = await this.db
       .prepare(
         `
+        WITH active AS MATERIALIZED (
+          SELECT DISTINCT json_extract(feeds.value, '$.url') AS feed_url,
+            destinations.value AS destination
+          FROM json_each(?) AS feeds
+          CROSS JOIN json_each(json_extract(feeds.value, '$.destinations')) AS destinations
+        )
         SELECT deliveries.feed_url, deliveries.destination,
           deliveries.payload, deliveries.attempts
         FROM relay_deliveries AS deliveries
+        JOIN active ON active.feed_url = deliveries.feed_url
+          AND active.destination = deliveries.destination
         LEFT JOIN relay_destinations AS destination
           ON destination.destination = deliveries.destination
         WHERE deliveries.state = 'pending'
@@ -289,18 +291,13 @@ export class DeliveryLedger {
             SELECT 1 FROM relay_destinations
             WHERE destination = '*' AND cooldown_until_ms > ${NOW_MS}
           )
-          AND EXISTS (
-            SELECT 1 FROM json_each(?) AS active
-            WHERE json_extract(active.value, '$.url') = deliveries.feed_url
-              AND json_extract(active.value, '$.destination') = deliveries.destination
-          )
           AND ${OWNER_GUARD}
         ORDER BY deliveries.first_seen_ms, deliveries.feed_url,
           deliveries.destination, deliveries.entry_id
         LIMIT ?
       `,
       )
-      .bind(JSON.stringify(active), owner, limit)
+      .bind(JSON.stringify(routes), owner, limit)
       .all<{
         feed_url: string;
         destination: string;

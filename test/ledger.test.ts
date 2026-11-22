@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, test } from 'node:test';
 import { DeliveryLedger, LostLeaseError } from '../src/ledger.ts';
+import {
+  loadConfig,
+  MAX_CONFIGURATION_BYTES,
+  validateConfigurationSize,
+} from '../src/config.ts';
 import type { FeedEntry, FeedRoute } from '../src/types.ts';
 import { createTestDatabase } from './helpers/d1.ts';
 
@@ -45,6 +50,67 @@ async function expire(): Promise<void> {
     .prepare('UPDATE relay_lease SET expires_at_ms = 0 WHERE id = 1')
     .run();
 }
+
+test('large fan-out keeps active-route parameters compact and filters removed routes without duplicates', async () => {
+  const names = Array.from({ length: 1100 }, (_, index) => `d${index}`);
+  const largeRoute = {
+    url: 'https://example.com/' + 'x'.repeat(2000),
+    destinations: names,
+  };
+  const webhooks = Object.fromEntries(
+    names.map((name, index) => [
+      name,
+      `https://discord.com/api/webhooks/${index + 1}/token`,
+    ]),
+  );
+  const config = loadConfig([largeRoute], webhooks);
+  validateConfigurationSize(config.feeds, config.webhooks);
+  const expandedBytes = Buffer.byteLength(
+    JSON.stringify(
+      names.map((destination) => ({ url: largeRoute.url, destination })),
+    ),
+  );
+  assert.ok(
+    expandedBytes > 2 * 1024 * 1024,
+    'repeating the URL would exceed D1 string limits',
+  );
+  await start();
+  await ledger.ingest(owner, largeRoute, []);
+  await ledger.ingest(owner, largeRoute, [entry('new')]);
+  const parameters: unknown[] = [];
+  const measured = new DeliveryLedger({
+    prepare(sql: string) {
+      const statement = db.prepare(sql);
+      return {
+        bind(...values: unknown[]) {
+          parameters.push(...values);
+          return statement.bind(...values);
+        },
+      };
+    },
+  } as unknown as D1Database);
+  const pending = await measured.pending(owner, config.feeds, 5);
+  assert.equal(pending.length, 5);
+  assert.ok(
+    parameters
+      .filter((value): value is string => typeof value === 'string')
+      .every((value) => Buffer.byteLength(value) < MAX_CONFIGURATION_BYTES),
+  );
+  const remaining = {
+    ...largeRoute,
+    destinations: [names[1099]!, names[1099]!],
+  };
+  const selected = await measured.pending(owner, [remaining, remaining], 5);
+  assert.deepEqual(
+    selected.map((delivery) => delivery.destination),
+    [names[1099]],
+  );
+  assert.deepEqual(await measured.pending(owner, [], 5), []);
+  assert.deepEqual(
+    await measured.pending('not-the-owner', config.feeds, 5),
+    [],
+  );
+});
 
 before(async () => {
   fixture = await createTestDatabase();
