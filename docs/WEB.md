@@ -211,6 +211,11 @@ in the browser tab. Both settings are optional:
 | `ADMIN_NAME`         | Installation name, for example `Community updates`. Surrounding spaces are removed; at most 80 characters are shown. |
 | `ADMIN_HEADER_COLOR` | Six-digit hex colour, for example `#304B70`. Header text automatically uses black or white for contrast.             |
 
+Use the
+[HTML Color Codes colour picker](https://htmlcolorcodes.com/color-picker/) to
+choose a colour, then copy its six-digit hex value, including the leading `#`,
+into `ADMIN_HEADER_COLOR`.
+
 In **Cloudflare Dashboard → Workers & Pages → your Worker → Settings → Variables
 and Secrets**, add either setting as a **Secret** and deploy the changes. These
 values are visible on the page; using the Secret type preserves them during code
