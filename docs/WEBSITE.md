@@ -21,9 +21,10 @@ npm run site:check
 npm run site:preview
 ```
 
-`site:check` builds the site and checks generated page links, anchors, and
-assets. `site:build` builds without the additional output check. Generated HTML
-and search data live in ignored `.vitepress/dist/`; do not commit them.
+`site:check` builds the site, verifies that only the selected pages are
+published, and checks generated page links, anchors, and assets. `site:build`
+builds without the additional output check. Generated HTML and search data live
+in ignored `.vitepress/dist/`; do not commit them.
 
 ## Edit content and appearance
 
@@ -31,13 +32,18 @@ and search data live in ignored `.vitepress/dist/`; do not commit them.
   readable as ordinary Markdown on GitHub, including relative file links.
 - Reuse the artwork in `assets/`. See [artwork](../assets/README.md) for its
   source files and colours.
-- Change the published page list, navigation, and site settings in
-  `.vitepress/config.mjs`. The theme lives under `.vitepress/theme/`.
+- Change the published page list and sidebar groups in `.vitepress/site.mjs`.
+  Page titles come from their Markdown headings.
+- Change navigation and site settings in `.vitepress/config.mjs`, and styling in
+  `.vitepress/theme/style.css`.
 
 The build converts links between published Markdown pages into website links.
 Links to repository files that are not published pages lead to GitHub. Review
 records, work queues, and design specs remain repository references. There is no
 separate copy of the documentation to synchronize.
+
+The site uses pinned VitePress and a scoped Vite override in `package.json`;
+review both when updating website dependencies.
 
 Before opening a PR, run the [complete project checks](QUALITY.md#gates).
 `scripts/check.sh` checks the website at both `/` and `/syndicord/`, covering
@@ -91,7 +97,7 @@ Variables** screen:
 | Variable         | Example                    | Meaning                                |
 | ---------------- | -------------------------- | -------------------------------------- |
 | `SITE_BASE_PATH` | `/`                        | Site path, with leading/trailing slash |
-| `SITE_URL`       | `https://docs.example.org` | Public origin for page metadata        |
+| `SITE_URL`       | `https://docs.example.org` | HTTP(S) origin without a path          |
 
 The equivalent variable commands are:
 
@@ -102,7 +108,8 @@ gh workflow run pages.yml --ref main
 ```
 
 Use `/` for an owner site named `OWNER.github.io` as well. For another subpath,
-set that path with leading and trailing slashes. Match a hosted path locally by
+set that path with leading and trailing slashes; path segments can contain
+letters, numbers, underscores, and hyphens. Match a hosted path locally by
 passing it to both build and preview:
 
 ```sh
