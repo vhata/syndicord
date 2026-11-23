@@ -17,7 +17,8 @@ bash docket/scripts/ci.sh
 - `scripts/setup.sh` installs pinned dependencies, builds the CLI and Worker,
   and installs commit hooks.
 - `scripts/check.sh` checks formatting, lint, types, source/runtime tests, and
-  npm installation.
+  npm installation, then builds and checks the website at root and project
+  paths.
 - `docket/scripts/ci.sh` checks the TODO and review queues for valid entries and
   checks relative documentation links and anchors. On GitHub pull requests, it
   also checks the PR description's queue markers. When run locally as above,
@@ -32,6 +33,10 @@ Run setup again when dependencies change, and in each new worktree. Use
 `npm test` for the source/runtime tests while working; run both check scripts
 before review. See [the complete command reference](QUALITY.md#gates) for
 individual checks and their scope.
+
+To work on the product website, run `npm run site:dev` after setup. Its pages
+come from the README and existing Markdown guides. See [website](WEBSITE.md) for
+production previews, theme changes, and GitHub Pages publication.
 
 ## Make a change
 

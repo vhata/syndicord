@@ -29,7 +29,8 @@ when the dependency manifest or lockfile changes.
 | `npm run check:staged`      | Prettier and Oxlint on staged files only                                                   |
 | `npm run check`             | Formatting, lint, generated Worker types, TypeScript, Worker build, and runtime/unit tests |
 | `npm run test:package`      | Build, normal npm installation, installed CLI, local D1, and deployment dry-runs           |
-| `bash scripts/check.sh`     | Both complete npm check commands, stopping on the first failure                            |
+| `npm run site:check`        | Static website build and generated page, anchor, and asset checks                          |
+| `bash scripts/check.sh`     | Source, installed-package, and website checks at root and project paths                    |
 | `bash docket/scripts/ci.sh` | Queue structure, Markdown links, and PR markers when PR metadata is supplied               |
 
 Toolchain versions are pinned in `.node-version`, `package.json`, and
@@ -183,8 +184,9 @@ and CI configuration. Inspect tracked files for stray credentials, generated
 output, databases, and package archives. Expected project files are
 TypeScript/JavaScript, SQL migrations, JSON, Markdown, shell scripts, workflow
 YAML, XML fixtures, SVG/PNG artwork, the license, and tool configuration.
-`node_modules/`, `.cloudflare/`, `dist/`, `.docket/`, and `.worktrees/` are
-private or generated state.
+`node_modules/`, `.cloudflare/`, `dist/`, `.vitepress/dist/`,
+`.vitepress/cache/`, `.docket/`, and `.worktrees/` are private or generated
+state.
 
 ## CI and hosting
 
@@ -203,6 +205,14 @@ To inspect CI, open the repository's **Actions → CI** page or use
 production deployment: use **Run workflow → main** or
 `gh workflow run check.yml --ref main` only when that deployment is intended.
 See [automatic deployment](DEPLOYMENT.md) for credentials and setup.
+
+`.github/workflows/pages.yml` separately builds and checks the product website
+on pull requests, pushes to main, and manual runs. It uploads only the checked
+static output. Its deployment job is limited to main pushes/manual runs and
+requires the opt-in `PAGES_ENABLED` repository variable. See
+[website publication](WEBSITE.md#publish-with-github-pages) for setup and path
+configuration. Local website checks establish neither a successful GitHub Pages
+deployment nor custom-domain DNS configuration.
 
 As inspected on 2026-11-20, the default branch's active GitHub ruleset prevents
 deletion and requires linear history, with an administrator bypass. It does not
