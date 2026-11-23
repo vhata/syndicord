@@ -593,6 +593,8 @@ test(
             ...runtimeOptions(`${adminOrigin}/admin/auth/callback`),
             port: Number(new URL(adminOrigin).port),
           });
+          // setOptions replaces runtime objects, including the D1 test stub.
+          const scopedDb = await runtime.getD1Database('DB');
           const scopedBrowser = await installedLogin(
             executable,
             hostile,
@@ -655,7 +657,7 @@ test(
           hasRole = false;
           assert.equal((await scopedBrowser('/admin/api/catalog')).status, 200);
           await admin(['catalog', 'list']);
-          await db
+          await scopedDb
             .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
             .bind(Date.now() - 120_000)
             .run();
