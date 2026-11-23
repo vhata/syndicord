@@ -239,6 +239,7 @@ test(
       assert.ok(files.includes('migrations/0003_runtime_configuration.sql'));
       assert.ok(files.includes('migrations/0004_web_admin.sql'));
       assert.ok(files.includes('migrations/0005_discord_auth.sql'));
+      assert.ok(files.includes('migrations/0007_session_permission_cache.sql'));
       assert.ok(
         !files.some(
           (path) =>
@@ -552,6 +553,17 @@ test(
         };
         assert.deepEqual(current.feeds, feeds);
         hasRole = false;
+        assert.deepEqual(
+          JSON.parse((await admin(['feeds', 'get'])).stdout),
+          feeds,
+        );
+        assert.equal((await browser('/admin/api/config')).status, 200);
+        // The installed browser and CLI keep their existing grants within the
+        // window, then both must refresh once persisted evidence has expired.
+        await db
+          .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+          .bind(Date.now() - 120_000)
+          .run();
         const rejected = await admin(['feeds', 'get'], { status: 2 });
         assert.match(rejected.stderr, /Access.*denied|role|server/i);
         const denied = await browser('/admin/api/config', {
@@ -581,6 +593,8 @@ test(
             ...runtimeOptions(`${adminOrigin}/admin/auth/callback`),
             port: Number(new URL(adminOrigin).port),
           });
+          // setOptions replaces runtime objects, including the D1 test stub.
+          const scopedDb = await runtime.getD1Database('DB');
           const scopedBrowser = await installedLogin(
             executable,
             hostile,
@@ -641,6 +655,12 @@ test(
             /catalog|scoped/i,
           );
           hasRole = false;
+          assert.equal((await scopedBrowser('/admin/api/catalog')).status, 200);
+          await admin(['catalog', 'list']);
+          await scopedDb
+            .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+            .bind(Date.now() - 120_000)
+            .run();
           assert.equal((await scopedBrowser('/admin/api/catalog')).status, 403);
           await admin(['catalog', 'list'], { status: 2 });
           hasRole = true;

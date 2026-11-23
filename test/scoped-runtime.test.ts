@@ -81,7 +81,18 @@ test('built Worker enforces scoped browser operations and verified delivery', as
           assert.equal(request.method, 'GET');
           assert.equal(request.headers.get('authorization'), null);
           lookups++;
-          if (revokeDuringLookup) roles = [feedRole];
+          if (revokeDuringLookup) {
+            roles = [feedRole];
+            // Simulate the lookup outliving cached evidence, so the final
+            // authorization must refresh before committing the destination.
+            const database = await runtime.getD1Database('DB');
+            await database
+              .prepare(
+                'UPDATE admin_sessions SET permissions_checked_at_ms = ?',
+              )
+              .bind(Date.now() - 120_000)
+              .run();
+          }
           return Response.json({
             id: hookId,
             type: 1,
@@ -156,6 +167,10 @@ test('built Worker enforces scoped browser operations and verified delivery', as
     );
     revokeDuringLookup = false;
     roles = [feedRole, routeRole];
+    await db
+      .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+      .bind(Date.now() - 120_000)
+      .run();
     await apply({
       type: 'destination.create',
       label: 'Updates',
@@ -227,6 +242,14 @@ test('built Worker enforces scoped browser operations and verified delivery', as
     assert.equal(sends, 1, 'moved webhook must never receive new content');
     assert.ok(lookups >= 4);
     roles = [routeRole];
+    assert.equal(
+      (await runtime.dispatchFetch(endpoint, { headers })).status,
+      200,
+    );
+    await db
+      .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+      .bind(Date.now() - 120_000)
+      .run();
     await apply(
       {
         type: 'feed.create',
@@ -236,6 +259,14 @@ test('built Worker enforces scoped browser operations and verified delivery', as
       403,
     );
     roles = [];
+    assert.equal(
+      (await runtime.dispatchFetch(endpoint, { headers })).status,
+      200,
+    );
+    await db
+      .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+      .bind(Date.now() - 120_000)
+      .run();
     assert.equal(
       (await runtime.dispatchFetch(endpoint, { headers })).status,
       403,

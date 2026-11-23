@@ -50,6 +50,8 @@ interface Session {
   expires_at_ms: number;
   config_hash: string;
   retry_at_ms: number;
+  permissions_json: string | null;
+  permissions_checked_at_ms: number | null;
 }
 
 interface OAuthRequest {
@@ -66,6 +68,12 @@ interface CliRequest {
   poll_after_ms: number;
 }
 
+interface PermissionEvidence {
+  permissions: AdminPermissions;
+  checkedAt: number;
+}
+
+const PERMISSION_CACHE_MS = 120_000;
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const LOGIN_MS = 10 * 60 * 1000;
 const POLL_MS = 2000;
@@ -329,16 +337,25 @@ async function jsonBody(request: Request) {
   }
 }
 
-function retryError(value: string | null) {
+function retrySeconds(value: unknown): number | null {
+  if (
+    (typeof value !== 'number' && typeof value !== 'string') ||
+    (typeof value === 'string' && !value.trim())
+  )
+    return null;
   const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+function retryError(value: unknown) {
+  const seconds = retrySeconds(value);
+  const retryAfter =
+    seconds === null ? 60 : Math.min(3600, Math.max(1, Math.ceil(seconds)));
   const error = new AuthError(
-    'Discord is rate limiting access checks. Wait and try again.',
+    `Discord is rate limiting access checks. Wait ${retryAfter} seconds, then try again.`,
     429,
   );
-  error.retryAfter =
-    Number.isFinite(seconds) && seconds > 0
-      ? Math.min(3600, Math.max(1, Math.ceil(seconds)))
-      : 60;
+  error.retryAfter = retryAfter;
   return error;
 }
 
@@ -363,8 +380,22 @@ async function discordRequest(
       throw new Error('Unexpected Discord redirect');
     }
     if (result.status === 429) {
-      await result.body?.cancel();
-      throw retryError(result.headers.get('retry-after'));
+      let retryAfter = retrySeconds(result.headers.get('retry-after'));
+      try {
+        const body: unknown = JSON.parse(
+          await boundedText(result.body, 64 * 1024, controller.signal),
+        );
+        if (body && typeof body === 'object' && !Array.isArray(body)) {
+          const bodyDelay = retrySeconds(
+            (body as Record<string, unknown>).retry_after,
+          );
+          if (bodyDelay !== null)
+            retryAfter = Math.max(retryAfter ?? 0, bodyDelay);
+        }
+      } catch {
+        // Keep the provider status and any valid header if its body is invalid.
+      }
+      throw retryError(retryAfter);
     }
     const text = await boundedText(result.body, 64 * 1024, controller.signal);
     return new Response(text, {
@@ -498,44 +529,199 @@ async function readSession(
   return session;
 }
 
+function checkCooldown(session: Session) {
+  const now = Date.now();
+  if (session.retry_at_ms > now) {
+    const error = retryError((session.retry_at_ms - now) / 1000);
+    error.user = { id: session.user_id, name: session.user_name };
+    throw error;
+  }
+}
+
+// This only validates the local credential, expiry, configuration and cooldown.
+// It never grants permissions: mutations still check authorization after
+// reading their body, and again after scoped webhook lookups before storage.
+export async function requireAdminSession(
+  request: Request,
+  env: AuthEnv,
+): Promise<void> {
+  const config = configured(env, request);
+  checkCooldown(await readSession(request, env, config));
+}
+
+function cachedPermissions(
+  session: Session,
+  config: AuthConfiguration,
+): PermissionEvidence | null {
+  const checkedAt = session.permissions_checked_at_ms;
+  const now = Date.now();
+  if (
+    typeof checkedAt !== 'number' ||
+    !Number.isSafeInteger(checkedAt) ||
+    checkedAt > now ||
+    now - checkedAt >= PERMISSION_CACHE_MS ||
+    typeof session.permissions_json !== 'string' ||
+    session.permissions_json.length > 128 * 1024
+  )
+    return null;
+  try {
+    const value: unknown = JSON.parse(session.permissions_json);
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return null;
+    const cached = value as Record<string, unknown>;
+    if (
+      Object.keys(cached).some(
+        (key) => !['mode', 'addFeeds', 'channels'].includes(key),
+      ) ||
+      typeof cached.addFeeds !== 'boolean' ||
+      !Array.isArray(cached.channels)
+    )
+      return null;
+    if (!config.policy) {
+      return cached.mode === 'legacy' &&
+        cached.addFeeds &&
+        cached.channels.length === 0
+        ? {
+            permissions: { mode: 'legacy', addFeeds: true, channels: [] },
+            checkedAt,
+          }
+        : null;
+    }
+    if (
+      cached.mode !== 'scoped' ||
+      (cached.addFeeds && !config.policy.grants.some((grant) => grant.addFeeds))
+    )
+      return null;
+    const allowed = new Set(
+      config.policy.grants.flatMap((grant) =>
+        grant.channelIds.map((id) => `${grant.guildId}:${id}`),
+      ),
+    );
+    const channels: AdminPermissions['channels'] = [];
+    const seen = new Set<string>();
+    for (const item of cached.channels) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+      const channel = item as Record<string, unknown>;
+      if (
+        Object.keys(channel).some(
+          (key) => !['guildId', 'channelId'].includes(key),
+        ) ||
+        typeof channel.guildId !== 'string' ||
+        typeof channel.channelId !== 'string'
+      )
+        return null;
+      const pair = `${channel.guildId}:${channel.channelId}`;
+      if (!allowed.has(pair) || seen.has(pair)) return null;
+      seen.add(pair);
+      channels.push({ guildId: channel.guildId, channelId: channel.channelId });
+    }
+    if (!cached.addFeeds && channels.length === 0) return null;
+    return {
+      permissions: { mode: 'scoped', addFeeds: cached.addFeeds, channels },
+      checkedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function activeSession(
+  session: Session,
+  env: AuthEnv,
+  config: AuthConfiguration,
+) {
+  const active = await env.DB.prepare(
+    'SELECT * FROM admin_sessions WHERE token_hash = ? AND kind = ? AND user_id = ? AND expires_at_ms > ? AND config_hash = ?',
+  )
+    .bind(
+      session.token_hash,
+      session.kind,
+      session.user_id,
+      Date.now(),
+      await configurationHash(config),
+    )
+    .first<Session>();
+  if (!active)
+    throw new AuthError(
+      'Your session expired or signed out. Sign in with Discord again.',
+      401,
+    );
+  checkCooldown(active);
+  return active;
+}
+
 async function checkSession(
   session: Session,
   env: AuthEnv,
   config: AuthConfiguration,
   fetcher: DiscordFetch,
-) {
-  const now = Date.now();
-  if (session.retry_at_ms > now) {
-    const error = retryError(
-      String(Math.ceil((session.retry_at_ms - now) / 1000)),
-    );
-    error.user = { id: session.user_id, name: session.user_name };
-    throw error;
-  }
-  let permissions: AdminPermissions;
+): Promise<{ identity: AdminIdentity; evidence: PermissionEvidence }> {
+  checkCooldown(session);
+  let providerRateLimit = false;
   try {
-    permissions = await membership(
-      config,
-      await open(session, await configurationKey(env.CONFIG_ENCRYPTION_KEY)),
-      session.user_id,
-      fetcher,
+    // Decrypt even on a hit so encryption-key rotation invalidates the session.
+    const token = await open(
+      session,
+      await configurationKey(env.CONFIG_ENCRYPTION_KEY),
     );
-    // Checking several servers can outlive a session or a concurrent logout.
-    const active = await env.DB.prepare(
-      'SELECT token_hash FROM admin_sessions WHERE token_hash = ? AND kind = ? AND expires_at_ms > ? AND config_hash = ?',
-    )
-      .bind(
-        session.token_hash,
-        session.kind,
-        Date.now(),
-        await configurationHash(config),
+    let evidence = cachedPermissions(session, config);
+    const refresh = evidence === null;
+    if (!evidence) {
+      // Start the lifetime before checking multiple servers, never after a slow
+      // response and never from the time an existing cache entry is read.
+      const checkedAt = Date.now();
+      try {
+        evidence = {
+          permissions: await membership(
+            config,
+            token,
+            session.user_id,
+            fetcher,
+          ),
+          checkedAt,
+        };
+      } catch (error) {
+        providerRateLimit = error instanceof AuthError && error.status === 429;
+        throw error;
+      }
+    }
+    if (refresh) {
+      const result = await env.DB.prepare(
+        'UPDATE admin_sessions SET permissions_json = ?, permissions_checked_at_ms = ? WHERE token_hash = ? AND kind = ? AND user_id = ? AND config_hash = ? AND expires_at_ms > ? AND retry_at_ms <= ?',
       )
-      .first();
-    if (!active)
+        .bind(
+          JSON.stringify(evidence.permissions),
+          evidence.checkedAt,
+          session.token_hash,
+          session.kind,
+          session.user_id,
+          await configurationHash(config),
+          Date.now(),
+          Date.now(),
+        )
+        .run();
+      if (result.meta.changes !== 1) {
+        await activeSession(session, env, config);
+        throw new AuthError('Your session changed. Try again shortly.', 503);
+      }
+    }
+    // Recheck after cryptography, provider work and cache persistence: none may
+    // outlive a logout, expiry or a concurrent provider cooldown.
+    await activeSession(session, env, config);
+    if (Date.now() - evidence.checkedAt >= PERMISSION_CACHE_MS)
       throw new AuthError(
-        'Your session expired or signed out. Sign in with Discord again.',
-        401,
+        'Discord access checks took too long. Try again shortly.',
+        503,
       );
+    return {
+      identity: {
+        id: session.user_id,
+        name: session.user_name,
+        kind: session.kind,
+        permissions: evidence.permissions,
+      },
+      evidence,
+    };
   } catch (error) {
     if (error instanceof AuthError) {
       error.user = { id: session.user_id, name: session.user_name };
@@ -543,21 +729,15 @@ async function checkSession(
         await env.DB.prepare('DELETE FROM admin_sessions WHERE token_hash = ?')
           .bind(session.token_hash)
           .run();
-      if (error.retryAfter)
+      if (providerRateLimit && error.retryAfter)
         await env.DB.prepare(
-          'UPDATE admin_sessions SET retry_at_ms = ? WHERE token_hash = ?',
+          'UPDATE admin_sessions SET retry_at_ms = MAX(retry_at_ms, ?) WHERE token_hash = ?',
         )
           .bind(Date.now() + error.retryAfter * 1000, session.token_hash)
           .run();
     }
     throw error;
   }
-  return {
-    id: session.user_id,
-    name: session.user_name,
-    kind: session.kind,
-    permissions,
-  };
 }
 
 export async function requireAdmin(
@@ -567,7 +747,7 @@ export async function requireAdmin(
 ): Promise<AdminIdentity> {
   const config = configured(env, request);
   const session = await readSession(request, env, config);
-  return checkSession(session, env, config, fetcher);
+  return (await checkSession(session, env, config, fetcher)).identity;
 }
 
 async function createSession(
@@ -577,6 +757,7 @@ async function createSession(
   user: { id: string; name: string },
   accessToken: string,
   expiresAt: number,
+  evidence?: PermissionEvidence,
 ) {
   const token = random();
   const tokenHash = await digest(token);
@@ -586,7 +767,7 @@ async function createSession(
     tokenHash,
   );
   await env.DB.prepare(
-    'INSERT INTO admin_sessions (token_hash, kind, user_id, user_name, encrypted_token, expires_at_ms, config_hash) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO admin_sessions (token_hash, kind, user_id, user_name, encrypted_token, expires_at_ms, config_hash, permissions_json, permissions_checked_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   )
     .bind(
       tokenHash,
@@ -596,6 +777,8 @@ async function createSession(
       encrypted,
       expiresAt,
       await configurationHash(config),
+      evidence ? JSON.stringify(evidence.permissions) : null,
+      evidence?.checkedAt ?? null,
     )
     .run();
   return { token, expiresAt, user };
@@ -798,8 +981,18 @@ async function callback(
           : identity.username,
     };
     let denied = false;
+    let evidence: PermissionEvidence | undefined;
+    const checkedAt = Date.now();
     try {
-      await membership(config, token.access_token, user.id, fetcher);
+      evidence = {
+        permissions: await membership(
+          config,
+          token.access_token,
+          user.id,
+          fetcher,
+        ),
+        checkedAt,
+      };
     } catch (error) {
       if (!(error instanceof AuthError) || error.status !== 403) throw error;
       denied = true;
@@ -812,6 +1005,7 @@ async function callback(
       user,
       token.access_token,
       Date.now() + Math.min(SESSION_MS, token.expires_in! * 1000),
+      evidence,
     );
     const target = denied
       ? '/admin?auth=denied'
@@ -1160,9 +1354,10 @@ async function pollCli(
       env,
       config,
       'cli',
-      user,
+      user.identity,
       await open(session, await configurationKey(env.CONFIG_ENCRYPTION_KEY)),
       session.expires_at_ms,
+      user.evidence,
     ),
   );
 }

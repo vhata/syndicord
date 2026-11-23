@@ -90,11 +90,20 @@ npm run syndicord -- cf workers secrets update DISCORD_AUTH_POLICY \
 Configuring this secret requires access to the installation’s Cloudflare
 account. A present policy replaces the single-server gate; it never adds that
 gate's broad permissions. Invalid policy JSON disables administration. Policy
-changes invalidate existing sessions. Remove roles or server membership to
-revoke their grants: every read and mutation checks Discord, and mutations check
-again after uploads and webhook lookups. Discord outages, rate limits, or
-malformed membership responses block access until verification succeeds.
-Existing routes continue after management access is revoked.
+changes invalidate existing sessions immediately. Removing a Discord role or
+server membership revokes its grants after the session's current permission
+window expires, at most two minutes after its last successful check. Reads and
+writes can reuse those verified permissions during that fixed window; use does
+not extend it.
+
+Every request validates the local session. Writes check authorization after
+uploads and scoped webhook lookups, refreshing expired permissions through
+Discord. Once the window expires, outages, rate limits, or malformed responses
+block access until verification succeeds; stale grants are never a fallback.
+Local logout and known session expiry remain immediate. See
+[granting and revoking access](WEB.md#grant-and-revoke-access) for the browser,
+CLI, and token-revocation behavior. Existing routes continue after management
+access is revoked.
 
 ## Initialize an existing installation
 

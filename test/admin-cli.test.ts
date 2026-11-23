@@ -761,9 +761,9 @@ test('status keeps Cloudflare targeting even when administration variables are c
   assert.equal(fetched, false);
 });
 
-test('removing the Discord role between CLI read and write blocks saving while logout remains available', async () => {
+test('membership cache expiring between CLI read and write observes role removal while logout remains available', async () => {
   const options = { roles: [TEST_ROLE_ID] };
-  const { browser, fetcher, workerEnv, dispose } = await fixture(options);
+  const { browser, fetcher, workerEnv, db, dispose } = await fixture(options);
   try {
     await browser.write(await browser.read(), feeds, { updates: webhook });
     const calls: string[] = [];
@@ -773,7 +773,13 @@ test('removing the Discord role between CLI read and write blocks saving while l
       adminFetch: async (url, init) => {
         calls.push(init.method!);
         const response = await fetcher(url, init);
-        if (init.method === 'GET') options.roles = [];
+        if (init.method === 'GET') {
+          options.roles = [];
+          await db
+            .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+            .bind(Date.now() - 120_000)
+            .run();
+        }
         return response;
       },
     });

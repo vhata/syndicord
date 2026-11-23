@@ -98,7 +98,7 @@ export function parseAuthPolicy(raw: string): AuthPolicy {
   return { version: 1, grants };
 }
 
-/** Membership evidence must come from Discord for the current request. */
+/** Derive permissions from verified Discord membership evidence. */
 export function permissionsForRoles(
   policy: AuthPolicy,
   rolesByGuild: ReadonlyMap<string, readonly string[]>,

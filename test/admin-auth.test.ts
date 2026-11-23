@@ -51,6 +51,14 @@ async function fixture() {
   const database = await createTestDatabase();
   return { ...database, env: authEnv(database.db) };
 }
+// Simulate elapsed membership-cache time without changing grants or the local
+// session lifetime. Provider-failure regressions must exercise a real refresh.
+async function expireMembershipEvidence(db: D1Database) {
+  await db
+    .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+    .bind(Date.now() - 120_000)
+    .run();
+}
 async function begin(env: AuthEnv, fetcher: DiscordFetch = discordFixture()) {
   const response = (await handleAuth(req('/admin/auth/login'), env, fetcher))!;
   assert.equal(response.status, 303, await response.clone().text());
@@ -131,8 +139,8 @@ test('scoped auth is operator-controlled and never falls back from an invalid po
   }
 });
 
-test('one Discord sign-in combines server-role grants and rechecks partial role revocation', async () => {
-  const { env: legacy, dispose } = await fixture();
+test('one Discord sign-in caches combined server-role grants and refreshes partial revocation after expiry', async () => {
+  const { env: legacy, db, dispose } = await fixture();
   const env = scopedEnv(legacy);
   const calls: Request[] = [];
   const guilds = {
@@ -155,11 +163,18 @@ test('one Discord sign-in combines server-role grants and rechecks partial role 
     });
     assert.equal(
       calls.length,
-      2,
-      'one membership fetch per guild despite multiple grants',
+      0,
+      'the callback checked each guild and seeded the cached grants',
     );
     guilds[TEST_GUILD_ID].roles = [SECOND_ROLE_ID];
     guilds[SECOND_GUILD_ID].roles = [];
+    assert.deepEqual(
+      (await requireAdmin(signed(cookie), env, fetcher)).permissions,
+      user.permissions,
+      'role changes remain cached within the approved window',
+    );
+    assert.equal(calls.length, 0);
+    await expireMembershipEvidence(db);
     assert.deepEqual(
       (await requireAdmin(signed(cookie), env, fetcher)).permissions,
       {
@@ -168,7 +183,13 @@ test('one Discord sign-in combines server-role grants and rechecks partial role 
         channels: [{ guildId: TEST_GUILD_ID, channelId: FIRST_CHANNEL_ID }],
       },
     );
+    assert.equal(
+      calls.length,
+      2,
+      'one refresh per guild despite multiple grants',
+    );
     guilds[TEST_GUILD_ID].roles = [];
+    await expireMembershipEvidence(db);
     await assert.rejects(
       requireAdmin(signed(cookie), env, fetcher),
       authError(403),
@@ -179,7 +200,7 @@ test('one Discord sign-in combines server-role grants and rechecks partial role 
 });
 
 test('absent guild membership grants nothing while other servers still grant their exact scopes', async () => {
-  const { env: legacy, dispose } = await fixture();
+  const { env: legacy, db, dispose } = await fixture();
   const env = scopedEnv(legacy);
   const guilds = {
     [TEST_GUILD_ID]: { roles: [TEST_ROLE_ID], status: 404 },
@@ -190,6 +211,7 @@ test('absent guild membership grants nothing while other servers still grant the
     const { cookie } = await browserLogin(env, fetcher);
     for (const status of [403, 404]) {
       guilds[TEST_GUILD_ID].status = status;
+      await expireMembershipEvidence(db);
       assert.deepEqual(
         (await requireAdmin(signed(cookie), env, fetcher)).permissions,
         {
@@ -202,6 +224,7 @@ test('absent guild membership grants nothing while other servers still grant the
       );
     }
     guilds[SECOND_GUILD_ID].status = 404;
+    await expireMembershipEvidence(db);
     await assert.rejects(
       requireAdmin(signed(cookie), env, fetcher),
       authError(403),
@@ -223,6 +246,7 @@ test('unavailable or malformed checks fail closed even after another guild grant
   try {
     const { cookie } = await browserLogin(env, fetcher);
     guilds[SECOND_GUILD_ID].status = 500;
+    await expireMembershipEvidence(db);
     await assert.rejects(
       requireAdmin(signed(cookie), env, fetcher),
       authError(503),
@@ -325,6 +349,7 @@ test('membership checks cannot authorize a session that expired or logged out wh
   try {
     for (const change of ['expiry', 'logout']) {
       const { cookie } = await browserLogin(env, fetcher);
+      await expireMembershipEvidence(db);
       const delayed: DiscordFetch = async (input, init) => {
         const response = await fetcher(input, init);
         if (String(input).includes(SECOND_GUILD_ID)) {
@@ -696,7 +721,7 @@ test('sessions are bounded, configuration-bound, invalidated by logout, and brow
   }
 });
 
-test('each access rechecks membership; role removal, revocation, malformed membership and Discord failures fail closed', async () => {
+test('membership refresh after cache expiry fails closed on role removal, revocation, malformed membership and Discord failures', async () => {
   const { env, db, dispose } = await fixture();
   const options: { roles: string[]; status: number } = {
     roles: [TEST_ROLE_ID],
@@ -707,6 +732,11 @@ test('each access rechecks membership; role removal, revocation, malformed membe
     const { cookie } = await browserLogin(env, fetcher);
     await requireAdmin(signed(cookie), env, fetcher);
     options.roles = [];
+    assert.equal(
+      (await requireAdmin(signed(cookie), env, fetcher)).kind,
+      'browser',
+    );
+    await expireMembershipEvidence(db);
     await assert.rejects(
       requireAdmin(signed(cookie), env, fetcher),
       authError(403),
@@ -746,11 +776,12 @@ test('each access rechecks membership; role removal, revocation, malformed membe
 });
 
 test('Discord rate limits propagate Retry-After and prevent repeated membership calls during the cooldown', async () => {
-  const { env, dispose } = await fixture();
+  const { env, db, dispose } = await fixture();
   const options = { status: 200, retryAfter: '37', calls: [] as Request[] };
   const fetcher = discordFixture(options);
   try {
     const { cookie } = await browserLogin(env, fetcher);
+    await expireMembershipEvidence(db);
     options.status = 429;
     await assert.rejects(
       requireAdmin(signed(cookie), env, fetcher),
@@ -806,6 +837,7 @@ for (const kind of ['browser', 'cli'] as const)
       };
 
       options.status = 429;
+      await expireMembershipEvidence(db);
       await assert.rejects(requireAdmin(request, env, fetcher), limited(2));
       assert.equal(await deadline(), started + 2000);
       const calls = options.calls.length;
@@ -832,6 +864,13 @@ for (const kind of ['browser', 'cli'] as const)
       now += 100;
       options.status = 429;
       options.retryAfter = '3';
+      assert.equal((await requireAdmin(request, env, fetcher)).kind, kind);
+      assert.equal(
+        options.calls.length,
+        calls + 1,
+        'recovery seeds a fresh cache',
+      );
+      now = started + 122_000;
       await assert.rejects(requireAdmin(request, env, fetcher), limited(3));
       assert.equal(await deadline(), now + 3000);
       assert.equal(options.calls.length, calls + 2);
@@ -842,7 +881,7 @@ for (const kind of ['browser', 'cli'] as const)
   });
 
 test('CLI browser approval issues a separate opaque application token under the same role checks and logout invalidates it', async () => {
-  const { env, dispose } = await fixture();
+  const { env, db, dispose } = await fixture();
   const options = { roles: [TEST_ROLE_ID] };
   const fetcher = discordFixture(options);
   try {
@@ -862,6 +901,8 @@ test('CLI browser approval issues a separate opaque application token under the 
       authError(401),
     );
     options.roles = [];
+    assert.equal((await requireAdmin(request, env, fetcher)).kind, 'cli');
+    await expireMembershipEvidence(db);
     await assert.rejects(requireAdmin(request, env, fetcher), authError(403));
     const logout = (await handleAuth(
       post(
@@ -1150,7 +1191,7 @@ test('failed CLI consent ends its terminal request and a validated failed accoun
 });
 
 test('CLI approval denial offers identity, logout and account recovery and stops terminal polling', async () => {
-  const { env, dispose } = await fixture();
+  const { env, db, dispose } = await fixture();
   const options = { roles: [TEST_ROLE_ID] };
   const fetcher = discordFixture(options);
   try {
@@ -1165,6 +1206,7 @@ test('CLI approval denial offers identity, logout and account recovery and stops
       verificationUri: string;
     };
     options.roles = [];
+    await expireMembershipEvidence(db);
     const page = (await handleAuth(
       new Request(pending.verificationUri, { headers: { Cookie: cookie } }),
       env,
@@ -1188,9 +1230,10 @@ test('CLI approval denial offers identity, logout and account recovery and stops
 });
 
 test('Discord redirects and oversized responses fail closed without following or exposing provider content', async () => {
-  const { env, dispose } = await fixture();
+  const { env, db, dispose } = await fixture();
   try {
     const { cookie } = await browserLogin(env);
+    await expireMembershipEvidence(db);
     for (const response of [
       new Response('', {
         status: 302,
@@ -1222,10 +1265,11 @@ test('Discord redirects and oversized responses fail closed without following or
 });
 
 test('the Discord timeout cancels a stalled response body and never authorizes access', async (context) => {
-  const { env, dispose } = await fixture();
+  const { env, db, dispose } = await fixture();
   let cancelled = false;
   try {
     const { cookie } = await browserLogin(env);
+    await expireMembershipEvidence(db);
     let fetched!: () => void;
     const ready = new Promise<void>((resolve) => {
       fetched = resolve;
@@ -1255,7 +1299,7 @@ test('the Discord timeout cancels a stalled response body and never authorizes a
   }
 });
 
-test('the authentication migration preserves saved feeds, encrypted webhooks, revision and delivery ledger', async () => {
+test('the authentication migrations preserve saved feeds, encrypted webhooks, revision and delivery ledger', async () => {
   const { env, db, dispose } = await fixture();
   try {
     await db.batch(
@@ -1290,17 +1334,22 @@ test('the authentication migration preserves saved feeds, encrypted webhooks, re
     const beforeLedger = await db
       .prepare('SELECT * FROM relay_deliveries')
       .first();
-    const migration = await readFile(
-      new NodeURL('../migrations/0005_discord_auth.sql', import.meta.url),
-      'utf8',
-    );
-    await db.batch(
-      migration
-        .split(';')
-        .map((sql) => sql.trim())
-        .filter(Boolean)
-        .map((sql) => db.prepare(sql)),
-    );
+    for (const name of [
+      '0005_discord_auth.sql',
+      '0007_session_permission_cache.sql',
+    ]) {
+      const migration = await readFile(
+        new NodeURL(`../migrations/${name}`, import.meta.url),
+        'utf8',
+      );
+      await db.batch(
+        migration
+          .split(';')
+          .map((sql) => sql.trim())
+          .filter(Boolean)
+          .map((sql) => db.prepare(sql)),
+      );
+    }
     assert.deepEqual(
       await db.prepare('SELECT * FROM relay_configuration').first(),
       beforeConfig,
@@ -1380,6 +1429,9 @@ test('CLI approval POST handles role removal, session expiry and Discord failure
       const approval = /name="approval" value="([A-Za-z0-9_-]+)"/.exec(
         await page.text(),
       )![1]!;
+      // Local session expiry remains immediate; Discord changes require a
+      // refresh only after the successful membership evidence has expired.
+      if (failure !== 'expired') await expireMembershipEvidence(db);
       if (failure === 'role') options.roles = [];
       if (failure === 'expired')
         await db.prepare('UPDATE admin_sessions SET expires_at_ms = 0').run();
