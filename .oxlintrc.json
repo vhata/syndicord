@@ -11,6 +11,9 @@
     ".wrangler/**",
     ".cloudflare/**",
     "dist/**",
-    "coverage/**"
+    "coverage/**",
+    ".vitepress/dist/**",
+    ".vitepress/cache/**",
+    ".vitepress/.temp/**"
   ]
 }

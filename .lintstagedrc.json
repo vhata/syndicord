@@ -3,5 +3,5 @@
     "prettier --write",
     "oxlint --deny-warnings --no-error-on-unmatched-pattern"
   ],
-  "*.{json,jsonc,md,mdx,yaml,yml}": "prettier --write"
+  "*.{json,jsonc,md,mdx,yaml,yml,vue,css}": "prettier --write"
 }

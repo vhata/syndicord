@@ -6,3 +6,8 @@ docket/
 
 # Private review evidence and scratch fixtures.
 .docket/
+
+# Generated website assets.
+.vitepress/dist/
+.vitepress/cache/
+.vitepress/.temp/

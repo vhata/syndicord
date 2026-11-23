@@ -17,3 +17,7 @@ syndicord-*.tgz
 
 *.log
 .DS_Store
+
+.vitepress/dist/
+.vitepress/cache/
+.vitepress/.temp/
