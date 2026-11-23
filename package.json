@@ -14,8 +14,8 @@
     "check": "npm run format:check && npm run lint && npm run check:types && npm test",
     "check:staged": "lint-staged",
     "check:types": "npm run types && tsc --noEmit",
-    "format": "prettier --write \"**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,mdx,yaml,yml}\"",
-    "format:check": "prettier --check \"**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,mdx,yaml,yml}\"",
+    "format": "prettier --write \"**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,mdx,yaml,yml,vue,css}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,mdx,yaml,yml,vue,css}\"",
     "format:markdown": "prettier --write \"**/*.{md,mdx}\"",
     "format:markdown:check": "prettier --check \"**/*.{md,mdx}\"",
     "lint": "oxlint --deny-warnings .",
@@ -30,30 +30,38 @@
     "test": "npm run build && node --test --test-concurrency=2 test/*.test.ts",
     "syndicord": "node cli/index.ts",
     "package": "npm run build && node scripts/build-package.ts",
-    "test:package": "npm run package && node --test test/package-acceptance.ts"
+    "test:package": "npm run package && node --test test/package-acceptance.ts",
+    "site:dev": "vitepress dev --host 127.0.0.1",
+    "site:build": "vitepress build",
+    "site:preview": "vitepress preview --host 127.0.0.1",
+    "site:check": "npm run site:build && node scripts/check-site.mjs"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "esbuild": "0.28.2",
+    "github-slugger": "2.0.0",
     "husky": "9.1.7",
     "lint-staged": "17.6.1",
     "miniflare": "5.20261118.0-beta",
     "oxlint": "1.94.0",
+    "parse5": "8.0.0",
     "prettier": "3.10.1",
     "typescript": "7.0.2",
-    "wrangler": "4.165.0",
-    "esbuild": "0.28.2"
+    "vitepress": "1.6.4",
+    "wrangler": "4.165.0"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
     "workerd@1.20261118.1": true,
     "fsevents": false,
-    "workerd@1.20261117.1": true
+    "workerd@1.20261117.1": true,
+    "esbuild@0.25.12": true
   },
   "dependencies": {
+    "cf": "1.0.0-rc.1",
     "entities": "7.0.1",
     "fast-xml-parser": "5.12.1",
     "feedsmith": "3.1.0",
-    "cf": "1.0.0-rc.1",
     "oauth4webapi": "3.8.9"
   },
   "bin": {
@@ -67,5 +75,10 @@
     "docs/",
     "LICENSE",
     "README.md"
-  ]
+  ],
+  "overrides": {
+    "vitepress": {
+      "vite": "6.4.6"
+    }
+  }
 }

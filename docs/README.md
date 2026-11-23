@@ -43,6 +43,7 @@ other common jobs:
 | Reference                                                               | What it contains                                                                       |
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | [Development](DEVELOPMENT.md)                                           | Local setup, contribution steps, and source layout                                     |
+| [Website](WEBSITE.md)                                                   | Preview, content and theme changes, and GitHub Pages publication                       |
 | [Quality and validation](QUALITY.md)                                    | Checks, hooks, package verification, and evidence limits                               |
 | [Provider API recipes](API.md)                                          | Optional advanced automation when dashboard or direct CLI commands do not cover a task |
 | [Docket contract](../docket/CONTRACT.md)                                | Branch, worktree, review, and landing rules                                            |
