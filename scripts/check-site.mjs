@@ -1,14 +1,22 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'parse5';
-import { basePath, routeFor, sources } from '../.vitepress/site.mjs';
+import {
+  basePath,
+  publicOrigin,
+  routeFor,
+  sources,
+} from '../.vitepress/site.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, '.vitepress/dist');
 const base = basePath();
-const origin = 'https://site-check.invalid';
+const hostedOrigin = publicOrigin();
+const origin = hostedOrigin || 'https://site-check.invalid';
+const socialImage = readFileSync(resolve(root, 'assets/social-preview.png'));
 const files = readdirSync(output, { recursive: true })
   .filter((file) => file.endsWith('.html'))
   .sort();
@@ -24,7 +32,23 @@ function document(file) {
   const parsed = parse(readFileSync(resolve(output, file), 'utf8'));
   const ids = new Set();
   const references = [];
+  const metadata = new Map();
+  let canonical;
   function visit(node) {
+    const attributes = Object.fromEntries(
+      (node.attrs || []).map(({ name, value }) => [name, value]),
+    );
+    if (node.tagName === 'meta') {
+      const key = attributes.property || attributes.name;
+      if (key?.startsWith('og:') || key?.startsWith('twitter:')) {
+        assert(!metadata.has(key), `${file}: duplicate ${key}`);
+        metadata.set(key, attributes.content);
+      }
+    }
+    if (node.tagName === 'link' && attributes.rel === 'canonical') {
+      assert.equal(canonical, undefined, `${file}: duplicate canonical URL`);
+      canonical = attributes.href;
+    }
     for (const { name, value } of node.attrs || []) {
       if (name === 'id' || (node.tagName === 'a' && name === 'name'))
         ids.add(value);
@@ -33,7 +57,7 @@ function document(file) {
     for (const child of node.childNodes || []) visit(child);
   }
   visit(parsed);
-  const result = { ids, references };
+  const result = { ids, references, metadata, canonical };
   documents.set(file, result);
   return result;
 }
@@ -68,8 +92,56 @@ function checkReference(from, reference, fragment = true) {
 }
 
 for (const file of files) {
-  for (const reference of document(file).references)
-    checkReference(file, reference);
+  const { references, metadata, canonical } = document(file);
+  for (const reference of references) checkReference(file, reference);
+  const meta = (key) => {
+    const value = metadata.get(key);
+    assert(value?.trim(), `${file}: missing ${key}`);
+    return value;
+  };
+  assert.equal(meta('og:type'), 'website');
+  assert.equal(meta('og:site_name'), 'syndicord');
+  assert.equal(meta('twitter:card'), 'summary_large_image');
+  for (const key of ['title', 'description', 'image', 'image:alt']) {
+    assert.equal(meta(`og:${key}`), meta(`twitter:${key}`));
+  }
+  assert.equal(meta('og:image:type'), 'image/png');
+  const image = meta('og:image');
+  assert.match(image, hostedOrigin ? /^https?:\/\// : /^\/(?!\/)/);
+  const imageUrl = new URL(image, `${origin}${base}${file}`);
+  assert.equal(
+    imageUrl.origin,
+    origin,
+    `${file}: image must use the site origin`,
+  );
+  assert(
+    imageUrl.pathname.startsWith(base),
+    `${file}: image escapes site base`,
+  );
+  checkReference(file, image, false);
+  const png = readFileSync(
+    resolve(output, decodeURIComponent(imageUrl.pathname.slice(base.length))),
+  );
+  assert.deepEqual(
+    png,
+    socialImage,
+    `${file}: published artwork differs from source`,
+  );
+  assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(png.readUInt32BE(16), 1280);
+  assert.equal(png.readUInt32BE(20), 640);
+  assert.equal(meta('og:image:width'), String(png.readUInt32BE(16)));
+  assert.equal(meta('og:image:height'), String(png.readUInt32BE(20)));
+  const hash = createHash('sha256').update(png).digest('hex').slice(0, 12);
+  assert(imageUrl.pathname.endsWith(`/social-preview-${hash}.png`));
+  if (hostedOrigin) {
+    const expected = `${origin}${base}${file.replace(/index\.html$/, '')}`;
+    assert.equal(meta('og:url'), expected);
+    assert.equal(canonical, expected);
+  } else {
+    assert.equal(metadata.has('og:url'), false);
+    assert.equal(canonical, undefined);
+  }
 }
 for (const file of readdirSync(output, { recursive: true }).filter((file) =>
   file.endsWith('.css'),
@@ -85,5 +157,5 @@ assert.equal(
   `Website links and assets failed:\n${failures.join('\n')}`,
 );
 console.log(
-  `Website verified: ${sources.length} content pages, 404 page, ${checked} local links/assets at ${base}`,
+  `Website verified: ${sources.length} content pages, 404 page, social previews, ${checked} local links/assets at ${base}`,
 );

@@ -26,8 +26,8 @@
     <text x="80" y="245" fill="#86E4D1" font-size="17" font-weight="700" letter-spacing="3">RSS + ATOM → DISCORD</text>
     <text x="76" y="332" fill="#F6FCFA" font-size="68" font-weight="700" letter-spacing="-2">Your feeds.</text>
     <text x="76" y="410" fill="#F6FCFA" font-size="68" font-weight="700" letter-spacing="-2">In the conversation.</text>
-    <text x="80" y="477" fill="#AAC2C7" font-size="24">A scheduled relay on Cloudflare Workers.</text>
-    <text x="80" y="573" fill="#7C9DA5" font-size="18">github.com/vhata/syndicord</text>
+    <text x="80" y="477" fill="#AAC2C7" font-size="24">Discord webhooks. Discord roles. No bot to install.</text>
+    <text x="80" y="573" fill="#7C9DA5" font-size="18">syndicord.vhata.net</text>
   </g>
   <g transform="translate(925 147)">
     <rect x="26" y="0" width="186" height="108" rx="18" fill="#24454D" stroke="#3B6970"/>

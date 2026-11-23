@@ -1,4 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { defineConfig } from 'vitepress';
 import { slug } from 'github-slugger';
 import {
@@ -20,9 +22,19 @@ const mark = readFileSync(
   'utf8',
 );
 const favicon = `data:image/svg+xml,${encodeURIComponent(mark)}`;
-const description = JSON.parse(
-  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-).description;
+const description =
+  'RSS and Atom updates in your Discord channels, delivered through webhooks. No bot to install. Editing access follows your Discord roles.';
+const socialImage = readFileSync(
+  new URL('../assets/social-preview.png', import.meta.url),
+);
+const imageHash = createHash('sha256')
+  .update(socialImage)
+  .digest('hex')
+  .slice(0, 12);
+const imagePath = `assets/social-preview-${imageHash}.png`;
+const imageUrl = `${origin || ''}${base}${imagePath}`;
+const imageAlt =
+  'syndicord: Your feeds. In the conversation. Feed cards flow into a teal message bubble. Discord webhooks and roles, with no bot to install.';
 const excludes = [
   ...readdirSync(root).filter(
     (name) => !['README.md', 'docs', '.vitepress'].includes(name),
@@ -79,36 +91,43 @@ export default defineConfig({
     }
   },
   transformHead({ pageData }) {
+    const title =
+      pageData.title === 'syndicord'
+        ? 'syndicord — feeds to Discord, without a bot'
+        : `${pageData.title} | syndicord`;
+    const summary = pageData.description || description;
     const head = [
-      [
-        'meta',
-        {
-          property: 'og:title',
-          content:
-            pageData.title === 'syndicord'
-              ? pageData.title
-              : `${pageData.title} | syndicord`,
-        },
-      ],
-      [
-        'meta',
-        {
-          property: 'og:description',
-          content: pageData.description || description,
-        },
-      ],
+      ['meta', { property: 'og:title', content: title }],
+      ['meta', { property: 'og:description', content: summary }],
       ['meta', { property: 'og:type', content: 'website' }],
+      ['meta', { property: 'og:site_name', content: 'syndicord' }],
+      ['meta', { property: 'og:image', content: imageUrl }],
+      ['meta', { property: 'og:image:type', content: 'image/png' }],
+      ['meta', { property: 'og:image:width', content: '1280' }],
+      ['meta', { property: 'og:image:height', content: '640' }],
+      ['meta', { property: 'og:image:alt', content: imageAlt }],
+      ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+      ['meta', { name: 'twitter:title', content: title }],
+      ['meta', { name: 'twitter:description', content: summary }],
+      ['meta', { name: 'twitter:image', content: imageUrl }],
+      ['meta', { name: 'twitter:image:alt', content: imageAlt }],
     ];
     if (origin) {
       const path = pageData.relativePath
         .replace(/\.md$/, '.html')
         .replace(/index\.html$/, '');
-      head.push([
-        'link',
-        { rel: 'canonical', href: `${origin}${base}${path}` },
-      ]);
+      const url = `${origin}${base}${path}`;
+      head.push(
+        ['link', { rel: 'canonical', href: url }],
+        ['meta', { property: 'og:url', content: url }],
+      );
     }
     return head;
+  },
+  buildEnd(siteConfig) {
+    const target = resolve(siteConfig.outDir, imagePath);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, socialImage);
   },
   vite: {
     publicDir: false,

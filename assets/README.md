@@ -9,13 +9,18 @@ not a Cloudflare or Discord logo.
 | `syndicord.svg`      | Editable, font-independent mark with a transparent background |
 | `syndicord.png`      | Transparent 256 × 256 raster export                           |
 | `social-preview.svg` | Editable 1280 × 640 conceptual feed-to-chat artwork           |
-| `social-preview.png` | Opaque social preview for repository links                    |
+| `social-preview.png` | Opaque social preview for website and repository links        |
 
 The social artwork is an illustration, not a product screenshot. Its text uses
 Arial, with Helvetica and sans-serif fallbacks. Font availability can change
 text rendering when exporting the SVG; the committed PNG is the intended upload
 image. The mark itself contains no text or external assets and works on light
 and dark backgrounds.
+
+The website publishes the committed social PNG at a content-versioned URL and
+advertises it in its link-preview metadata. After changing the SVG, regenerate
+the PNG before building the site. See
+[website link previews](../docs/WEBSITE.md#link-previews).
 
 ## Export
 
