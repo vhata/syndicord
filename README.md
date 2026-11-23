@@ -16,9 +16,16 @@ syndicord brings RSS and Atom updates into Discord. It runs on Cloudflare
 Workers, checks feeds on a schedule, and posts new entries to the channels you
 choose. Messages include the feed name, title, link, and a short excerpt.
 
-**Reading updates?** Just follow the Discord channel. You need no syndicord
-account or software. **Managing updates?** Use the web editor or CLI; both save
-to the same installation, and changes need no code deployment.
+- **No bot to invite or authorize.** Create a webhook for each destination
+  channel. syndicord uses those webhooks to post feed updates, with no bot
+  installation on your server.
+- **Discord roles control access.** Editors sign in with Discord. The host
+  selects the roles that can edit; grant or revoke access through those roles.
+  No separate accounts or per-person permission lists. See
+  [sign-in and access](docs/WEB.md).
+- **Use the web editor or CLI.** Readers just follow the Discord channel, with
+  no extra account or software. Editors manage feeds and channels from either
+  client; changes need no code deployment.
 
 ## Start here
 

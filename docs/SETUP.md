@@ -9,6 +9,11 @@ Discord server, and Node.js 26.12 or newer in the 26.x line with npm 11. An
 installation is one **Worker** (the running service) and one **D1 database**
 (feeds, encrypted webhook URLs, routing, and delivery history).
 
+Discord delivery uses channel webhooks, so you do not invite or authorize a bot
+on your server. [Discord sign-in](WEB.md) uses an OAuth application to check
+members' roles. You choose which roles can edit feeds and channels, then grant
+or revoke people's access by managing those roles in Discord.
+
 Follow the steps below in order. GitHub automatic deployment is optional; you do
 not need your own repository to host syndicord.
 
