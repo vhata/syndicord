@@ -1,5 +1,12 @@
 # Operational status
 
+**Requires access to the installation’s Cloudflare account.** If you only manage
+feeds or channels, ask the person who hosts syndicord to run this check. For
+live logs and CPU errors, use **Cloudflare → Workers & Pages → your Worker →
+Logs → Live** and **Metrics**, or
+[tail events in the CLI](RECOVERY.md#inspect-a-run). The status report below
+summarizes saved D1 health; it is not a live delivery test.
+
 Inspect polling health and pending deliveries without invoking the Worker or
 sending a Discord message:
 
@@ -9,11 +16,12 @@ export SYNDICORD_DATABASE_ID='your-existing-database-uuid'
 npm run syndicord -- status
 ```
 
-The command uses the project's `cf` dependency and its existing authentication.
-For the [npm-installed CLI](SETUP.md#optional-npm-installation), use
-`npx --no-install syndicord status`. It only queries D1; it needs no webhook
-secret or `.dev.vars` file. Hosted reads count toward D1 usage. The database ID
-is non-secret deployment configuration; use the ID recorded for the deployment
+First [sign in to Cloudflare](OPERATIONS.md#select-a-cloudflare-installation) if
+needed. The command uses the project's pinned `cf` dependency. For the
+[npm-installed CLI](SETUP.md#optional-npm-installation), use
+`npx syndicord status`. It only queries D1; it needs no webhook secret or
+`.dev.vars` file. Hosted reads count toward D1 usage. The database ID is
+non-secret deployment configuration; use the ID recorded for the deployment
 rather than creating a new database. Use `npm run syndicord -- status --local`
 from a development checkout for its local D1 state instead. Remote is the
 default for the CLI; the command never changes migrations, releases a lease, or
@@ -21,8 +29,8 @@ resumes a suspended destination.
 
 Deployment applies migrations. A fresh installation has no feeds and reports
 `disabled`. Add configuration through [the web interface](WEB.md) or
-[CLI](OPERATIONS.md). Until the Worker records completed polls, active feeds
-have status `unknown`; older delivery history does not establish current health.
+[CLI](USAGE.md). Until the Worker records completed polls, active feeds have
+status `unknown`; older delivery history does not establish current health.
 
 ## Reading the report
 
@@ -52,7 +60,19 @@ checks both the run heartbeat and each feed's health.
 The output includes pending counts and oldest pending age for active routes,
 alongside destination suspension/cooldown state. Removed routes are excluded;
 their retained pending deliveries resume if the same configuration is restored.
-Feed indices identify entries in `npm run syndicord -- feeds get`. Only
+Feed indices are zero-based positions in the current relay feed list. How you
+match them to configuration depends on the installation's editing permissions:
+
+- With **one admin role**, members can edit all feeds and destinations: inspect
+  the list with `npm run syndicord -- feeds get`.
+- With **separate feed and channel permissions**, roles manage the shared feed
+  catalog, specified channels, or both. The report omits catalog feeds without
+  subscriptions, so its feed indices are **not catalog IDs**. The bulk
+  `feeds get` command is unavailable.
+
+Destination names in this report are delivery-tracking keys, which may differ
+from destination labels and IDs shown in the editor or by `destinations list`.
+Use the [recovery notes](RECOVERY.md#inspect-a-run) when matching records. Only
 hostnames are printed; feed paths/query strings, webhook URLs, fingerprints, and
 message payloads are not included.
 

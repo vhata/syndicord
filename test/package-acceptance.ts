@@ -770,7 +770,7 @@ test(
 );
 
 test(
-  'normal npm Git installation isolates caller Git state and runs without a retained checkout',
+  'packing from Git and installing globally preserves caller state and runs through npx from another directory',
   { timeout: 240_000 },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), 'syndicord git install '));
@@ -785,6 +785,7 @@ test(
       CLOUDFLARE_API_TOKEN: 'not-a-real-token-git-test',
       SYNDICORD_DATABASE_ID: '12345678-1234-4234-8234-123456789abc',
       SYNDICORD_WORKER_NAME: 'git-package-test',
+      npm_config_loglevel: 'error',
     };
     const run = (
       command: string,
@@ -875,7 +876,7 @@ test(
         inherited.CLOUDFLARE_API_TOKEN,
       );
       const fixture = join(directory, 'git source');
-      const prefix = join(directory, 'installation');
+      const prefix = join(directory, 'global installation');
       await mkdir(fixture);
       await mkdir(prefix);
       for (const path of [
@@ -913,19 +914,38 @@ test(
       run(
         'npm',
         [
+          'pack',
+          `git+${pathToFileURL(fixture).href}#${commit}`,
+          '--pack-destination',
+          directory,
+        ],
+        parent,
+      );
+      const tarballs = (await readdir(directory)).filter((path) =>
+        path.endsWith('.tgz'),
+      );
+      assert.equal(tarballs.length, 1);
+      const tarball = join(directory, tarballs[0]!);
+      await rm(fixture, { recursive: true, force: true });
+      run(
+        'npm',
+        [
           'install',
+          '--global',
+          '--prefix',
+          prefix,
           '--no-audit',
           '--no-fund',
-          `git+${pathToFileURL(fixture).href}#${commit}`,
+          tarball,
         ],
-        prefix,
+        parent,
       );
-      const installed = join(prefix, 'node_modules/syndicord');
+      const installed = join(prefix, 'lib/node_modules/syndicord');
       assert.equal((await lstat(installed)).isSymbolicLink(), false);
       for (const path of ['src/index.ts', 'cli/index.ts', 'feeds.json'])
         await assert.rejects(readFile(join(installed, path)));
       for (const dependency of ['husky', 'typescript', 'esbuild', 'wrangler'])
-        for (const base of [prefix, installed])
+        for (const base of [join(prefix, 'lib'), installed])
           await assert.rejects(
             readFile(join(base, `node_modules/${dependency}/package.json`)),
           );
@@ -933,16 +953,33 @@ test(
       await readFile(
         join(installed, 'dist/worker/v1/workers/default/bundle/index.js'),
       );
-      await rm(fixture, { recursive: true, force: true });
+      await rm(tarball);
+      // A fresh offline cache proves npx resolves the installed global binary
+      // without downloading a registry package or depending on the source tree.
+      const npxEnvironment = {
+        ...environment,
+        npm_config_prefix: prefix,
+        npm_config_cache: join(directory, 'empty npx cache'),
+        npm_config_offline: 'true',
+      };
       assert.match(
-        run('npx', ['--no-install', 'syndicord', '--help'], prefix),
+        run('npx', ['syndicord', '--help'], parent, npxEnvironment),
         /Usage: syndicord/,
+      );
+      assert.match(
+        run(
+          'npx',
+          ['syndicord', 'deploy', '--dry-run'],
+          parent,
+          npxEnvironment,
+        ),
+        /Validated package for Worker git-package-test/,
       );
       const runtimeBin = join(directory, 'runtime-bin');
       await mkdir(runtimeBin);
       await symlink(process.execPath, join(runtimeBin, 'node'));
       const runtimeEnvironment = { ...environment, PATH: runtimeBin };
-      const executable = join(prefix, 'node_modules/.bin/syndicord');
+      const executable = join(prefix, 'bin/syndicord');
       assert.match(
         run(executable, ['--help'], directory, runtimeEnvironment),
         /Usage: syndicord/,

@@ -1,12 +1,41 @@
 # TODO
 
-Ordinary follow-ups live here; promoted codebase-review findings live in
-[review/BACKLOG.md](review/BACKLOG.md). Follow the
-[queue guide](docket/TODO_GUIDE.md) when adding or claiming work.
+This is the project's staged queue of deferred work, used by people and
+coding agents. Looking for something to implement? Start with
+[Ready for separate work](#ready-for-separate-work), then follow the
+[queue guide](docket/TODO_GUIDE.md#selecting-and-claiming) to check that an
+entry is unclaimed. [Needs triage](#needs-triage) holds ideas needing a
+decision; [Needs proof of concept](#needs-proof-of-concept) needs an
+experiment first; [Waiting](#waiting) holds understood but blocked work.
+
+The repeated headings are slots for stages and priorities (P0 is most
+urgent, P3 least; Unprioritized has not been assigned a priority). Empty
+headings are intentional: no entries currently occupy that slot. An empty
+Ready section means nothing in this queue is ready to pick up yet.
+Completed entries are removed; their history remains in git.
+
+Ordinary follow-ups and bugs found during other work live here.
+Whole-codebase review findings promoted for separate work live in
+[review/BACKLOG.md](review/BACKLOG.md). Follow
+[docket/TODO_GUIDE.md](docket/TODO_GUIDE.md) before adding, claiming, moving
+or resolving an entry.
 
 ## Needs triage
 
 ### Unprioritized
+
+- [RELAY] `initial-feed-entries` — **Design an option to send a few recent entries when a feed is added.** The first successful poll currently establishes a silent baseline, so a new subscription gives no immediate example of its content.
+  - Source: User request, PR #25 and `task/docs-navigation`, 2026-11-22
+  - Starting point: `docs/BEHAVIOR.md#baselines-and-entry-identity`, `src/ledger.ts`, and the browser/CLI subscription flows.
+  - Decide the opt-in control, default and maximum entry count, selection/order when dates are absent or unreliable, and whether the option applies when adding a destination to an existing feed. Preserve duplicate prevention and retry behavior; distinguish first subscription from restoring a previous route.
+  - Related: `busy-feed-delivery-policy`
+
+- [RELAY] `busy-feed-delivery-policy` — **Design predictable delivery for busy feeds and document the reasons for polling limits.** Bursts and sustained traffic can outpace the shared delivery budget, while longer feed rotations can miss entries before they are observed.
+  - Source: User request, PR #25 and `task/docs-navigation`, 2026-11-22
+  - Starting point: `docs/BEHAVIOR.md#polling-limits`, `src/runner.ts`, `src/ledger.ts`, `src/http.ts`, `src/feed.ts`, and status reporting.
+  - Decide pacing, batching or digests, ordering and fairness across feeds/destinations, retry and Discord cooldown interactions, and what happens to an excessive backlog; make any coalescing or dropped entries explicit to installation owners and feed/channel administrators.
+  - Assess polling cadence versus source retention, configuration and feed-size bounds, request/run deadlines, provider quotas, and growth of retained identities and pending payloads. Explain which limits protect runtime resources or correctness, how installation owners recognize approaching them, and the trade-offs of making them configurable or retaining less history.
+  - Related: `initial-feed-entries`
 
 - [RELAY] `web-admin-security` — **Review remaining administration request boundaries and secret/key lifecycle.** Discord authentication, revocable sessions, and server/role authorization are implemented; assess any additional controls separately without broadening this authentication change.
   - Source: User request, PR #14, and `task/discord-admin-auth`, 2026-11-21
