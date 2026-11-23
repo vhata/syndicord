@@ -5,7 +5,12 @@ feeds, destinations, or subscriptions, use the [everyday guide](USAGE.md).
 
 ## Access models
 
-The installation owner chooses how Discord roles grant editing access:
+Editing access follows Discord server roles. The installation owner chooses
+which roles grant which permissions; after setup, grant or revoke a person's
+access by assigning or removing those roles in Discord. There are no separate
+syndicord accounts or per-person access lists to maintain.
+
+Choose an access model:
 
 | Model                                                     | Permissions                                                                                                                                                            |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
