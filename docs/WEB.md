@@ -5,9 +5,7 @@ an existing installation, start with [managing feeds](USAGE.md).
 [First deployment](SETUP.md) brings you here once the Worker is running.
 
 People sign in to the web editor with Discord. You choose which Discord roles
-can edit feeds and channels. Use [scoped permissions](PERMISSIONS.md) to combine
-roles across servers and delegate individual destination channels. Without a
-policy, one configured server/role pair administers all configuration. The
+can edit feeds and channels using one of the access models below. The
 [syndicord CLI](USAGE.md) signs in through the browser and edits the same
 configuration through the same API. Changes apply on the next scheduled poll.
 
@@ -19,9 +17,16 @@ Administration remains disabled until all settings below are present. Missing
 OAuth settings do not prevent deployment or scheduled relay operation. A fresh
 installation starts empty, with polling paused.
 
-Choose **one admin role** for everyone who may edit all configuration, or
-[scoped roles](PERMISSIONS.md) for separate feed and channel responsibilities.
-Both use the same Discord application and encryption key.
+Choose how people will edit feeds and channels:
+
+| Access model                              | Who can edit what                                                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **One admin role**                        | Members of one configured Discord role can manage every feed, webhook, and route.                                                           |
+| **Separate feed and channel permissions** | Roles can manage the shared feed catalog (the list of sources), specified destination channels, or both. A person's matching roles combine. |
+
+Both use the same Discord application and encryption key. The
+[permissions guide](PERMISSIONS.md#access-models) explains the models and gives
+an example of separate feed and channel responsibilities.
 
 ### Register a Discord application
 
@@ -39,8 +44,8 @@ Both use the same Discord application and encryption key.
 4. In Discord, enable **User Settings → Advanced → Developer Mode**. Right-click
    the server and choose **Copy Server ID**. Under **Server Settings → Roles**,
    create or select the role allowed to administer syndicord and copy its role
-   ID from the role's context menu. Use the numeric IDs, not names. For scoped
-   access, collect the roles and channels in your
+   ID from the role's context menu. Use the numeric IDs, not names. For separate
+   feed and channel permissions, collect the roles and channels in your
    [policy](PERMISSIONS.md#configure-access).
 
 There is no Discord CLI setup command in this project; use these dashboard
@@ -75,8 +80,8 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 | `DISCORD_CLIENT_ID`     | Client ID copied from Discord Developer Portal → OAuth2 (step 2)         |
 | `DISCORD_CLIENT_SECRET` | Client Secret copied from Discord Developer Portal → OAuth2 (step 2)     |
 | `DISCORD_REDIRECT_URI`  | Exact callback URL saved under OAuth2 → Redirects (step 3)               |
-| `DISCORD_GUILD_ID`      | Server ID copied in Discord (step 4), for single-role mode               |
-| `DISCORD_ROLE_ID`       | Role ID copied in Discord (step 4), for single-role mode                 |
+| `DISCORD_GUILD_ID`      | Server ID copied in Discord (step 4), when using one admin role          |
+| `DISCORD_ROLE_ID`       | Role ID copied in Discord (step 4), when using one admin role            |
 
 - **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
   Variables and Secrets**. Add each setting as a **Secret** using the names
@@ -84,9 +89,9 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
   but storing them as secrets preserves them alongside the other runtime
   settings during code deployment.
 - **CLI:** Each command uses a hidden value prompt. Paste the value there. For
-  scoped roles, run the first four commands, then
+  separate feed and channel permissions, run the first four commands, then
   [set `DISCORD_AUTH_POLICY`](PERMISSIONS.md#configure-access); skip the last
-  two commands for the single-role settings.
+  two commands, which configure one admin role.
 
   ```sh
   npm run syndicord -- cf workers secrets update CONFIG_ENCRYPTION_KEY \
@@ -103,8 +108,9 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
     --worker "$SYNDICORD_WORKER_NAME" --type secret_text
   ```
 
-For scoped access, use `DISCORD_AUTH_POLICY` instead of `DISCORD_GUILD_ID` and
-`DISCORD_ROLE_ID` in either method. All other settings remain required.
+For separate feed and channel permissions, use `DISCORD_AUTH_POLICY` instead of
+`DISCORD_GUILD_ID` and `DISCORD_ROLE_ID` in either method. All other settings
+remain required.
 
 For the [npm-installed CLI](SETUP.md#optional-npm-installation), substitute
 `npx syndicord` for `npm run syndicord --`.
@@ -146,8 +152,8 @@ npm run syndicord -- logout
 
 - **Grant:** Invite the person to a configured Discord server separately, then
   assign its configured role in **Discord → Server Settings → Members**. Have
-  them sign in. With a scoped policy, their matching roles combine the
-  corresponding grants.
+  them sign in. With separate feed and channel permissions, their matching roles
+  combine the corresponding permissions.
 - **Revoke:** Remove that role, or remove the person from the server. Both the
   editor and configuration API check Discord membership and role; every
   configuration write requires a fresh check. Already loaded pages may remain
@@ -191,7 +197,7 @@ feed/destination pairs establish a silent baseline before delivering posts. See
 | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Administration disabled             | OAuth/key settings, valid policy or server/role pair, callback origin/path, and migrations          |
 | Discord rejects the callback        | The exact registered redirect matches `DISCORD_REDIRECT_URI` and the origin used in the browser/CLI |
-| Access denied                       | The account matches a policy grant, or the single-role mode’s exact server/role IDs                 |
+| Access denied                       | The account matches a policy grant, or the exact server/role IDs configured for one admin role      |
 | Sign-in expired or already used     | Start sign-in again; callbacks and CLI grants are single use                                        |
 | Discord unavailable or rate limited | Wait as directed and retry; configuration has not been authorized                                   |
 | CLI cannot authenticate             | Select the intended origin and run `login` again                                                    |
@@ -278,4 +284,4 @@ authenticate with the CLI's separate bearer session. Server-side authorization
 covers both the editor and the shared configuration API.
 
 [Documentation index](README.md) · [Manage feeds](USAGE.md) ·
-[Scoped permissions](PERMISSIONS.md)
+[Feed and channel permissions](PERMISSIONS.md)

@@ -18,8 +18,9 @@ A feed administrator adds shared sources; a channel administrator chooses what
 reaches their channels. The **installation owner** is the person who hosts
 syndicord, manages its Cloudflare resources, and sets up access. A feed or
 channel administrator does not need Cloudflare access. A small installation can
-give one Discord role all editing permissions; [scoped roles](PERMISSIONS.md)
-let several groups share it.
+give one Discord role all editing permissions, or assign roles
+[separate feed and channel permissions](PERMISSIONS.md#access-models): managing
+the shared list of feeds, specified channels, or both.
 
 ## Run an installation
 

@@ -37,17 +37,26 @@ accept `--local`. Other addresses must use HTTPS.
 
 ## Choose the section matching your editor
 
-| The editor shows…                                               | Your mode                                              | Follow                                    |
-| --------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------- |
-| **Feed catalog**, **Your destinations**, **Your subscriptions** | Scoped access: feed and channel roles can be different | [Scoped access](#scoped-access)           |
-| **Feeds** and **Webhooks**, with **Add webhook**                | Single role: authorized members manage all routes      | [Single-role access](#single-role-access) |
+Your installation uses one of two [access models](PERMISSIONS.md#access-models).
+**One admin role** lets members of that Discord role edit all feeds, webhooks,
+and routes. **Separate feed and channel permissions** let roles manage the
+shared feed catalog (the list of sources), specific destination channels, or
+both. Your matching roles combine; having feed permission does not by itself
+give you permission to manage a channel.
+
+| The editor shows…                                               | Your mode                             | Follow                                                                         |
+| --------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ |
+| **Feed catalog**, **Your destinations**, **Your subscriptions** | Separate feed and channel permissions | [Manage the catalog and your channels](#separate-feed-and-channel-permissions) |
+| **Feeds** and **Webhooks**, with **Add webhook**                | One admin role                        | [Manage all feeds and destinations](#one-admin-role)                           |
 
 The person who hosts syndicord chooses the mode. If you see **Verify and
 initialize catalog**, choose it to
 [initialize the catalog](PERMISSIONS.md#initialize-an-existing-installation). If
 that fails, ask the person who hosts syndicord for help.
 
-## Scoped access
+<a id="scoped-access"></a>
+
+## Separate feed and channel permissions
 
 You can see all feed labels and only the destinations your roles allow you to
 manage. Adding feeds and managing channels are separate permissions; you may
@@ -107,8 +116,9 @@ npm run syndicord -- destinations list
 ```
 
 Registration verifies the webhook's actual server and channel against your
-permissions without sending a message. Scoped access supports channel webhooks;
-thread routing and forum/media channels requiring `thread_id` are unsupported.
+permissions without sending a message. This access model supports channel
+webhooks; thread routing and forum/media channels requiring `thread_id` are
+unsupported.
 
 ### 3. Subscribe the channel
 
@@ -153,12 +163,14 @@ delivery, but a run already in progress may finish. Restoring the same
 subscription resumes pending entries; label changes preserve delivery history.
 See [permissions and verification](PERMISSIONS.md) for the exact rules.
 
-## Single-role access
+<a id="single-role-access"></a>
+
+## One admin role
 
 Everyone with the configured role can edit the whole configuration. Add a
 webhook first, then select it when adding a feed. Each feed needs at least one
 destination. Use only this section's `feeds` / `webhooks` commands in this mode;
-scoped installations reject them.
+installations with separate feed and channel permissions reject them.
 
 ### Add or change webhooks
 

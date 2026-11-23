@@ -1,18 +1,35 @@
-# Scoped Discord permissions
+# Discord access models and permissions
 
 **For the person who hosts syndicord and configures editing access.** To add
-feeds, destinations, or subscriptions, use the
-[everyday guide](USAGE.md#scoped-access).
+feeds, destinations, or subscriptions, use the [everyday guide](USAGE.md).
 
-As the installation owner, you can delegate the shared feed catalog and
-individual Discord channels to different roles. Sign in once; syndicord combines
-the grants for every configured server/role pair you match. The browser and CLI
-use the same server checks. Discord roles cannot edit Worker secrets or the
-authorization policy.
+## Access models
+
+The installation owner chooses how Discord roles grant editing access:
+
+| Model                                                     | Permissions                                                                                                                                                            |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **One admin role** (single-role access)                   | Members of one configured Discord role can manage every feed, webhook, and route.                                                                                      |
+| **Separate feed and channel permissions** (scoped access) | Each role can manage the shared feed catalog, specified destination channels, or both. Roles may come from different servers; a person's matching permissions combine. |
+
+Here, **scoped** means limited to the configured tasks and channels. It does not
+mean a private catalog for each role: everyone granted access can see the shared
+feed labels, and channel administrators can subscribe to any catalog feed. In
+this model, saved source URLs remain hidden even from feed administrators.
+
+For example, a **Feed curators** role could manage sources while an
+**Announcements editors** role manages subscriptions only for `#announcements`.
+Someone with both roles could do both jobs. One role can also hold both kinds of
+permission; the distinction is what it permits, not how many roles exist.
+
+The browser and CLI enforce the same permissions. Neither model grants access to
+Cloudflare Worker secrets or the authorization policy. To configure one admin
+role, follow [Discord sign-in setup](WEB.md#enable-administration). The
+remaining sections explain separate feed and channel permissions.
 
 ## Configure access
 
-First configure
+To enable separate feed and channel permissions, first configure
 [Discord sign-in and the encryption key](WEB.md#enable-administration). Instead
 of the single `DISCORD_GUILD_ID` / `DISCORD_ROLE_ID` gate, set the
 `DISCORD_AUTH_POLICY` Worker secret to JSON like this, replacing every example
@@ -106,13 +123,13 @@ history. Subsequent label changes also preserve those identities. Catalog
 storage, routing, and encrypted webhook credentials are updated together with
 optimistic concurrency checks. The complete normalized configuration is bounded
 to 96 KiB, including unrouted feeds and unused destinations. Requests are
-limited to 128 KiB; scoped responses allow 256 KiB to include the caller’s
-channel grants.
+limited to 128 KiB; the CLI accepts catalog API responses up to 256 KiB to
+include the caller's channel permissions.
 
 ## Feeds and subscriptions
 
 Everyone with a grant can see catalog labels and feed IDs. Saved source URLs are
-never returned by the scoped API, including to feed administrators: a URL may
+never returned by the catalog API, including to feed administrators: a URL may
 contain credentials. Use descriptive labels that do not contain secrets. Channel
 administrators can route any catalog feed into their authorized channels, so
 adding a feed makes its content available to those administrators.
@@ -124,17 +141,17 @@ destination's administrator explicitly select the new feed and remove its old
 subscription. Renames, deletion, and the old bulk-save API cannot transfer
 subscriptions.
 
-The scoped editor shows the actions your grants permit. Choose a catalog feed
+The catalog editor shows the actions your grants permit. Choose a catalog feed
 and one of your destinations to add or remove a subscription. Newly subscribed
 pairs silently establish a baseline before sending new posts. An unrouted feed
 is kept in the catalog without being polled. Removing all subscriptions pauses
 polling and delivery; a run already in progress may finish using its snapshot.
 
 For the browser steps, JSON input examples, and CLI commands, see
-[manage feeds and channels](USAGE.md#scoped-access). Both clients offer adding,
-renaming, deleting unused feeds, and adding/removing subscriptions.
-Secret-bearing input files accept `--file -`; back up URLs privately and delete
-temporary files after use.
+[manage feeds and channels](USAGE.md#separate-feed-and-channel-permissions).
+Both clients offer adding, renaming, deleting unused feeds, and adding/removing
+subscriptions. Secret-bearing input files accept `--file -`; back up URLs
+privately and delete temporary files after use.
 
 ## Destinations and webhook rotation
 
@@ -156,22 +173,23 @@ different channel, register a new destination and explicitly subscribe feeds
 there. Remove subscriptions before deleting a destination. Removal in syndicord
 does not delete a Discord webhook.
 
-Scoped destinations support channel webhooks without `thread_id`. The lookup
-verifies the webhook's parent channel, not a supplied thread target, so thread
-routing and forum/media destinations requiring a thread are unsupported here.
+Destinations registered with channel permissions support channel webhooks
+without `thread_id`. The lookup verifies the webhook's parent channel, not a
+supplied thread target, so thread routing and forum/media destinations requiring
+a thread are unsupported here.
 
-Before each scoped delivery, syndicord checks that the webhook still belongs to
-its saved server/channel. A mismatch or failed lookup defers the delivery
-without sending its content. Restore the binding or rotate to a valid
-same-channel credential. Discord lookup and execution are separate requests; a
-webhook owner could move it between those requests. The checks detect observed
-moves but cannot make Discord's two operations atomic.
+Before sending to a registered channel destination, syndicord checks that the
+webhook still belongs to its saved server/channel. A mismatch or failed lookup
+defers the delivery without sending its content. Restore the binding or rotate
+to a valid same-channel credential. Discord lookup and execution are separate
+requests; a webhook owner could move it between those requests. The checks
+detect observed moves but cannot make Discord's two operations atomic.
 
 ## Conflicts and verification
 
 A stale revision rejects the entire operation. Reload, inspect the current
 catalog, and reapply the intended change. Neither client automatically retries
-an ambiguous save. The scoped API accepts a single named operation, not an
+an ambiguous save. The catalog API accepts a single named operation, not an
 editable whole-document export or client-provided grants.
 
 Automated coverage uses local D1 and synthetic Discord responses. Hosted

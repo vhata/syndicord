@@ -47,13 +47,16 @@ Discord rate limits affect the destination, or all destinations for a global
 limit. Pending deliveries remain available after fetch or delivery failures.
 
 Feed indices refer to the zero-based active route list, not catalog IDs. In
-single-role mode, inspect it with `npm run syndicord -- feeds get`. In scoped
-mode, someone with Cloudflare access can inspect `relay_configuration` in
-**Cloudflare → Storage & databases → D1 → your database → Console**: `feeds`
-contains the active route list; `catalog` maps source URLs and each
-destination's `deliveryKey` to catalog IDs and labels. These fields can contain
-private feed URLs; do not share their raw contents. Scoped list commands
-intentionally hide source URLs and do not expose delivery keys.
+installations where **one admin role** can edit every feed and destination,
+inspect it with `npm run syndicord -- feeds get`. With **separate feed and
+channel permissions**, roles manage a shared feed catalog, specified channels,
+or both. For that model, someone with Cloudflare access can inspect
+`relay_configuration` in **Cloudflare → Storage & databases → D1 → your database
+→ Console**: `feeds` contains the active route list; `catalog` maps source URLs
+and each destination's `deliveryKey` to catalog IDs and labels. These fields can
+contain private feed URLs; do not share their raw contents. Catalog and
+destination list commands intentionally hide source URLs and do not expose
+delivery keys.
 
 To inspect hosted delivery counts without reading message payloads, run this SQL
 in that D1 console, or use the CLI command below:
@@ -72,14 +75,16 @@ Add `--local` to inspect local development state instead.
 
 ## Resume a suspended destination
 
-[Rotate the webhook](USAGE.md#change-or-remove-something) in scoped mode, or
-[replace its URL](USAGE.md#add-or-change-webhooks) in single-role mode, and
-update its backup. A changed URL clears suspension and its destination cooldown
-on the next poll; pending entries retain their retry times.
+[Rotate the webhook](USAGE.md#change-or-remove-something) when roles have
+separate feed and channel permissions, or
+[replace its URL](USAGE.md#add-or-change-webhooks) when one admin role manages
+everything, and update its backup. A changed URL clears suspension and its
+destination cooldown on the next poll; pending entries retain their retry times.
 
 If you repaired permissions without changing the URL, save this as `resume.sql`,
 replacing `updates` with the exact **Destination** key printed by `status`. For
-scoped catalogs this is a delivery key, not necessarily its label or ID:
+destinations registered with channel permissions, this is a delivery key, not
+necessarily the label or ID shown in the editor:
 
 ```sql
 UPDATE relay_destinations
@@ -140,8 +145,8 @@ npm run deploy
 A conflict with dashboard-managed Worker settings stops deployment. Inspect and
 reconcile it before retrying; `cf workers versions get` above shows the active
 version's configuration. Do not suppress an unexplained conflict with `--force`.
-Operators using a custom source build keep their intended runtime settings in
-`cloudflare.config.ts`. Hosted feeds and secrets are preserved.
+Installation owners using a custom source build keep their intended runtime
+settings in `cloudflare.config.ts`. Hosted feeds and secrets are preserved.
 
 For optional GitHub deployment, inspect the failed run in **GitHub → Actions →
 CI → failed run → failed job**, or use the CLI below with its numeric ID. Repair
@@ -170,15 +175,16 @@ Use `gh run view NEW_RUN_ID --web` if you prefer the browser summary.
 
 ## Pause and roll back
 
-For scoped catalogs, save `subscriptions list` and remove the relevant
-subscriptions through the editor or
+With separate feed and channel permissions, save `subscriptions list` and remove
+the relevant subscriptions through the editor or
 `subscriptions remove FEED_ID DESTINATION_ID`. Restore them with
-`subscriptions add FEED_ID DESTINATION_ID`. Each destination requires its own
-authorized administrator; removing all subscriptions pauses relay work.
-Operators can also pause the Worker cron in Cloudflare’s dashboard. Do not use
-the whole-configuration commands below for scoped catalogs.
+`subscriptions add FEED_ID DESTINATION_ID`. Each removal requires permission for
+that destination; removing all subscriptions pauses relay work. The installation
+owner can also pause the Worker cron in Cloudflare’s dashboard. This access
+model rejects the whole-configuration commands below.
 
-For single-role installations, save the current feed configuration first:
+When one admin role can edit every feed and destination, save the current feed
+configuration first:
 
 ```sh
 npm run syndicord -- feeds get > .feeds.json

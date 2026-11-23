@@ -22,13 +22,13 @@ to the same installation, and changes need no code deployment.
 
 ## Start here
 
-| I want to…                                      | Read                                                                    |
-| ----------------------------------------------- | ----------------------------------------------------------------------- |
-| Add feeds or choose which channels receive them | [Manage feeds and channels](docs/USAGE.md)                              |
-| Host syndicord for my community                 | [First deployment](docs/SETUP.md)                                       |
-| Give people access to manage it                 | [Sign-in and access](docs/WEB.md) · [Scoped roles](docs/PERMISSIONS.md) |
-| Check why updates have stopped                  | [Status](docs/STATUS.md) · [Troubleshooting](docs/RECOVERY.md)          |
-| Work on the code                                | [Development](docs/DEVELOPMENT.md)                                      |
+| I want to…                                      | Read                                                                                    |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Add feeds or choose which channels receive them | [Manage feeds and channels](docs/USAGE.md)                                              |
+| Host syndicord for my community                 | [First deployment](docs/SETUP.md)                                                       |
+| Give people access to manage it                 | [Sign-in and access](docs/WEB.md) · [Feed and channel permissions](docs/PERMISSIONS.md) |
+| Check why updates have stopped                  | [Status](docs/STATUS.md) · [Troubleshooting](docs/RECOVERY.md)                          |
+| Work on the code                                | [Development](docs/DEVELOPMENT.md)                                                      |
 
 ## How it fits together
 

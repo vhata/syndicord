@@ -191,7 +191,7 @@ with the earlier commands. Keep the encryption key that belongs to each dataset.
 | `src/admin.ts`                | Authorized configuration HTTP endpoints                 |
 | `src/admin-auth.ts`           | Discord OAuth, role checks, and application sessions    |
 | `src/admin-policy.ts`         | Authorization grants and exact channel scopes           |
-| `src/catalog-store.ts`        | Scoped catalog operations and atomic relay projection   |
+| `src/catalog-store.ts`        | Shared catalog operations and atomic relay projection   |
 | `src/webhook-verification.ts` | Bounded Discord destination verification                |
 | `src/admin-store.ts`          | Encrypted webhook configuration and atomic API saves    |
 | `src/admin-page.ts`           | Feed, webhook, and routing web interface                |

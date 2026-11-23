@@ -60,12 +60,19 @@ checks both the run heartbeat and each feed's health.
 The output includes pending counts and oldest pending age for active routes,
 alongside destination suspension/cooldown state. Removed routes are excluded;
 their retained pending deliveries resume if the same configuration is restored.
-Feed indices are zero-based positions in the current relay feed list. In
-single-role mode, this is `npm run syndicord -- feeds get`. In scoped mode,
-unrouted feeds are omitted and these indices are **not catalog IDs**; the bulk
-`feeds get` command is unavailable. Destination names in this report are ledger
-keys, which may differ from scoped labels and IDs. Use the
-[recovery notes](RECOVERY.md#inspect-a-run) when matching records. Only
+Feed indices are zero-based positions in the current relay feed list. How you
+match them to configuration depends on the installation's editing permissions:
+
+- With **one admin role**, members can edit all feeds and destinations: inspect
+  the list with `npm run syndicord -- feeds get`.
+- With **separate feed and channel permissions**, roles manage the shared feed
+  catalog, specified channels, or both. The report omits catalog feeds without
+  subscriptions, so its feed indices are **not catalog IDs**. The bulk
+  `feeds get` command is unavailable.
+
+Destination names in this report are delivery-tracking keys, which may differ
+from destination labels and IDs shown in the editor or by `destinations list`.
+Use the [recovery notes](RECOVERY.md#inspect-a-run) when matching records. Only
 hostnames are printed; feed paths/query strings, webhook URLs, fingerprints, and
 message payloads are not included.
 

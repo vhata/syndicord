@@ -116,12 +116,12 @@ Complete [Discord sign-in setup](WEB.md#enable-administration): register the
 Discord application and callback, save the encryption key and OAuth settings,
 and choose who can edit:
 
-| Access model       | Use it when                                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------------ |
-| **One admin role** | Everyone with one Discord role may manage all feeds and destinations.                            |
-| **Scoped roles**   | Different roles should manage the feed catalog or particular channels, including across servers. |
+| Access model                              | Use it when                                                                                                                    |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **One admin role**                        | Everyone with one Discord role may manage all feeds and destinations.                                                          |
+| **Separate feed and channel permissions** | Roles should manage the shared feed catalog (list of sources), specified channels, or both. A person’s matching roles combine. |
 
-For scoped roles,
+For separate feed and channel permissions,
 [configure the policy and initialize the catalog](PERMISSIONS.md#configure-access).
 For either model, open the web editor using the link from
 [sign-in setup](WEB.md#configure-the-worker), sign in, and follow

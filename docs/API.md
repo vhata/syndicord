@@ -177,10 +177,10 @@ Otherwise, use Discord's **Edit Channel → Integrations → Webhooks** page; th
 API alternative requires the bot credentials.
 
 The following Bash snippet creates one webhook and saves its URL under the
-`updates` key in a new `.webhooks.json`, using the single-role mapping format.
-It refuses to overwrite an existing file. Bot tokens are entered without echo;
-the credential response is kept in a private temporary file and deleted
-afterwards:
+`updates` key in a new `.webhooks.json`. This mapping format is used when one
+admin role can edit every feed and destination. The snippet refuses to overwrite
+an existing file. Bot tokens are entered without echo; the credential response
+is kept in a private temporary file and deleted afterwards:
 
 ```bash
 (
@@ -210,13 +210,15 @@ This creates a webhook but sends no Discord message. If creation has an
 uncertain outcome, inspect the channel's webhooks before repeating it. Save the
 URL in your password manager, then choose your installation's access model:
 
-- **Single-role:** [Configure the destination](USAGE.md#add-or-change-webhooks)
-  with `npm run syndicord -- webhooks set --file .webhooks.json`, or enter the
-  URL in the web interface.
-- **Scoped:** Copy the URL from the file's `updates` value and
-  [register a destination](USAGE.md#2-register-a-destination) in the web
-  interface or with `destinations register`. That command takes a label and
-  `webhookUrl`; scoped installations reject the single-role mapping and
+- **One admin role** (members can edit every feed and destination):
+  [Configure the destination](USAGE.md#add-or-change-webhooks) with
+  `npm run syndicord -- webhooks set --file .webhooks.json`, or enter the URL in
+  the web interface.
+- **Separate feed and channel permissions** (roles manage the shared feed
+  catalog, specified channels, or both): Copy the URL from the file's `updates`
+  value and [register a destination](USAGE.md#2-register-a-destination) in the
+  web interface or with `destinations register`. That command takes a label and
+  `webhookUrl`; this access model rejects the whole-configuration mapping and
   `webhooks set` command.
 
 Delete the temporary `.webhooks.json` afterwards.
