@@ -312,6 +312,16 @@ test('the built web interface persists routes and encrypted webhooks used by the
     ]);
     assert.deepEqual(configuration.destinations, ['news']);
     roles = [];
+    assert.equal(
+      (await runtime.dispatchFetch(endpoint, { headers: { Cookie: cookie } }))
+        .status,
+      200,
+      'the built Worker retains cached role grants within the two-minute window',
+    );
+    await db
+      .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+      .bind(Date.now() - 120_000)
+      .run();
     const denied = await runtime.dispatchFetch(endpoint, {
       method: 'PUT',
       headers: {

@@ -336,7 +336,7 @@ test('administration requires configured Discord OAuth and signed-out pages show
 });
 
 test('branding bindings reach the editor and every access state without invalidating sessions', async () => {
-  const { env, dispose, handleAdmin, request, setRoles } = await fixture();
+  const { env, db, dispose, handleAdmin, request, setRoles } = await fixture();
   try {
     const branded = {
       ...env,
@@ -353,6 +353,10 @@ test('branding bindings reach the editor and every access state without invalida
       }))!,
     ];
     setRoles([]);
+    await db
+      .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+      .bind(Date.now() - 120_000)
+      .run();
     responses.push((await handleAdmin(request('/admin'), branded))!);
     assert.deepEqual(
       responses.map((response) => response.status),
@@ -374,9 +378,10 @@ test('branding bindings reach the editor and every access state without invalida
   }
 });
 
-test('role removal blocks editor, direct reads, and writes; Discord failures never authorize configuration', async () => {
+test('expired membership evidence blocks editor, direct reads, and writes after role removal; Discord refresh failures never authorize configuration', async () => {
   const {
     env,
+    db,
     dispose,
     handleAdmin,
     request,
@@ -390,6 +395,15 @@ test('role removal blocks editor, direct reads, and writes; Discord failures nev
       await configurationKey(key),
     );
     setRoles([]);
+    assert.equal(
+      (await handleAdmin(request()))!.status,
+      200,
+      'fresh cached access remains usable',
+    );
+    await db
+      .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+      .bind(Date.now() - 120_000)
+      .run();
     for (const denied of [
       request('/admin'),
       request(),
@@ -692,7 +706,7 @@ test('mutations require a same-origin JSON request and enforce the body limit be
 });
 
 test(
-  'configuration writes recheck access after a delayed body finishes',
+  'configuration writes recheck expired membership evidence and local session expiry after a delayed body finishes',
   { timeout: 10_000 },
   async () => {
     for (const revoked of ['role', 'session']) {
@@ -735,9 +749,18 @@ test(
             throw new Error('Request finished before reading its body');
           }),
         ]);
-        if (revoked === 'role') setRoles([]);
-        else
+        if (revoked === 'role') {
+          setRoles([]);
+          // The body outlives the cached membership window. Keep the local
+          // session active so the final check must observe Discord's denial.
+          await db
+            .prepare('UPDATE admin_sessions SET permissions_checked_at_ms = ?')
+            .bind(Date.now() - 120_000)
+            .run();
+        } else {
+          // Local revocation stays immediate even while membership is cached.
           await db.prepare('UPDATE admin_sessions SET expires_at_ms = 0').run();
+        }
         release.resolve();
         const response = (await pending)!;
         assert.equal(response.status, revoked === 'role' ? 403 : 401);
