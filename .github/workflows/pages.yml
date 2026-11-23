@@ -76,6 +76,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -85,6 +86,20 @@ jobs:
       group: syndicord-website
       cancel-in-progress: false
     steps:
+      - name: Check the current main revision
+        id: current
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          main_head="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$main_head" = "$GITHUB_SHA" ]; then
+            printf '%s\n' 'publish=true' >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' 'A newer main revision exists; skipping this deployment.'
+          fi
+
       - name: Deploy the checked website
+        if: steps.current.outputs.publish == 'true'
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

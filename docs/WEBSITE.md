@@ -51,6 +51,8 @@ Publishing is opt-in. The **Website** workflow builds and uploads its checked
 site artifact even while publishing is disabled. Only a push or manual run on
 `main` can publish, and only when the repository variable `PAGES_ENABLED` is
 `true`. It publishes the static website; it does not deploy a syndicord Worker.
+Deployments run one at a time and recheck the current `main` revision before
+publishing, so a slower build of an older revision cannot replace a newer site.
 
 After merging the website workflow, a repository administrator can enable it:
 
