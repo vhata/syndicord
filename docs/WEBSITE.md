@@ -45,6 +45,25 @@ separate copy of the documentation to synchronize.
 The site uses pinned VitePress and a scoped Vite override in `package.json`;
 review both when updating website dependencies.
 
+### Link previews
+
+The built HTML includes Open Graph and large-image card metadata for links
+shared in Discord and other clients. The homepage describes webhook delivery and
+Discord role access; guide links retain their own page titles. The preview uses
+the committed [social artwork](../assets/README.md).
+
+Set `SITE_URL` to the public origin and `SITE_BASE_PATH` to its publication path
+when building for hosting, as described below. These produce absolute image and
+canonical URLs. Without `SITE_URL`, local builds use a site-relative image URL
+and omit canonical URLs. Use `site:preview` to inspect the built image;
+`site:dev` does not publish it.
+
+The PNG is copied into the build with a content hash in its filename, so an
+artwork change gets a new image URL. `site:check` validates the generated
+metadata, image bytes, dimensions, and paths. Actual unfurls still need a check
+in Discord after publication; local previews do not verify Discord's rendering
+or refresh an existing message's cached preview.
+
 Before opening a PR, run the [complete project checks](QUALITY.md#gates).
 `scripts/check.sh` checks the website at both `/` and `/syndicord/`, covering
 domain-root and GitHub project-site paths. The **Website** workflow also builds
