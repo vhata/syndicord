@@ -154,10 +154,11 @@ npm run syndicord -- logout
   assign its configured role in **Discord → Server Settings → Members**. Have
   them sign in. With separate feed and channel permissions, their matching roles
   combine the corresponding permissions.
-- **Revoke:** Remove that role, or remove the person from the server. Both the
-  editor and configuration API check Discord membership and role; every
-  configuration write requires a fresh check. Already loaded pages may remain
-  visible, but further saves are refused. A write already authorized may finish.
+- **Revoke:** Remove that role, or remove the person from the server. Browser
+  and CLI permissions can remain valid for up to two minutes after their last
+  successful Discord check. After that window, further reads and saves require
+  another check and are refused if access was removed. Already loaded pages may
+  remain visible. A write already authorized may finish.
 - **Sign out:** Browser sign-out and CLI logout invalidate their respective
   application sessions. They do not sign the person out of Discord itself.
 - **Change accounts:** Use **Try Discord sign-in again** on the access page, or
@@ -165,9 +166,18 @@ npm run syndicord -- logout
   Discord's authorization screen. A private browser window can also select a
   different Discord login.
 
-Sessions last at most eight hours and never outlive the Discord access token.
-Expired or revoked credentials require another login. Discord outages and rate
-limits block access until the check can succeed; no alternative login is used.
+Sessions last at most eight hours and never outlive the Discord access token's
+known expiry. Local sign-out, session expiry, and changes to the configured
+Discord access policy invalidate access immediately. Discord-side token
+revocation, role changes, and server departures are detected when the two-minute
+permission window expires. Using the editor or CLI does not extend that window.
+
+A valid permission result can be reused during a Discord outage until its fixed
+deadline. After expiry, an outage, rate limit, or invalid Discord response
+blocks access; expired permissions are never used as a fallback. A rate-limit
+error shows how many seconds to wait. Keep the open form, wait, then save again;
+the editor preserves an unsuccessful save's entered values and does not retry
+saves automatically.
 
 To disable administration without stopping the relay, delete
 `DISCORD_CLIENT_SECRET` in **Cloudflare Dashboard → Workers & Pages → your
@@ -199,14 +209,15 @@ feed/destination pairs establish a silent baseline before delivering posts. See
 | Discord rejects the callback        | The exact registered redirect matches `DISCORD_REDIRECT_URI` and the origin used in the browser/CLI |
 | Access denied                       | The account matches a policy grant, or the exact server/role IDs configured for one admin role      |
 | Sign-in expired or already used     | Start sign-in again; callbacks and CLI grants are single use                                        |
-| Discord unavailable or rate limited | Wait as directed and retry; configuration has not been authorized                                   |
+| Discord unavailable or rate limited | Keep the form, wait for the stated delay, then retry; the failed request did not save changes       |
 | CLI cannot authenticate             | Select the intended origin and run `login` again                                                    |
 
 Automated checks use mocked Discord responses and local D1. Before relying on a
 hosted installation, verify with real accounts: authorized browser and CLI
 login, denied consent, a nonmember, a member without the role, and removal of
-the role while both clients are signed in. Confirm that fresh reads/saves are
-refused, logout invalidates the session, and a new login restores access only
+the role while both clients are signed in. Allow the two-minute permission
+window to expire, then confirm that reads and saves are refused. Verify that
+logout invalidates its session immediately and a new login restores access only
 after membership and role are granted. These checks require your own Discord
 application and Cloudflare deployment.
 
@@ -282,6 +293,22 @@ this setting in the hosted installation and keep external proxies from logging
 callback queries. Browser writes require the same origin; CLI writes
 authenticate with the CLI's separate bearer session. Server-side authorization
 covers both the editor and the shared configuration API.
+
+Successful Discord membership checks are cached in the session's D1 row for a
+fixed 120 seconds, measured from the start of verification. Sign-in seeds that
+cache; a separately approved CLI session inherits the evidence's original
+deadline. Each request still validates its local session and configuration.
+Writes validate the local session before accepting an upload and check
+authorization after the body is read; scoped writes check again after webhook
+lookups and before storage. Those checks reuse permissions only while their
+fixed lifetime remains valid. The cache is not extended by reads or failed
+refreshes, and an invalid cache entry requires another Discord check.
+
+Discord's
+[rate-limit responses](https://docs.discord.com/developers/topics/rate-limits)
+provide a retry delay in the `Retry-After` header or JSON `retry_after` field.
+Syndicord reads these bounded responses, reports the wait in seconds, and
+preserves the cooldown deadline across early retries.
 
 [Documentation index](README.md) · [Manage feeds](USAGE.md) ·
 [Feed and channel permissions](PERMISSIONS.md)
