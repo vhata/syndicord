@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
+import { URL as NodeURL } from 'node:url';
+import {
+  configurationKey,
+  readAdminConfiguration,
+  saveAdminConfiguration,
+} from '../src/admin-store.ts';
 import { AuthError, handleAuth, requireAdmin } from '../src/admin-auth.ts';
 import { createTestDatabase } from './helpers/d1.ts';
 import {
@@ -458,3 +465,161 @@ for (const [name, header, body, expected] of [
     }
   });
 }
+
+test('permission-cache migration preserves populated old sessions and relay data', async (context) => {
+  const { db, dispose } = await createTestDatabase();
+  const env = authEnv(db);
+  const options = { calls: [] as Request[] };
+  const fetcher = discordFixture(options);
+  const fields =
+    'token_hash, kind, user_id, user_name, encrypted_token, expires_at_ms, config_hash, retry_at_ms';
+  const statements = (sql: string) =>
+    sql
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean);
+  try {
+    const browser = await browserLogin(env, fetcher);
+    const cli = await cliLogin(env, fetcher);
+    const deadline = Date.now() + 30_000;
+    await db
+      .prepare(
+        "UPDATE admin_sessions SET retry_at_ms = ? WHERE kind = 'browser'",
+      )
+      .bind(deadline)
+      .run();
+    const sessions = await db
+      .prepare(`SELECT ${fields} FROM admin_sessions ORDER BY token_hash`)
+      .all<Record<string, string | number>>();
+    const key = await configurationKey(env.CONFIG_ENCRYPTION_KEY);
+    const before = await readAdminConfiguration(env, key);
+    await saveAdminConfiguration(env, key, {
+      revision: before.revision,
+      feeds: [
+        {
+          url: 'https://example.com/preserved-feed',
+          destinations: ['updates'],
+        },
+      ],
+      webhooks: {
+        updates: 'https://discord.com/api/webhooks/123/private-preserved-token',
+      },
+    });
+    await db
+      .prepare(
+        "INSERT INTO relay_routes(feed_url, destination, baseline_id, initialized_at_ms) VALUES ('https://example.com/preserved-feed', 'updates', 'baseline', 1)",
+      )
+      .run();
+    const savedConfiguration = await db
+      .prepare('SELECT * FROM relay_configuration')
+      .all();
+    const savedRoutes = await db.prepare('SELECT * FROM relay_routes').all();
+
+    // Recreate the actual pre-cache table from its original migration, keeping
+    // valid opaque credentials and encrypted tokens created by the login flow.
+    const oldMigration = statements(
+      await readFile(
+        new NodeURL('../migrations/0005_discord_auth.sql', import.meta.url),
+        'utf8',
+      ),
+    );
+    await db.prepare('DROP TABLE admin_sessions').run();
+    await db.batch(oldMigration.slice(0, 2).map((sql) => db.prepare(sql)));
+    const insertOld = (row: Record<string, string | number>) =>
+      db
+        .prepare(
+          `INSERT INTO admin_sessions (${fields}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(...fields.split(', ').map((name) => row[name]));
+    await db.batch(sessions.results.map(insertOld));
+    const upgrade = statements(
+      await readFile(
+        new NodeURL(
+          '../migrations/0007_session_permission_cache.sql',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
+    await db.batch(upgrade.map((sql) => db.prepare(sql)));
+    assert.deepEqual(
+      (
+        await db
+          .prepare(`SELECT ${fields} FROM admin_sessions ORDER BY token_hash`)
+          .all()
+      ).results,
+      sessions.results,
+    );
+    const caches = (
+      await db
+        .prepare(
+          'SELECT permissions_json, permissions_checked_at_ms FROM admin_sessions',
+        )
+        .all()
+    ).results;
+    assert.equal(caches.length, sessions.results.length);
+    assert.ok(
+      caches.every(
+        (row) =>
+          row.permissions_json === null &&
+          row.permissions_checked_at_ms === null,
+      ),
+    );
+
+    // An old Worker can still use the old INSERT column list after migration.
+    const oldRow = sessions.results[0]!;
+    await db
+      .prepare('DELETE FROM admin_sessions WHERE token_hash = ?')
+      .bind(oldRow.token_hash)
+      .run();
+    await insertOld(oldRow).run();
+    assert.equal(
+      await db
+        .prepare(
+          'SELECT permissions_json FROM admin_sessions WHERE token_hash = ?',
+        )
+        .bind(oldRow.token_hash)
+        .first('permissions_json'),
+      null,
+    );
+    const count = options.calls.length;
+    await assert.rejects(
+      requireAdmin(signed(browser.cookie), env, fetcher),
+      denied(429),
+    );
+    assert.equal(options.calls.length, count);
+    assert.equal(
+      await db
+        .prepare(
+          "SELECT retry_at_ms FROM admin_sessions WHERE kind = 'browser' LIMIT 1",
+        )
+        .first('retry_at_ms'),
+      deadline,
+    );
+    context.mock.method(Date, 'now', () => deadline);
+    assert.equal(
+      (await requireAdmin(signed(browser.cookie), env, fetcher)).kind,
+      'browser',
+    );
+    assert.equal(
+      (await requireAdmin(bearer(cli.token), env, fetcher)).kind,
+      'cli',
+    );
+    assert.equal(
+      options.calls.length,
+      count + 2,
+      'old browser and CLI rows each refresh once',
+    );
+    assert.deepEqual(
+      (await db.prepare('SELECT * FROM relay_configuration').all()).results,
+      savedConfiguration.results,
+    );
+    assert.deepEqual(
+      (await db.prepare('SELECT * FROM relay_routes').all()).results,
+      savedRoutes.results,
+    );
+  } finally {
+    context.mock.restoreAll();
+    await dispose();
+  }
+});
