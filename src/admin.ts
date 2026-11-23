@@ -4,6 +4,7 @@ import {
   authConfiguration,
   handleAuth,
   requireAdmin,
+  requireAdminSession,
 } from './admin-auth.ts';
 import type { AuthEnv } from './admin-auth.ts';
 import {
@@ -165,6 +166,32 @@ export async function handleAdmin(
       return response('Method not allowed.', 405, { Allow: 'GET' });
     if (url.pathname === '/')
       return response(null, 302, { Location: '/admin' });
+    const mutation =
+      (api && request.method === 'PUT') ||
+      (catalog && request.method === 'POST');
+    let input: unknown;
+    if (mutation) {
+      // Reject invalid sessions before accepting an upload, but spend the
+      // Discord membership request only after its complete body is available.
+      await requireAdminSession(request, env);
+      if (request.headers.get('origin') !== url.origin)
+        throw new AdminError(
+          'Configuration changes must come from this site.',
+          403,
+        );
+      if (
+        request.headers
+          .get('content-type')
+          ?.split(';', 1)[0]
+          ?.trim()
+          .toLowerCase() !== 'application/json'
+      )
+        throw new AdminError(
+          'Use application/json for configuration changes.',
+          415,
+        );
+      input = await readBody(request);
+    }
     const user = await requireAdmin(request, env, fetcher);
     const signInMessage = callbackMessage(url);
     if (page && signInMessage)
@@ -216,30 +243,12 @@ export async function handleAdmin(
         return json({ error: 'Method not allowed.' }, 405, {
           Allow: 'GET, POST',
         });
-      if (request.headers.get('origin') !== url.origin)
-        throw new AdminError(
-          'Configuration changes must come from this site.',
-          403,
-        );
-      if (
-        request.headers
-          .get('content-type')
-          ?.split(';', 1)[0]
-          ?.trim()
-          .toLowerCase() !== 'application/json'
-      )
-        throw new AdminError(
-          'Use application/json for configuration changes.',
-          415,
-        );
-      const input = await readBody(request);
-      const current = await requireAdmin(request, env, fetcher);
       return json(
         await saveCatalog(
           env,
           key,
           input,
-          current.permissions,
+          user.permissions,
           fetcher,
           async () => (await requireAdmin(request, env, fetcher)).permissions,
         ),
@@ -252,25 +261,6 @@ export async function handleAdmin(
         return json({ error: 'Method not allowed.' }, 405, {
           Allow: 'GET, PUT',
         });
-      if (request.headers.get('origin') !== url.origin)
-        throw new AdminError(
-          'Configuration changes must come from this site.',
-          403,
-        );
-      if (
-        request.headers
-          .get('content-type')
-          ?.split(';', 1)[0]
-          ?.trim()
-          .toLowerCase() !== 'application/json'
-      )
-        throw new AdminError(
-          'Use application/json for configuration changes.',
-          415,
-        );
-      const input = await readBody(request);
-      // Reading a streamed body can outlive the session or its Discord role.
-      await requireAdmin(request, env, fetcher);
       return json(await saveAdminConfiguration(env, key, input));
     }
     return html((nonce) => renderAdminPage(nonce, user, appearance), 200);
