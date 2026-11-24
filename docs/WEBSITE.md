@@ -124,7 +124,12 @@ Variables** screen:
 | `SITE_BASE_PATH` | `/`                        | Site path, with leading/trailing slash |
 | `SITE_URL`       | `https://docs.example.org` | HTTP(S) origin without a path          |
 
-The equivalent variable commands are:
+After saving the variables, open **Actions → Website → Run workflow**, select
+`main`, and start a new run. Changing the domain or variables does not trigger a
+build. Wait for **Publish website** to succeed, then reload the site; the new
+paths take effect only in that rebuilt deployment.
+
+The equivalent CLI steps are:
 
 ```sh
 gh variable set SITE_BASE_PATH --body /
