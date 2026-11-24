@@ -14,7 +14,6 @@ import {
   sources,
 } from './site.mjs';
 import { repositoryMarkdown } from './source.mjs';
-import { writeRedirects } from './redirects.mjs';
 
 const base = basePath();
 const origin = publicOrigin();
@@ -129,7 +128,6 @@ export default defineConfig({
     const target = resolve(siteConfig.outDir, imagePath);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, socialImage);
-    writeRedirects(siteConfig.outDir);
   },
   vite: {
     publicDir: false,

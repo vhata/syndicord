@@ -210,8 +210,6 @@ Read [relay behavior](BEHAVIOR.md) for the polling and delivery model,
 [authentication design](#authentication-design) for sign-in, and
 [permissions](PERMISSIONS.md) for the shared catalog and channel grants.
 
-<a id="format-markdown"></a> <a id="staged-checks"></a>
-
 ## Commit hooks and CI
 
 Commits run staged formatting and lint only. Builds and tests belong in the

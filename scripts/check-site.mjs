@@ -3,9 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runInNewContext } from 'node:vm';
 import { parse } from 'parse5';
-import { redirects } from '../.vitepress/redirects.mjs';
 import {
   basePath,
   publicOrigin,
@@ -24,8 +22,8 @@ const files = readdirSync(output, { recursive: true })
   .sort();
 assert.deepEqual(
   files,
-  [...sources.map(routeFor), ...Object.keys(redirects), '404.html'].sort(),
-  'The website must contain exactly the public documentation, redirects, and 404 page.',
+  [...sources.map(routeFor), '404.html'].sort(),
+  'The website must contain exactly the public documentation pages and 404 page.',
 );
 
 const documents = new Map();
@@ -96,38 +94,6 @@ function checkReference(from, reference, fragment = true) {
 for (const file of files) {
   const { references, metadata, canonical } = document(file);
   for (const reference of references) checkReference(file, reference);
-  if (Object.hasOwn(redirects, file)) {
-    const { target, sections = {} } = redirects[file];
-    const html = readFileSync(resolve(output, file), 'utf8');
-    const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-    assert(script, `${file}: missing redirect script`);
-    const existingAnchor = [...document(`docs/${target}`).ids][0];
-    assert(
-      existingAnchor,
-      `${file}: target needs an anchor to verify preservation`,
-    );
-    for (const [hash, destination] of [
-      ['', target],
-      [`#${existingAnchor}`, `${target}#${existingAnchor}`],
-      ...Object.entries(sections),
-    ]) {
-      const location = new URL(`${origin}${base}${file}?from=bookmark${hash}`);
-      let redirected;
-      location.replace = (url) => {
-        redirected = url;
-      };
-      runInNewContext(script, { location, URL }, { timeout: 1000 });
-      const expected = new URL(destination, location);
-      expected.search = location.search;
-      assert.equal(
-        redirected,
-        expected.href,
-        `${file}: redirect lost its destination, query, or fragment`,
-      );
-      checkReference(file, redirected);
-    }
-    continue;
-  }
   const meta = (key) => {
     const value = metadata.get(key);
     assert(value?.trim(), `${file}: missing ${key}`);
@@ -191,5 +157,5 @@ assert.equal(
   `Website links and assets failed:\n${failures.join('\n')}`,
 );
 console.log(
-  `Website verified: ${sources.length} content pages, ${Object.keys(redirects).length} redirects, 404 page, social previews, ${checked} local links/assets at ${base}`,
+  `Website verified: ${sources.length} content pages, 404 page, social previews, ${checked} local links/assets at ${base}`,
 );

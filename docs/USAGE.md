@@ -78,8 +78,6 @@ initialize catalog**, choose it to
 [initialize the catalog](PERMISSIONS.md#initialize-an-existing-installation). If
 that fails, ask the person who hosts syndicord for help.
 
-<a id="scoped-access"></a>
-
 ## Separate feed and channel permissions
 
 You can see all feed labels and only the destinations your roles allow you to
@@ -189,8 +187,6 @@ not delete its webhook in Discord. Removing all subscriptions pauses polling and
 delivery, but a run already in progress may finish. Restoring the same
 subscription resumes pending entries; label changes preserve delivery history.
 See [permissions and verification](PERMISSIONS.md) for the exact rules.
-
-<a id="single-role-access"></a>
 
 ## One admin role
 
