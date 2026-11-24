@@ -21,19 +21,43 @@ same installation as below. Examples use a source checkout; for an
 
 ### Select an installation
 
+Use these commands if you want to manage feeds from your terminal. Set
+`SYNDICORD_ADMIN_URL` to the web-editor link **without `/admin` or any other
+path**, replacing the example address below. Then run `login` to authorize this
+CLI to edit that installation using your Discord account:
+
 ```sh
 export SYNDICORD_ADMIN_URL='https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev'
 npm run syndicord -- login
 ```
 
-Use the web-editor link without `/admin` or any other path. Approve the browser
-request only when its code matches the terminal. Configuration commands need no
-Cloudflare credentials. Use `login --no-browser` if you want to open the printed
-URL yourself, and `npm run syndicord -- logout` to sign out. Expired sessions
-require another login; see [session details](WEB.md#cli-login).
+The command opens a browser and prints a verification URL and code. Sign in with
+Discord, check that the browser's code matches your terminal, and approve the
+request. Approve only a request you started. If the browser does not open, open
+the printed URL yourself; `login --no-browser` prints the URL without trying to
+open it.
+
+After approval, return to your terminal and continue with the section matching
+your editor below. Configuration commands need no Cloudflare credentials. The
+CLI receives its own syndicord session; Discord tokens and the client secret
+stay on the Worker.
 
 For local development use `http://localhost:8787`; configuration commands do not
 accept `--local`. Other addresses must use HTTPS.
+
+### CLI sessions and logout
+
+Sessions are saved privately under `$XDG_CONFIG_HOME/syndicord`, or
+`~/.config/syndicord`, and separated by Worker origin. When a session expires,
+run `login` again. To sign the CLI out of the selected installation, run:
+
+```sh
+npm run syndicord -- logout
+```
+
+Browser sign-out and CLI logout end their respective sessions; neither signs you
+out of Discord itself. For session limits and role changes, see
+[grant and revoke access](WEB.md#grant-and-revoke-access).
 
 ## Choose the section matching your editor
 
@@ -92,11 +116,13 @@ subscription. Renaming a label keeps the source and subscriptions intact.
 
 ### 2. Register a destination
 
-In Discord, open **Edit Channel → Integrations → Webhooks**, create a webhook,
-and copy its URL. You need permission to manage webhooks in that channel. Keep
-the URL in your password manager; syndicord never reveals saved webhook URLs.
-Discord has no supported setup CLI in this project; advanced bot-based creation
-is an [optional API recipe](API.md#create-a-discord-webhook).
+In your Discord client, open the destination channel’s **Edit Channel →
+Integrations → Webhooks**, create a webhook, and copy its URL. You need
+permission to manage webhooks in that channel. Keep the URL in your password
+manager; syndicord never reveals saved webhook URLs. Create it in the Discord
+client; syndicord’s CLI does not create Discord webhooks. If you already operate
+a Discord bot, an [optional API recipe](API.md#create-a-discord-webhook) covers
+that alternative.
 
 **Web:** Under **Your destinations**, choose **Register webhook**, enter a label
 and the URL, and save.

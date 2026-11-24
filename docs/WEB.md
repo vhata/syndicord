@@ -1,97 +1,156 @@
 # Configure Discord sign-in
 
-For the person who hosts syndicord and manages its Cloudflare resources. To use
-an existing installation, start with [managing feeds](USAGE.md).
-[First deployment](SETUP.md) brings you here once the Worker is running.
+This guide is for the person hosting syndicord. It connects a deployed Worker to
+Discord and sets which roles can manage feeds and channels, in both the web
+editor and CLI. If someone has already set up your installation, go straight to
+[managing feeds](USAGE.md).
 
-People sign in to the web editor with Discord. You choose which Discord roles
-can edit feeds and channels using one of the access models below. The
-[syndicord CLI](USAGE.md) signs in through the browser and edits the same
-configuration through the same API. Changes apply on the next scheduled poll.
+For a new installation, follow the setup steps below, then continue to
+[Using syndicord](USAGE.md) to add your first feed and destination. The later
+[grant and revoke access](#grant-and-revoke-access) and
+[troubleshooting](#troubleshooting-and-acceptance) sections are references for
+maintaining sign-in after setup.
 
 ## Enable administration
 
-Start with a deployed Worker and its HTTPS address. If you have not deployed
-yet, complete [first deployment](SETUP.md#create-the-database-and-deploy).
-Administration remains disabled until all settings below are present. Missing
-OAuth settings do not prevent deployment or scheduled relay operation. A fresh
-installation starts empty, with polling paused.
+Start with a deployed Worker. If you have not deployed yet, complete
+[first deployment](SETUP.md#create-the-database-and-deploy). Administration
+stays disabled until you finish the steps below. A fresh installation has no
+feeds and stays idle until you add them.
 
-Choose how people will edit feeds and channels:
+### Find and keep your Worker address
 
-| Access model                              | Who can edit what                                                                                                                           |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **One admin role**                        | Members of one configured Discord role can manage every feed, webhook, and route.                                                           |
-| **Separate feed and channel permissions** | Roles can manage the shared feed catalog (the list of sources), specified destination channels, or both. A person's matching roles combine. |
+Open **Cloudflare Dashboard → Workers & Pages → your Worker → Domains** and copy
+the HTTPS address for its `workers.dev` domain, for example
+`https://syndicord.my-community.workers.dev`. Cloudflare's
+[Domains tab](https://developers.cloudflare.com/changelog/post/2026-05-14-domains-tab/)
+shows the Worker's addresses. Use the address without a trailing slash or path;
+this is the **Worker origin** used below. If you already connected your own
+HTTPS domain to this Worker, you can use that address instead. No custom domain
+is needed for setup.
 
-Both use the same Discord application and encryption key. The
-[permissions guide](PERMISSIONS.md#access-models) explains the models and gives
-an example of separate feed and channel responsibilities.
+Create a password-manager entry for this installation and save the address as
+**Worker URL**. Keep this entry open: you will collect the Discord credentials
+and IDs there, then paste them into the Worker settings later in this guide. The
+address also gives you two links:
+
+| Link             | Make it by                                   | Example                                                          |
+| ---------------- | -------------------------------------------- | ---------------------------------------------------------------- |
+| Discord callback | Add `/admin/auth/callback` to the Worker URL | `https://syndicord.my-community.workers.dev/admin/auth/callback` |
+| Web editor       | Add `/admin` to the Worker URL               | `https://syndicord.my-community.workers.dev/admin`               |
+
+Save both links in the same entry. The callback is where Discord returns you
+after sign-in; you will register it in the next steps. The web-editor link is
+what you will open and share with editors once setup is complete.
+
+For a terminal lookup, use the terminal from deployment, where
+`CLOUDFLARE_ACCOUNT_ID` and `SYNDICORD_WORKER_NAME` are still set:
+
+```sh
+npm run syndicord -- cf workers get "$SYNDICORD_WORKER_NAME" -q
+```
+
+Copy the `subdomain.url` value from the JSON output. The optional
+[Worker address lookup](API.md#find-the-worker-address) shows how to extract
+just the URL with `jq`. For an
+[npm-installed CLI](SETUP.md#optional-npm-installation), replace
+`npm run syndicord --` with `npx syndicord`.
+
+### Choose an access model
+
+Choose based on what people should be allowed to manage. **One admin role** is
+the simplest starting point when all editors should have full access.
+
+| Model                                     | Use it when                                                                                    | What you will configure                                                                                             |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **One admin role**                        | Everyone with one role should manage every feed, webhook, and route.                           | A server ID and role ID in [Configure one admin role](#configure-one-admin-role).                                   |
+| **Separate feed and channel permissions** | You want feed curators, editors limited to particular channels, or roles from several servers. | A JSON policy listing each role's permissions in [Configure separate permissions](#configure-separate-permissions). |
+
+Choosing here does not change the Worker yet. Both paths first need the same
+Discord application and encryption key. After saving those common settings,
+follow **only your chosen model's configuration section**. For examples of
+separate responsibilities, see [access models](PERMISSIONS.md#access-models).
 
 ### Register a Discord application
+
+Collect the following values in your installation's password-manager entry. You
+will use them under [Configure the Worker](#configure-the-worker), so there is
+no need to set Worker secrets while working through these steps.
 
 1. Open the
    [Discord Developer Portal](https://discord.com/developers/applications) and
    choose **New Application**, or select the application for this installation.
-2. Under **OAuth2**, copy the **Client ID**, then reset/copy the **Client
-   Secret** into your password manager. Only the Worker receives the client
-   secret.
-3. Under **OAuth2 → Redirects**, register the exact callback URL:
-   `https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev/admin/auth/callback`. Use your
-   custom HTTPS origin instead if that is where you administer the Worker. Save
-   changes. The registered URL and `DISCORD_REDIRECT_URI` must match exactly,
-   including scheme, host, port, and path.
-4. In Discord, enable **User Settings → Advanced → Developer Mode**. Right-click
-   the server and choose **Copy Server ID**. Under **Server Settings → Roles**,
-   create or select the role allowed to administer syndicord and copy its role
-   ID from the role's context menu. Use the numeric IDs, not names. For separate
-   feed and channel permissions, collect the roles and channels in your
-   [policy](PERMISSIONS.md#configure-access).
+2. Under **OAuth2**, copy the **Client ID** and **Client Secret** into the
+   entry, labelled `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET`. Use **Reset
+   Secret** if you need to generate a secret. Keep it private; you will give it
+   only to the Worker.
+3. Under **OAuth2 → Redirects**, add the **Discord callback** you saved
+   [above](#find-and-keep-your-worker-address), then save changes. For the
+   example Worker, this is
+   `https://syndicord.my-community.workers.dev/admin/auth/callback`. Save that
+   exact URL as `DISCORD_REDIRECT_URI` in your entry too. Discord's registered
+   URL and this Worker setting must match exactly.
+4. In your **Discord client**, enable **User Settings → Advanced → Developer
+   Mode** so you can copy numeric IDs. Right-click the server where you want to
+   deliver RSS feeds and choose **Copy Server ID**. Under **Server Settings →
+   Roles**, create or select the role whose members should manage syndicord,
+   then copy its role ID from the role's context menu. For **one admin role**,
+   save these as `DISCORD_GUILD_ID` and `DISCORD_ROLE_ID`; Discord calls a
+   server a "guild" in its API. For **separate permissions**, collect each
+   server and role ID you need, plus channel IDs from the channels' context
+   menus, and label them with their server, role, or channel names for building
+   the policy.
+5. Assign the chosen role to yourself under **Server Settings → Members** so you
+   can test sign-in. Owning the server alone does not satisfy syndicord's role
+   check.
 
-There is no Discord CLI setup command in this project; use these dashboard
-steps. No bot installation or privileged member intent is needed. Sign-in asks
-only for `identify` and `guilds.members.read`. It does not invite anyone, join a
-server, or assign a role. Invitations and role assignment remain separate
-server-administration actions.
+The Discord-side setup uses the Developer Portal and your Discord client;
+syndicord's CLI does not create Discord applications or manage server roles. No
+bot installation is needed. Sign-in asks Discord for your identity and server
+membership so syndicord can check your roles; it does not join a server or
+assign a role.
 
 ### Configure the Worker
 
-Use the values collected in
-[Register a Discord application](#register-a-discord-application) above. The
-`DISCORD_*` settings below name those same values; `CONFIG_ENCRYPTION_KEY` is a
-separate key you generate here. Save these runtime settings on the Cloudflare
-Worker. GitHub's `production` environment holds the deployment credentials
-described in [automatic deployment](DEPLOYMENT.md).
+Now save the Discord values you just collected as settings on the Cloudflare
+Worker. You will also create `CONFIG_ENCRYPTION_KEY` below: this is a separate
+key syndicord uses to encrypt saved webhook URLs and Discord session tokens.
+Both access models need these four common settings.
 
-For CLI commands,
-[select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation)
-first. Choose one way to save the settings below.
+#### Generate and save the encryption key
 
-Generate an encryption key once, and save it in your password manager. Reuse an
-installation's existing key if it already has saved webhooks:
+For a new installation, run this command once in your terminal:
 
 ```sh
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-| Setting                 | Value                                                                    |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `CONFIG_ENCRYPTION_KEY` | Base64-encoded 32-byte key for saved webhooks and Discord session tokens |
-| `DISCORD_CLIENT_ID`     | Client ID copied from Discord Developer Portal → OAuth2 (step 2)         |
-| `DISCORD_CLIENT_SECRET` | Client Secret copied from Discord Developer Portal → OAuth2 (step 2)     |
-| `DISCORD_REDIRECT_URI`  | Exact callback URL saved under OAuth2 → Redirects (step 3)               |
-| `DISCORD_GUILD_ID`      | Server ID copied in Discord (step 4), when using one admin role          |
-| `DISCORD_ROLE_ID`       | Role ID copied in Discord (step 4), when using one admin role            |
+Copy its output into your password-manager entry as `CONFIG_ENCRYPTION_KEY`. The
+command only prints a new key; you will save it on the Worker in the next step.
+For an existing installation, reuse its existing key. Replacing or losing that
+key makes saved webhooks unreadable and prevents delivery.
+
+#### Save the four common settings
+
+| Setting                 | Paste this value from your password manager                               |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `CONFIG_ENCRYPTION_KEY` | The encryption key you just generated, or the installation's existing key |
+| `DISCORD_CLIENT_ID`     | Client ID from the Developer Portal                                       |
+| `DISCORD_CLIENT_SECRET` | Client Secret from the Developer Portal                                   |
+| `DISCORD_REDIRECT_URI`  | The exact callback URL you registered under OAuth2 → Redirects            |
+
+Choose **Cloudflare Dashboard** or **CLI**; both save the same settings:
 
 - **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
-  Variables and Secrets**. Add each setting as a **Secret** using the names
-  above, then deploy the changes. IDs and the callback URL are not confidential,
-  but storing them as secrets preserves them alongside the other runtime
-  settings during code deployment.
-- **CLI:** Each command uses a hidden value prompt. Paste the value there. For
-  separate feed and channel permissions, run the first four commands, then
-  [set `DISCORD_AUTH_POLICY`](PERMISSIONS.md#configure-access); skip the last
-  two commands, which configure one admin role.
+  Variables and Secrets**. Add each setting as a **Secret**, with the name and
+  value above, then deploy the settings changes. IDs and the callback URL are
+  not confidential, but the Secret type preserves them during code deployment.
+- **CLI:** Use the terminal where you set `CLOUDFLARE_ACCOUNT_ID` and
+  `SYNDICORD_WORKER_NAME` during setup. If you opened a new terminal,
+  [select the installation again](OPERATIONS.md#select-a-cloudflare-installation).
+  Run each command below and paste that setting's value at its hidden prompt.
+  For an [npm-installed CLI](SETUP.md#optional-npm-installation), replace
+  `npm run syndicord --` with `npx syndicord`.
 
   ```sh
   npm run syndicord -- cf workers secrets update CONFIG_ENCRYPTION_KEY \
@@ -102,58 +161,73 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
     --worker "$SYNDICORD_WORKER_NAME" --type secret_text
   npm run syndicord -- cf workers secrets update DISCORD_REDIRECT_URI \
     --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+  ```
+
+Next, complete one of the following two sections to tell syndicord who may sign
+in and edit.
+
+### Configure one admin role
+
+For **one admin role**, save these two additional Worker secrets. Together they
+mean "allow members of this server who have this role to manage everything."
+
+| Setting            | Value collected in your Discord client |
+| ------------------ | -------------------------------------- |
+| `DISCORD_GUILD_ID` | The numeric server ID                  |
+| `DISCORD_ROLE_ID`  | The numeric role ID                    |
+
+- **Cloudflare Dashboard:** Add both as **Secret** values in the same **Settings
+  → Variables and Secrets** page, then deploy the changes.
+- **CLI:** Run each command and paste the corresponding ID at the prompt:
+
+  ```sh
   npm run syndicord -- cf workers secrets update DISCORD_GUILD_ID \
     --worker "$SYNDICORD_WORKER_NAME" --type secret_text
   npm run syndicord -- cf workers secrets update DISCORD_ROLE_ID \
     --worker "$SYNDICORD_WORKER_NAME" --type secret_text
   ```
 
-For separate feed and channel permissions, use `DISCORD_AUTH_POLICY` instead of
-`DISCORD_GUILD_ID` and `DISCORD_ROLE_ID` in either method. All other settings
-remain required.
+Continue to
+[Sign in and start managing feeds](#sign-in-and-start-managing-feeds).
 
-For the [npm-installed CLI](SETUP.md#optional-npm-installation), substitute
-`npx syndicord` for `npm run syndicord --`.
+### Configure separate permissions
 
-Open **Cloudflare Dashboard → Workers & Pages → your Worker** and copy its HTTPS
-address. Add `/admin` to make the web-editor link, for example
-`https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev/admin`. Share this complete link
-with the people who will manage feeds and channels.
+For **separate feed and channel permissions**, use the
+[policy setup steps](PERMISSIONS.md#configure-access) to build and save one
+`DISCORD_AUTH_POLICY` Worker secret and initialize the catalog. That guide
+explains the JSON fields, gives a complete example, and shows both dashboard and
+CLI commands.
 
-Open the link in your browser and sign in. An authorized account sees its
-Discord identity, a **Sign out** control, and the editor. An account without the
-configured membership or role receives an explanation and can sign out or try
-another Discord account.
+The policy lists server/role pairs and what each may manage. It replaces the
+single server/role pair, so this path does not set `DISCORD_GUILD_ID` or
+`DISCORD_ROLE_ID`: those two values can express only unrestricted access for one
+role. The four common settings above are still needed for sign-in and
+encryption. After the policy steps, continue below.
 
-## CLI login
+### Sign in and start managing feeds
 
-```sh
-export SYNDICORD_ADMIN_URL='https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev'
-npm run syndicord -- login
-```
+Open the **web-editor link** saved at the start (your Worker URL plus `/admin`)
+and choose **Sign in with Discord**. Use the account you assigned the role to.
+An authorized account sees its Discord identity, a **Sign out** control, and the
+editor. If access is denied, check the server/role IDs and your role assignment,
+or try another Discord account.
 
-The CLI opens a browser and prints a verification URL and code. If opening the
-browser fails, open that URL yourself. Use `login --no-browser` to print the URL
-without opening a browser. Sign in with Discord, check that the code matches the
-terminal, and approve the CLI request. Approve only a request you started. The
-CLI receives its own syndicord session; Discord tokens and the client secret
-stay on the Worker. Copying browser cookies is unnecessary.
+**Sign-in setup is complete. Continue to [Using syndicord](USAGE.md)** to add a
+destination webhook and feed, in the browser or CLI. CLI login is optional and
+is explained there when you choose terminal editing. Once you have a feed and
+destination, return to [Verify delivery](SETUP.md#verify-delivery) to check that
+new entries reach Discord.
 
-Sessions are saved privately under `$XDG_CONFIG_HOME/syndicord`, or
-`~/.config/syndicord`, and separated by Worker origin. Configuration commands
-need no Cloudflare credentials. When a session expires, run `login` again. Sign
-out of the selected installation with:
-
-```sh
-npm run syndicord -- logout
-```
+Share the web-editor link with anyone else who should manage feeds and assign
+them the configured roles. They need that link and their Discord account; keep
+your Worker settings and secrets private.
 
 ## Grant and revoke access
 
 - **Grant:** Invite the person to a configured Discord server separately, then
-  assign its configured role in **Discord → Server Settings → Members**. Have
-  them sign in. With separate feed and channel permissions, their matching roles
-  combine the corresponding permissions.
+  assign its configured role in your **Discord client → Server Settings →
+  Members**. Have them sign in. With separate feed and channel permissions,
+  their matching roles combine the corresponding permissions.
 - **Revoke:** Remove that role, or remove the person from the server. Browser
   and CLI permissions can remain valid for up to two minutes after their last
   successful Discord check. After that window, further reads and saves require
@@ -194,13 +268,6 @@ stable and backed up: changing or losing it makes saved webhooks unreadable and
 stops delivery until the correct key is restored. Back up D1 and the key
 together for recovery.
 
-## Add feeds and routing
-
-Use [managing feeds](USAGE.md) for the web and CLI steps in either access model.
-Feed changes apply on the next scheduled poll without a deployment. New
-feed/destination pairs establish a silent baseline before delivering posts. See
-[delivery behavior](BEHAVIOR.md) for retries and configuration changes.
-
 ## Troubleshooting and acceptance
 
 | Symptom                             | Check                                                                                               |
@@ -221,94 +288,12 @@ logout invalidates its session immediately and a new login restores access only
 after membership and role are granted. These checks require your own Discord
 application and Cloudflare deployment.
 
-## Installation name and colour
+## Related guides
 
-The admin editor and its sign-in and access pages can show an installation name
-beside the syndicord mark and use a custom header colour. The name also appears
-in the browser tab. Both settings are optional:
+- [Manage feeds and sign in with the CLI](USAGE.md#sign-in).
+- [Change the installation name and colour](OPERATIONS.md#installation-name-and-colour).
+- [Preview locally](DEVELOPMENT.md#run-locally).
+- [Authentication design](DEVELOPMENT.md#authentication-design).
 
-| Setting              | Value                                                                                                                |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `ADMIN_NAME`         | Installation name, for example `Community updates`. Surrounding spaces are removed; at most 80 characters are shown. |
-| `ADMIN_HEADER_COLOR` | Six-digit hex colour, for example `#304B70`. Header text automatically uses black or white for contrast.             |
-
-Use the
-[HTML Color Codes colour picker](https://htmlcolorcodes.com/color-picker/) to
-choose a colour, then copy its six-digit hex value, including the leading `#`,
-into `ADMIN_HEADER_COLOR`.
-
-In **Cloudflare Dashboard → Workers & Pages → your Worker → Settings → Variables
-and Secrets**, add either setting as a **Secret** and deploy the changes. These
-values are visible on the page; using the Secret type preserves them during code
-deployments, like the other installation settings.
-
-Alternatively, use the CLI's value prompts:
-
-```sh
-npm run syndicord -- cf workers secrets update ADMIN_NAME \
-  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
-npm run syndicord -- cf workers secrets update ADMIN_HEADER_COLOR \
-  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
-```
-
-For local development, set these values in `.dev.vars`. Reload the page after
-changing them. An absent or blank name shows only syndicord; an absent or
-invalid colour uses the default dark green header. To restore a hosted
-installation's defaults, remove the setting in **Cloudflare Dashboard → Workers
-& Pages → your Worker → Settings → Variables and Secrets** and deploy the
-change, or use `cf workers secrets delete ADMIN_NAME` or
-`cf workers secrets delete ADMIN_HEADER_COLOR` with the same Worker selection.
-For local development, remove the setting from `.dev.vars`. Custom logos and
-page-wide themes are not supported.
-
-## Local preview
-
-Follow [local development setup](DEVELOPMENT.md#run-locally). For interactive
-Discord login, register `http://localhost:8787/admin/auth/callback` on a
-development application and configure that callback in `.dev.vars`. Visit
-`http://localhost:8787/admin`; for terminal editing set
-`SYNDICORD_ADMIN_URL=http://localhost:8787` and run `login`. HTTP is permitted
-only for loopback development. Automated tests need no real Discord application.
-
-Both clients edit only that local Worker's D1 database. Saving configuration
-does not send a Discord message; manually triggering a scheduled poll can.
-
-## Authentication design
-
-The Worker uses Discord's authorization-code flow with S256 PKCE, one-time
-browser-bound state, and server-side code exchange. Discord's
-[authorization server metadata](https://discord.com/.well-known/oauth-authorization-server)
-advertises S256 support. It queries
-[the current user's guild membership](https://docs.discord.com/developers/resources/user#get-current-user-guild-member)
-with the user's access token and checks role IDs. See
-[Discord OAuth2](https://docs.discord.com/developers/topics/oauth2) for the
-scopes and flow. These references were checked on 2026-11-22.
-
-Syndicord owns revocable D1 sessions with opaque tokens, bounded lifetimes, and
-Secure HttpOnly SameSite cookies in production. Discord access tokens are
-encrypted in D1, never returned to the browser or CLI, and never logged by the
-application. The deployment enables Cloudflare query-string redaction for
-request logs and traces so callback codes are omitted from those URLs. Verify
-this setting in the hosted installation and keep external proxies from logging
-callback queries. Browser writes require the same origin; CLI writes
-authenticate with the CLI's separate bearer session. Server-side authorization
-covers both the editor and the shared configuration API.
-
-Successful Discord membership checks are cached in the session's D1 row for a
-fixed 120 seconds, measured from the start of verification. Sign-in seeds that
-cache; a separately approved CLI session inherits the evidence's original
-deadline. Each request still validates its local session and configuration.
-Writes validate the local session before accepting an upload and check
-authorization after the body is read; scoped writes check again after webhook
-lookups and before storage. Those checks reuse permissions only while their
-fixed lifetime remains valid. The cache is not extended by reads or failed
-refreshes, and an invalid cache entry requires another Discord check.
-
-Discord's
-[rate-limit responses](https://docs.discord.com/developers/topics/rate-limits)
-provide a retry delay in the `Retry-After` header or JSON `retry_after` field.
-Syndicord reads these bounded responses, reports the wait in seconds, and
-preserves the cooldown deadline across early retries.
-
-[Documentation index](README.md) · [Manage feeds](USAGE.md) ·
+[Documentation index](README.md) ·
 [Feed and channel permissions](PERMISSIONS.md)

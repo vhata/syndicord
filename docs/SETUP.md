@@ -111,36 +111,29 @@ schedule. It builds current source in a checkout or uses the bundled Worker in
 an npm installation. The dashboard can create the database, but syndicord's CLI
 handles its code, migrations, and bindings together.
 
-Open **Cloudflare Dashboard → Workers & Pages → your Worker** and save its HTTPS
-address. The `workers.dev` address is enabled; preview URLs are disabled. The
-fresh service has no feeds and stays idle until you configure it.
+The fresh service has no feeds and stays idle until you configure it. Before
+continuing, open **Cloudflare Dashboard → Workers & Pages → your Worker →
+Domains** and copy its HTTPS `workers.dev` address. Save it as **Worker URL** in
+a password-manager entry for this installation, alongside the account ID, Worker
+name, and database ID. You will use this address next to register Discord
+sign-in and open the feed editor. The
+[sign-in guide](WEB.md#find-and-keep-your-worker-address) shows how to find it
+again, including a CLI option.
 
 ## Enable configuration access
 
-Complete [Discord sign-in setup](WEB.md#enable-administration): register the
-Discord application and callback, save the encryption key and OAuth settings,
-and choose who can edit:
+Next, follow [Configure Discord sign-in](WEB.md). It walks you through
+collecting the Discord application credentials, choosing who can edit, and
+saving the settings on your Worker. Keep using the same password-manager entry
+for those values and the encryption key generated there.
 
-| Access model                              | Use it when                                                                                                                    |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **One admin role**                        | Everyone with one Discord role may manage all feeds and destinations.                                                          |
-| **Separate feed and channel permissions** | Roles should manage the shared feed catalog (list of sources), specified channels, or both. A person’s matching roles combine. |
+That guide ends by sending you to [Using syndicord](USAGE.md) to create a
+destination webhook and add your first feed in the browser or CLI. For the
+delivery check below, use a feed you can publish to, such as your own
+repository's commit feed. Save the webhook URL in your password manager too;
+saved URLs are never returned by either client.
 
-For separate feed and channel permissions,
-[configure the policy and initialize the catalog](PERMISSIONS.md#configure-access).
-For either model, open the web editor using the link from
-[sign-in setup](WEB.md#configure-the-worker), sign in, and follow
-[managing feeds](USAGE.md) to add a destination and feed using the web interface
-or CLI.
-
-In Discord, create the destination webhook under **Edit Channel → Integrations →
-Webhooks**. Use a feed you can publish to for the delivery check, such as your
-own repository's commit feed.
-
-Keep the account/database IDs, Worker address, Discord application credentials,
-encryption key, and webhook URLs in your password manager. Saved webhook URLs
-are never returned by either client; the encryption key is needed to read their
-stored values.
+**After adding your feed and destination, return here to verify delivery.**
 
 ## Verify delivery
 

@@ -28,7 +28,7 @@ default for the CLI; the command never changes migrations, releases a lease, or
 resumes a suspended destination.
 
 Deployment applies migrations. A fresh installation has no feeds and reports
-`disabled`. Add configuration through [the web interface](WEB.md) or
+`disabled`. Add configuration through [the web interface](USAGE.md) or
 [CLI](USAGE.md). Until the Worker records completed polls, active feeds have
 status `unknown`; older delivery history does not establish current health.
 

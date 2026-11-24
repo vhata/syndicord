@@ -1,8 +1,7 @@
 # Advanced provider operations
 
 Use [setup](SETUP.md) for the normal dashboard and CLI instructions. Routine
-feed and webhook edits use the [web interface](WEB.md) or
-[syndicord CLI](USAGE.md).
+feed and webhook edits use the [web editor or syndicord CLI](USAGE.md).
 
 Use this optional reference for account-token policies and provider API tasks.
 Normal setup uses [dashboard steps and native CLI commands](SETUP.md). The API
@@ -107,19 +106,29 @@ make no automatic retries; inspect the current state after an ambiguous write.
 
 ## Find the Worker address
 
-With `CLOUDFLARE_ACCOUNT_ID` and `SYNDICORD_WORKER_NAME` set for the
-installation:
+First
+[select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation).
+The pinned CLI can retrieve a Worker by name. If you have `jq`, extract its
+address with:
 
 ```sh
-cf_api workers/subdomain |
-  jq -er --arg worker "$SYNDICORD_WORKER_NAME" \
-    'if .success then "https://\($worker).\(.result.subdomain).workers.dev/admin" else error("Subdomain lookup failed") end'
+npm run syndicord -- cf workers get "$SYNDICORD_WORKER_NAME" -q |
+  jq -r '.subdomain.url'
 ```
 
-This needs Workers Scripts Read or Write permission and prints the default
-address. Alternatively, the Worker's Cloudflare overview shows its configured
-addresses.
-[Subdomain API](https://developers.cloudflare.com/api/resources/workers/subresources/subdomains/methods/get/)
+Without `jq`, omit the pipe and read `subdomain.url` in the JSON output. `-q`
+keeps CLI metadata out of the JSON. This lookup uses your existing Cloudflare
+login; it does not need the API-token helper above.
+
+This is the default `workers.dev` address without `/admin`. Use it when
+`subdomain.enabled` is `true`; Cloudflare may return a URL even when that route
+is disabled. If you use a custom domain, copy that HTTPS address from
+**Cloudflare Dashboard → Workers & Pages → your Worker → Domains** instead. See
+the
+[Worker response fields](https://developers.cloudflare.com/api/resources/workers/).
+
+Continue with [Discord sign-in setup](WEB.md#find-and-keep-your-worker-address)
+to make the callback and web-editor links from this address.
 
 ## Pause and restore cron triggers
 

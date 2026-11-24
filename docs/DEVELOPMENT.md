@@ -207,7 +207,7 @@ with the earlier commands. Keep the encryption key that belongs to each dataset.
 | `cloudflare.config.ts`        | Worker, bindings, schedule, and logging                 |
 
 Read [relay behavior](BEHAVIOR.md) for the polling and delivery model,
-[authentication design](WEB.md#authentication-design) for sign-in, and
+[authentication design](#authentication-design) for sign-in, and
 [permissions](PERMISSIONS.md) for the shared catalog and channel grants.
 
 <a id="format-markdown"></a> <a id="staged-checks"></a>
@@ -232,3 +232,40 @@ Normal [CLI installation](SETUP.md#optional-npm-installation) and
 - [Cloudflare configuration](https://developers.cloudflare.com/cf/projects/cloudflare-config/)
 - [Cloudflare CLI project commands](https://developers.cloudflare.com/cf/projects/)
 - [Advanced provider API recipes](API.md)
+
+## Authentication design
+
+The Worker uses Discord's authorization-code flow with S256 PKCE, one-time
+browser-bound state, and server-side code exchange. Discord's
+[authorization server metadata](https://discord.com/.well-known/oauth-authorization-server)
+advertises S256 support. It queries
+[the current user's guild membership](https://docs.discord.com/developers/resources/user#get-current-user-guild-member)
+with the user's access token and checks role IDs. See
+[Discord OAuth2](https://docs.discord.com/developers/topics/oauth2) for the
+scopes and flow. These references were checked on 2026-11-22.
+
+Syndicord owns revocable D1 sessions with opaque tokens, bounded lifetimes, and
+Secure HttpOnly SameSite cookies in production. Discord access tokens are
+encrypted in D1, never returned to the browser or CLI, and never logged by the
+application. The deployment enables Cloudflare query-string redaction for
+request logs and traces so callback codes are omitted from those URLs. Verify
+this setting in the hosted installation and keep external proxies from logging
+callback queries. Browser writes require the same origin; CLI writes
+authenticate with the CLI's separate bearer session. Server-side authorization
+covers both the editor and the shared configuration API.
+
+Successful Discord membership checks are cached in the session's D1 row for a
+fixed 120 seconds, measured from the start of verification. Sign-in seeds that
+cache; a separately approved CLI session inherits the evidence's original
+deadline. Each request still validates its local session and configuration.
+Writes validate the local session before accepting an upload and check
+authorization after the body is read; scoped writes check again after webhook
+lookups and before storage. Those checks reuse permissions only while their
+fixed lifetime remains valid. The cache is not extended by reads or failed
+refreshes, and an invalid cache entry requires another Discord check.
+
+Discord's
+[rate-limit responses](https://docs.discord.com/developers/topics/rate-limits)
+provide a retry delay in the `Retry-After` header or JSON `retry_after` field.
+Syndicord reads these bounded responses, reports the wait in seconds, and
+preserves the cooldown deadline across early retries.

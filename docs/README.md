@@ -29,14 +29,15 @@ content. [Running an installation](OPERATIONS.md) covers selecting its
 Cloudflare resources and finding maintenance tasks. These references cover the
 other common jobs:
 
-| Task                                                            | Guide                                       |
-| --------------------------------------------------------------- | ------------------------------------------- |
-| Configure Discord login, branding, or sessions                  | [Sign-in and administration](WEB.md)        |
-| Delegate feeds and particular channels across servers           | [Permission policy](PERMISSIONS.md)         |
-| Inspect health and pending deliveries                           | [Operational status](STATUS.md)             |
-| Diagnose failures, pause delivery, roll back, or restore D1     | [Troubleshooting and recovery](RECOVERY.md) |
-| Deploy automatically from your GitHub repository                | [Automatic deployment](DEPLOYMENT.md)       |
-| Understand baselines, retries, message formatting, and capacity | [Relay behavior](BEHAVIOR.md)               |
+| Task                                                            | Guide                                                                 |
+| --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Configure Discord login or maintain editing access              | [Sign-in and access](WEB.md)                                          |
+| Change the editor’s name or colour                              | [Installation appearance](OPERATIONS.md#installation-name-and-colour) |
+| Delegate feeds and particular channels across servers           | [Permission policy](PERMISSIONS.md)                                   |
+| Inspect health and pending deliveries                           | [Operational status](STATUS.md)                                       |
+| Diagnose failures, pause delivery, roll back, or restore D1     | [Troubleshooting and recovery](RECOVERY.md)                           |
+| Deploy automatically from your GitHub repository                | [Automatic deployment](DEPLOYMENT.md)                                 |
+| Understand baselines, retries, message formatting, and capacity | [Relay behavior](BEHAVIOR.md)                                         |
 
 ## Go deeper
 
