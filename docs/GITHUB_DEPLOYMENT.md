@@ -71,8 +71,8 @@ to the deployment account. Create it and copy its complete value.
 ### Create through the CLI
 
 Follow the
-[account-token CLI recipe](API.md#create-a-deployment-token-with-the-cli). It
-uses native `cf` commands and a JSON policy file. The pinned CLI grants
+[account-token CLI recipe](PROVIDER_API.md#create-a-deployment-token-with-the-cli).
+It uses native `cf` commands and a JSON policy file. The pinned CLI grants
 **Workers Scripts Write** (including creation/deletion); use the dashboard for
 **Workers Editor**, which updates and deploys existing Workers.
 

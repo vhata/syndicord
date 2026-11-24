@@ -143,7 +143,8 @@ Those require the checks run by the person hosting syndicord in
 
 Read [relay behavior](BEHAVIOR.md), the [source layout](DEVELOPMENT.md#layout),
 and the guides for [setup](SETUP.md), [configuration](USAGE.md),
-[deployment](DEPLOYMENT.md), [status](STATUS.md), and [recovery](RECOVERY.md).
+[deployment](GITHUB_DEPLOYMENT.md), [status](STATUS.md), and
+[recovery](RECOVERY.md).
 
 Focus on these boundaries:
 
@@ -204,7 +205,7 @@ To inspect CI, open the repository's **Actions → CI** page or use
 `gh run list --workflow check.yml`. A manual run on `main` also attempts a
 production deployment: use **Run workflow → main** or
 `gh workflow run check.yml --ref main` only when that deployment is intended.
-See [automatic deployment](DEPLOYMENT.md) for credentials and setup.
+See [automatic deployment](GITHUB_DEPLOYMENT.md) for credentials and setup.
 
 `.github/workflows/pages.yml` separately builds and checks the product website
 on pull requests, pushes to main, and manual runs. It uploads only the checked

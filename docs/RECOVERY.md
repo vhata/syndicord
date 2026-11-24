@@ -4,15 +4,15 @@
 Start with [status](STATUS.md), then follow the row that matches the symptom.
 Everyday feed edits are in [manage feeds and channels](USAGE.md).
 
-| Symptom or task                          | Start here                                                            |
-| ---------------------------------------- | --------------------------------------------------------------------- |
-| No messages just after adding a feed     | [Verify delivery](SETUP.md#verify-delivery): the first poll is silent |
-| Sign-in or access denied                 | [Sign-in troubleshooting](WEB.md#troubleshooting-and-acceptance)      |
-| Feed errors, delays, or missing messages | [Inspect a run](#inspect-a-run)                                       |
-| Destination suspended                    | [Resume a destination](#resume-a-suspended-destination)               |
-| Deploy failed or its outcome is unclear  | [Failed deployment](#failed-deployment)                               |
-| Stop sends or return to earlier code     | [Pause and roll back](#pause-and-roll-back)                           |
-| Recover lost or damaged data             | [Restore D1](#restore-d1)                                             |
+| Symptom or task                          | Start here                                                                   |
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
+| No messages just after adding a feed     | [Verify delivery](SETUP.md#verify-delivery): the first poll is silent        |
+| Sign-in or access denied                 | [Sign-in troubleshooting](DISCORD_SIGN_IN.md#troubleshooting-and-acceptance) |
+| Feed errors, delays, or missing messages | [Inspect a run](#inspect-a-run)                                              |
+| Destination suspended                    | [Resume a destination](#resume-a-suspended-destination)                      |
+| Deploy failed or its outcome is unclear  | [Failed deployment](#failed-deployment)                                      |
+| Stop sends or return to earlier code     | [Pause and roll back](#pause-and-roll-back)                                  |
+| Recover lost or damaged data             | [Restore D1](#restore-d1)                                                    |
 
 Select the installation as described in
 [Cloudflare operations](OPERATIONS.md#select-a-cloudflare-installation). Feed

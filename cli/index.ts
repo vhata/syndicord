@@ -33,7 +33,7 @@ export const USAGE = `Usage: syndicord <command>
   cf <arguments...>                Run the bundled Cloudflare CLI
 
 Set SYNDICORD_ADMIN_URL and run 'syndicord login' to manage feeds and webhooks
-through the same API as the web interface. See docs/WEB.md for configuration.
+through the same API as the web interface. See docs/USAGE.md for feed management.
 Use a loopback URL for local configuration; configuration commands do not use
 --local. Saved webhook URLs are encrypted in D1 and never returned by the API.
 

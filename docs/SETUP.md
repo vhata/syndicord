@@ -10,9 +10,9 @@ installation is one **Worker** (the running service) and one **D1 database**
 (feeds, encrypted webhook URLs, routing, and delivery history).
 
 Discord delivery uses channel webhooks, so you do not invite or authorize a bot
-on your server. [Discord sign-in](WEB.md) uses an OAuth application to check
-members' roles. You choose which roles can edit feeds and channels, then grant
-or revoke people's access by managing those roles in Discord.
+on your server. [Discord sign-in](DISCORD_SIGN_IN.md) uses an OAuth application
+to check members' roles. You choose which roles can edit feeds and channels,
+then grant or revoke people's access by managing those roles in Discord.
 
 Follow the steps below in order. GitHub automatic deployment is optional; you do
 not need your own repository to host syndicord.
@@ -117,15 +117,15 @@ Domains** and copy its HTTPS `workers.dev` address. Save it as **Worker URL** in
 a password-manager entry for this installation, alongside the account ID, Worker
 name, and database ID. You will use this address next to register Discord
 sign-in and open the feed editor. The
-[sign-in guide](WEB.md#find-and-keep-your-worker-address) shows how to find it
-again, including a CLI option.
+[sign-in guide](DISCORD_SIGN_IN.md#find-and-keep-your-worker-address) shows how
+to find it again, including a CLI option.
 
 ## Enable configuration access
 
-Next, follow [Configure Discord sign-in](WEB.md). It walks you through
-collecting the Discord application credentials, choosing who can edit, and
-saving the settings on your Worker. Keep using the same password-manager entry
-for those values and the encryption key generated there.
+Next, follow [Configure Discord sign-in](DISCORD_SIGN_IN.md). It walks you
+through collecting the Discord application credentials, choosing who can edit,
+and saving the settings on your Worker. Keep using the same password-manager
+entry for those values and the encryption key generated there.
 
 That guide ends by sending you to [Using syndicord](USAGE.md) to create a
 destination webhook and add your first feed in the browser or CLI. For the
@@ -177,7 +177,7 @@ For an npm installation, repeat the
 [packing and global-install steps](#optional-npm-installation), then run
 `npx syndicord deploy`. Keep the same account, Worker, and database identifiers.
 Deployments preserve feeds, webhook URLs, and Worker secrets. You can also
-enable [automatic deployment from GitHub](DEPLOYMENT.md).
+enable [automatic deployment from GitHub](GITHUB_DEPLOYMENT.md).
 
 [Documentation index](README.md) · [Manage feeds](USAGE.md) ·
 [Cloudflare database setup](https://developers.cloudflare.com/d1/get-started/)

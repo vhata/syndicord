@@ -57,7 +57,7 @@ npm run syndicord -- logout
 
 Browser sign-out and CLI logout end their respective sessions; neither signs you
 out of Discord itself. For session limits and role changes, see
-[grant and revoke access](WEB.md#grant-and-revoke-access).
+[grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access).
 
 ## Choose the section matching your editor
 
@@ -121,8 +121,9 @@ Integrations → Webhooks**, create a webhook, and copy its URL. You need
 permission to manage webhooks in that channel. Keep the URL in your password
 manager; syndicord never reveals saved webhook URLs. Create it in the Discord
 client; syndicord’s CLI does not create Discord webhooks. If you already operate
-a Discord bot, an [optional API recipe](API.md#create-a-discord-webhook) covers
-that alternative.
+a Discord bot, an
+[optional API recipe](PROVIDER_API.md#create-a-discord-webhook) covers that
+alternative.
 
 **Web:** Under **Your destinations**, choose **Register webhook**, enter a label
 and the URL, and save.

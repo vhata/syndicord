@@ -1,4 +1,4 @@
-# Local development only. First follow docs/WEB.md#register-a-discord-application
+# Local development only. First follow docs/DISCORD_SIGN_IN.md#register-a-discord-application
 # to get the client ID, client secret, server ID, and role ID from Discord.
 # Register the local callback below on that development application.
 # Copy this file to .dev.vars and fill in the Discord values you collected.

@@ -51,8 +51,8 @@ npm run syndicord -- cf workers get "$SYNDICORD_WORKER_NAME" -q
 ```
 
 Copy the `subdomain.url` value from the JSON output. The optional
-[Worker address lookup](API.md#find-the-worker-address) shows how to extract
-just the URL with `jq`. For an
+[Worker address lookup](PROVIDER_API.md#find-the-worker-address) shows how to
+extract just the URL with `jq`. For an
 [npm-installed CLI](SETUP.md#optional-npm-installation), replace
 `npm run syndicord --` with `npx syndicord`.
 

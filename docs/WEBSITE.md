@@ -42,6 +42,12 @@ Links to repository files that are not published pages lead to GitHub. Review
 records, work queues, and design specs remain repository references. There is no
 separate copy of the documentation to synchronize.
 
+The production build also writes redirect pages for renamed guides, defined in
+`.vitepress/redirects.mjs`. These keep existing website links working, including
+section links moved to another guide. New navigation and search results use the
+current filenames. `site:check` verifies the redirect destinations for the
+selected site path; use `site:preview` to try them locally.
+
 The site uses pinned VitePress and a scoped Vite override in `package.json`;
 review both when updating website dependencies.
 

@@ -99,9 +99,9 @@ and review evidence; the contract covers the full workflow.
 
 Tests above are the quickest way to exercise the project. For an interactive
 editor with Discord sign-in, first follow
-[Register a Discord application](WEB.md#register-a-discord-application) using a
-development application and role. Those steps show where to get the client ID,
-client secret, server ID, and role ID. At the redirect step, register
+[Register a Discord application](DISCORD_SIGN_IN.md#register-a-discord-application)
+using a development application and role. Those steps show where to get the
+client ID, client secret, server ID, and role ID. At the redirect step, register
 `http://localhost:8787/admin/auth/callback` for this local preview.
 
 Then create the private settings file:
@@ -149,7 +149,7 @@ and destinations.
 `npm run db:migrate:local` always passes `--local`, even if invoked in CI. The
 CI test job also uses local fixtures. Production deployment uses a separate
 command to migrate the configured hosted D1 database; see
-[deployment and migration behavior](DEPLOYMENT.md#deployment-and-migration-behavior).
+[deployment and migration behavior](GITHUB_DEPLOYMENT.md#deployment-and-migration-behavior).
 
 To trigger a local poll, open `http://localhost:8787/cdn-cgi/local/scheduled` in
 a browser, or run:
@@ -231,7 +231,7 @@ Normal [CLI installation](SETUP.md#optional-npm-installation) and
 
 - [Cloudflare configuration](https://developers.cloudflare.com/cf/projects/cloudflare-config/)
 - [Cloudflare CLI project commands](https://developers.cloudflare.com/cf/projects/)
-- [Advanced provider API recipes](API.md)
+- [Advanced provider API recipes](PROVIDER_API.md)
 
 ## Authentication design
 

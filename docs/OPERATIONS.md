@@ -35,9 +35,9 @@ explains its results.
 
 | Task                                                 | Guide                                                       |
 | ---------------------------------------------------- | ----------------------------------------------------------- |
-| Configure sign-in or change who can edit             | [Sign-in and access](WEB.md)                                |
+| Configure sign-in or change who can edit             | [Sign-in and access](DISCORD_SIGN_IN.md)                    |
 | Update the deployed code                             | [Update the installation](SETUP.md#update-the-installation) |
-| Deploy automatically from GitHub                     | [Automatic deployment](DEPLOYMENT.md)                       |
+| Deploy automatically from GitHub                     | [Automatic deployment](GITHUB_DEPLOYMENT.md)                |
 | Check health and pending deliveries                  | [Operational status](STATUS.md)                             |
 | Diagnose failures, pause, roll back, or restore data | [Troubleshooting and recovery](RECOVERY.md)                 |
 

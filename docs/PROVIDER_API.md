@@ -19,7 +19,7 @@ First
 [select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation).
 Your membership needs **API Token Provisioning** (or Super Administrator), with
 the product permissions you want to grant. This creates an account-owned token
-for [GitHub deployment](DEPLOYMENT.md).
+for [GitHub deployment](GITHUB_DEPLOYMENT.md).
 
 The pinned CLI's OAuth scopes support **Workers Scripts Write**. Use the
 dashboard for the narrower **Workers Editor** permission.
@@ -76,7 +76,7 @@ In the JSON printed by `cf`, copy the complete `value` string (beginning with
 `cfat_`), without the surrounding quotes.
 
 Continue with
-[storing the token in GitHub](DEPLOYMENT.md#store-the-token-in-github).
+[storing the token in GitHub](GITHUB_DEPLOYMENT.md#store-the-token-in-github).
 [Account token requirements](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
 
 ## Cloudflare API access
@@ -127,8 +127,9 @@ is disabled. If you use a custom domain, copy that HTTPS address from
 the
 [Worker response fields](https://developers.cloudflare.com/api/resources/workers/).
 
-Continue with [Discord sign-in setup](WEB.md#find-and-keep-your-worker-address)
-to make the callback and web-editor links from this address.
+Continue with
+[Discord sign-in setup](DISCORD_SIGN_IN.md#find-and-keep-your-worker-address) to
+make the callback and web-editor links from this address.
 
 ## Pause and restore cron triggers
 

@@ -29,16 +29,16 @@ permission; the distinction is what it permits, not how many roles exist.
 
 The browser and CLI enforce the same permissions. Neither model grants access to
 Cloudflare Worker secrets or the authorization policy. To configure one admin
-role, follow [Discord sign-in setup](WEB.md#enable-administration). The
-remaining sections explain separate feed and channel permissions.
+role, follow [Discord sign-in setup](DISCORD_SIGN_IN.md#enable-administration).
+The remaining sections explain separate feed and channel permissions.
 
 ## Configure access
 
 Follow this section if you chose **separate feed and channel permissions**.
 First save the four common settings in
-[Configure the Worker](WEB.md#configure-the-worker): the encryption key, client
-ID, client secret, and callback URL. If you came here from that guide, those
-settings are already in place.
+[Configure the Worker](DISCORD_SIGN_IN.md#configure-the-worker): the encryption
+key, client ID, client secret, and callback URL. If you came here from that
+guide, those settings are already in place.
 
 You will now save a JSON document as the `DISCORD_AUTH_POLICY` Worker secret.
 Each entry (a **grant**) names a Discord server and role, then says whether that
@@ -168,16 +168,17 @@ uploads and scoped webhook lookups, refreshing expired permissions through
 Discord. Once the window expires, outages, rate limits, or malformed responses
 block access until verification succeeds; stale grants are never a fallback.
 Local logout and known session expiry remain immediate. See
-[granting and revoking access](WEB.md#grant-and-revoke-access) for the browser,
-CLI, and token-revocation behavior. Existing routes continue after management
-access is revoked.
+[granting and revoking access](DISCORD_SIGN_IN.md#grant-and-revoke-access) for
+the browser, CLI, and token-revocation behavior. Existing routes continue after
+management access is revoked.
 
 ## Initialize an existing installation
 
-Apply the packaged migrations through the normal [deployment](DEPLOYMENT.md)
-flow before enabling the policy. Keep the existing encryption key and a database
-backup. Enabling policy blocks the old whole-configuration write API
-immediately; it does not change existing deliveries.
+Apply the packaged migrations through the normal
+[deployment](SETUP.md#update-the-installation) flow before enabling the policy.
+Keep the existing encryption key and a database backup. Enabling policy blocks
+the old whole-configuration write API immediately; it does not change existing
+deliveries.
 
 **Verify and initialize catalog** verifies every saved webhook with Discord and
 imports all existing feeds, destinations, and subscriptions in one atomic save.
