@@ -9,7 +9,7 @@ without invoking the Worker or sending a Discord message. It is not a live
 delivery test; for live logs and CPU errors, see
 [Inspect a run](RECOVERY.md#inspect-a-run).
 
-[Select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation)
+[Select a Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation)
 first, then run:
 
 ```sh
@@ -18,10 +18,11 @@ npm run syndicord -- status
 
 The command uses the project's pinned `cf` dependency and only queries D1; it
 needs no webhook secret or `.dev.vars` file. Hosted reads count toward D1 usage.
-Use the database ID recorded for the installation rather than creating a new
-database. Use `npm run syndicord -- status --local` from a development checkout
-for its local D1 state instead. Remote is the default; the command never changes
-migrations, releases a lease, or resumes a suspended destination.
+The database ID is non-secret; use the one recorded for the installation rather
+than creating a new database. Use `npm run syndicord -- status --local` from a
+development checkout for its local D1 state instead. Remote is the default; the
+command never changes migrations, releases a lease, or resumes a suspended
+destination.
 
 Deployment applies migrations. A fresh installation has no feeds and reports
 `disabled`. Add configuration with [Manage feeds and channels](FEEDS.md). Until

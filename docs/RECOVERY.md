@@ -213,9 +213,17 @@ the saved list when ready:
 npm run syndicord -- feeds set --file .feeds.json
 ```
 
-Either model can also pause the Worker's cron schedule in Cloudflare, which
-stops polling without touching stored configuration; see
-[Restore D1](#restore-d1) for the steps.
+Either model can instead pause the Worker's cron schedule, which stops polling
+without touching stored configuration. Open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then open **Settings → Triggers
+→ Cron Triggers**. Record the current schedule, then remove it. Allow up to 15
+minutes for trigger changes to propagate, plus time for running invocations to
+finish, and keep deployments from running meanwhile: deployment reinstalls the
+schedule from source configuration. The pinned CLI has no direct cron-management
+command; to script it, use the
+[cron trigger recipe](PROVIDER_API.md#pause-and-restore-cron-triggers). Add the
+recorded schedule back on the same page to resume.
 
 ### Roll back the code
 
@@ -251,16 +259,9 @@ gh workflow run check.yml --ref main
 
 [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
 retains seven days on Workers Free and thirty days on Workers Paid. A restore
-overwrites the database. First, open
-[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
-in the Cloudflare dashboard, select your Worker, then open **Settings → Triggers
-→ Cron Triggers**. Record the current schedule, then remove it temporarily.
-Prevent concurrent deployments and allow up to 15 minutes for trigger changes to
-propagate, plus time for running invocations to finish. The pinned CLI has no
-direct cron-management command; to script it, use the
-[cron trigger recipe](PROVIDER_API.md#pause-and-restore-cron-triggers). A pause
-stored as `[]` is insufficient: restoring D1 also restores the old feed
-configuration.
+overwrites the database. First [pause the cron schedule](#pause-delivery) and
+wait for it to take effect. A pause stored as `[]` is insufficient: restoring D1
+also restores the old feed configuration.
 
 Record the current bookmark, then look up the intended restore point:
 

@@ -54,7 +54,8 @@ and brings you back to verify delivery.
 | Change the editor's name or colour                          | [Installation name and colour](OPERATIONS.md#installation-name-and-colour)         |
 | Check health and pending deliveries                         | [Operational status](STATUS.md)                                                    |
 | Find out why messages stopped or a destination is suspended | [Troubleshooting and recovery](RECOVERY.md)                                        |
-| Pause delivery or roll back the code                        | [Pause and roll back](RECOVERY.md#pause-and-roll-back)                             |
+| Pause delivery                                              | [Pause delivery](RECOVERY.md#pause-delivery)                                       |
+| Roll back the code                                          | [Roll back the code](RECOVERY.md#roll-back-the-code)                               |
 | Restore the database                                        | [Restore D1](RECOVERY.md#restore-d1)                                               |
 | Script provider tasks                                       | [Advanced provider operations](PROVIDER_API.md)                                    |
 

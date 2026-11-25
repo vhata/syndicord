@@ -244,6 +244,9 @@ known expiry. Local sign-out, session expiry, and changes to the configured
 Discord access policy invalidate access immediately. Discord-side token
 revocation, role changes, and server departures are detected when the two-minute
 permission window expires. Using the editor or CLI does not extend that window.
+Every request validates the local session, and writes check authorization again
+after the upload is read and after any webhook lookup, refreshing expired
+permissions through Discord.
 
 A valid permission result can be reused during a Discord outage until its fixed
 deadline. After expiry, an outage, rate limit, or invalid Discord response
