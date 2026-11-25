@@ -64,9 +64,11 @@ Administrator), plus the product permissions you will grant. Choose one path:
 
 ### Create through the dashboard
 
-In the **Cloudflare Dashboard**, open **Manage account → Account API tokens →
-Create Token**. Select Workers **Editor** and D1 **Edit**, and limit the token
-to the deployment account. Create it and copy its complete value.
+In the **Cloudflare Dashboard**, open
+[**Account API tokens**](https://dash.cloudflare.com/?to=/:account/api-tokens)
+and choose **Create Token**. Select Workers **Editor** and D1 **Edit**, and
+limit the token to the deployment account. Create it and copy its complete
+value.
 
 ### Create through the CLI
 

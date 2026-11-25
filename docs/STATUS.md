@@ -2,10 +2,11 @@
 
 **Requires access to the installation’s Cloudflare account.** If you only manage
 feeds or channels, ask the person who hosts syndicord to run this check. For
-live logs and CPU errors, use **Cloudflare → Workers & Pages → your Worker →
-Logs → Live** and **Metrics**, or
-[tail events in the CLI](RECOVERY.md#inspect-a-run). The status report below
-summarizes saved D1 health; it is not a live delivery test.
+live logs and CPU errors, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then use **Logs → Live** and
+**Metrics**, or [tail events in the CLI](RECOVERY.md#inspect-a-run). The status
+report below summarizes saved D1 health; it is not a live delivery test.
 
 Inspect polling health and pending deliveries without invoking the Worker or
 sending a Discord message:

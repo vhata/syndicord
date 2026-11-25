@@ -26,8 +26,10 @@ export GH_REPO='YOUR_OWNER/YOUR_REPOSITORY'
 
 ## Inspect a run
 
-**Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Logs → Live**.
-Use **Metrics** to check invocation failures and CPU time.
+**Cloudflare Dashboard:** Open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+select your Worker, then open **Logs → Live**. Use **Metrics** to check
+invocation failures and CPU time.
 [Cloudflare live-log reference](https://developers.cloudflare.com/workers/observability/logs/real-time-logs/)
 
 **CLI:** Stream events from the same Worker:
@@ -50,13 +52,14 @@ Feed indices refer to the zero-based active route list, not catalog IDs. In
 installations where **one admin role** can edit every feed and destination,
 inspect it with `npm run syndicord -- feeds get`. With **separate feed and
 channel permissions**, roles manage a shared feed catalog, specified channels,
-or both. For that model, someone with Cloudflare access can inspect
-`relay_configuration` in **Cloudflare → Storage & databases → D1 → your database
-→ Console**: `feeds` contains the active route list; `catalog` maps source URLs
-and each destination's `deliveryKey` to catalog IDs and labels. These fields can
-contain private feed URLs; do not share their raw contents. Catalog and
-destination list commands intentionally hide source URLs and do not expose
-delivery keys.
+or both. For that model, someone with Cloudflare access can open
+[**D1 SQL database**](https://dash.cloudflare.com/?to=/:account/workers/d1),
+select the installation's database, and open **Console** to inspect
+`relay_configuration`: `feeds` contains the active route list; `catalog` maps
+source URLs and each destination's `deliveryKey` to catalog IDs and labels.
+These fields can contain private feed URLs; do not share their raw contents.
+Catalog and destination list commands intentionally hide source URLs and do not
+expose delivery keys.
 
 To inspect hosted delivery counts without reading message payloads, run this SQL
 in that D1 console, or use the CLI command below:
@@ -96,8 +99,10 @@ SET next_attempt_ms = 0
 WHERE destination = 'updates' AND state = 'pending';
 ```
 
-**Cloudflare Dashboard:** Run the two statements under **Storage & databases →
-D1 → your database → Console**. **CLI:** Apply the same file to that database:
+**Cloudflare Dashboard:** Open
+[**D1 SQL database**](https://dash.cloudflare.com/?to=/:account/workers/d1),
+select your database, then open **Console** and run the two statements. **CLI:**
+Apply the same file to that database:
 
 ```sh
 npm run syndicord -- cf d1 raw "$SYNDICORD_DATABASE_ID" --sql @resume.sql
@@ -116,8 +121,10 @@ available, without printing remote annotations or secret values.
 
 If an upload or readback was ambiguous, inspect the active deployment before
 retrying; uploading can succeed before a later step fails. In the Cloudflare
-dashboard, open **Workers & Pages → your Worker → Deployments** and inspect the
-active version and traffic allocation. In the CLI:
+dashboard, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+select your Worker, then open **Deployments** and inspect the active version and
+traffic allocation. In the CLI:
 
 ```sh
 npm run syndicord -- cf workers deployments list --worker "$SYNDICORD_WORKER_NAME"
@@ -215,10 +222,13 @@ gh run list --workflow check.yml --limit 5
 For a code rollback, check out the intended revision, run `npm ci`, and run
 `npm run deploy`. For the npm-installed CLI, prepare the intended Git ref using
 `npm pack github:vhata/syndicord#COMMIT_OR_TAG`, install the resulting `.tgz`
-with `npm install --global ./FILENAME.tgz`, then run `npx syndicord deploy`.
-Cloudflare's **Deployments → Rollback** also selects an earlier Worker version.
-A Worker rollback reverses neither D1 migrations, stored routing, nor Discord
-messages. Check that the selected version can read the current database schema.
+with `npm install --global ./FILENAME.tgz`, then run `npx syndicord deploy`. For
+a dashboard rollback, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+select your Worker, then use **Deployments → Rollback** to select an earlier
+version. A Worker rollback reverses neither D1 migrations, stored routing, nor
+Discord messages. Check that the selected version can read the current database
+schema.
 
 Prefer reverting the faulty code commit and deploying the revert. Resume CI when
 `main` contains the code you intend to deploy: choose **Enable workflow**, then
@@ -233,12 +243,14 @@ gh workflow run check.yml --ref main
 
 [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
 retains seven days on Workers Free and thirty days on Workers Paid. A restore
-overwrites the database. First, in Cloudflare open **Workers & Pages → your
-Worker → Settings → Triggers → Cron Triggers**. Record the current schedule,
-then remove it temporarily. Prevent concurrent deployments and allow up to 15
-minutes for trigger changes to propagate, plus time for running invocations to
-finish. The pinned CLI has no direct cron-management command. A pause stored as
-`[]` is insufficient: restoring D1 also restores the old feed configuration.
+overwrites the database. First, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then open **Settings → Triggers
+→ Cron Triggers**. Record the current schedule, then remove it temporarily.
+Prevent concurrent deployments and allow up to 15 minutes for trigger changes to
+propagate, plus time for running invocations to finish. The pinned CLI has no
+direct cron-management command. A pause stored as `[]` is insufficient:
+restoring D1 also restores the old feed configuration.
 
 Record the current bookmark, then look up the intended restore point:
 

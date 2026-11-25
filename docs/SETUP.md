@@ -71,8 +71,10 @@ npm run syndicord -- cf auth login
 npm run syndicord -- cf auth whoami
 ```
 
-Copy the account ID from `whoami`, or use
-[**Cloudflare Dashboard → Search → Copy account ID**](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/).
+Copy the account ID from `whoami`, or open the
+[Cloudflare Dashboard](https://dash.cloudflare.com/), select your account, and
+use **Search → Copy account ID**
+([account-ID help](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/)).
 Choose a Worker name and keep these values in your terminal:
 
 ```sh
@@ -88,11 +90,15 @@ identifiers select infrastructure; they do not contain feed configuration.
 **This creates metered Cloudflare resources; usage may fit the free plan.** For
 an existing installation, reuse its database ID and skip creation.
 
+The dashboard links below open Cloudflare for your signed-in account. If
+prompted, sign in and choose the account for this installation.
+
 Choose one way to create the database:
 
-- **Cloudflare Dashboard:** Open **Storage & databases → D1 SQL database →
-  Create Database**, name it `syndicord` (or your chosen Worker name), and copy
-  its UUID from the database's page.
+- **Cloudflare Dashboard:** Open
+  [**D1 SQL database**](https://dash.cloudflare.com/?to=/:account/workers/d1),
+  then choose **Create Database**. Name it `syndicord` (or your chosen Worker
+  name), and copy its UUID from the database's page.
 - **CLI:** Run:
 
   ```sh
@@ -112,11 +118,12 @@ an npm installation. The dashboard can create the database, but syndicord's CLI
 handles its code, migrations, and bindings together.
 
 The fresh service has no feeds and stays idle until you configure it. Before
-continuing, open **Cloudflare Dashboard → Workers & Pages → your Worker →
-Domains** and copy its HTTPS `workers.dev` address. Save it as **Worker URL** in
-a password-manager entry for this installation, alongside the account ID, Worker
-name, and database ID. You will use this address next to register Discord
-sign-in and open the feed editor. The
+continuing, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+select your Worker, then open **Domains** and copy its HTTPS `workers.dev`
+address. Save it as **Worker URL** in a password-manager entry for this
+installation, alongside the account ID, Worker name, and database ID. You will
+use this address next to register Discord sign-in and open the feed editor. The
 [sign-in guide](DISCORD_SIGN_IN.md#find-and-keep-your-worker-address) shows how
 to find it again, including a CLI option.
 
@@ -139,7 +146,9 @@ saved URLs are never returned by either client.
 
 Watch the Worker using either method:
 
-- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Logs → Live**
+- **Cloudflare Dashboard:** Open
+  [**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+  select your Worker, then open **Logs → Live**
   ([real-time logs](https://developers.cloudflare.com/workers/observability/logs/real-time-logs/)).
 - **CLI:** Start a live tail:
 

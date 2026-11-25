@@ -107,9 +107,11 @@ array denies all administration access.
 
 Choose one method:
 
-- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
-  Variables and Secrets**, add `DISCORD_AUTH_POLICY` as a **Secret**, paste your
-  complete JSON document, and deploy the setting.
+- **Cloudflare Dashboard:** Open
+  [**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+  select your Worker, then open **Settings → Variables and Secrets**. Add
+  `DISCORD_AUTH_POLICY` as a **Secret**, paste your complete JSON document, and
+  deploy the setting.
 - **CLI:** In the terminal where you selected your Cloudflare installation, run
   the command below and paste the JSON as a single line at its hidden prompt:
 

@@ -65,10 +65,12 @@ Use the
 choose a colour, then copy its six-digit hex value, including the leading `#`,
 into `ADMIN_HEADER_COLOR`.
 
-In **Cloudflare Dashboard → Workers & Pages → your Worker → Settings → Variables
-and Secrets**, add either setting as a **Secret** and deploy the changes. These
-values are visible on the page; using the Secret type preserves them during code
-deployments, like the other installation settings.
+Open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then open **Settings →
+Variables and Secrets**. Add either setting as a **Secret** and deploy the
+changes. These values are visible on the page; using the Secret type preserves
+them during code deployments, like the other installation settings.
 
 Alternatively, use the CLI's value prompts:
 
@@ -82,9 +84,11 @@ npm run syndicord -- cf workers secrets update ADMIN_HEADER_COLOR \
 For local development, set these values in `.dev.vars`. Reload the page after
 changing them. An absent or blank name shows only syndicord; an absent or
 invalid colour uses the default dark green header. To restore a hosted
-installation's defaults, remove the setting in **Cloudflare Dashboard → Workers
-& Pages → your Worker → Settings → Variables and Secrets** and deploy the
-change, or use `cf workers secrets delete ADMIN_NAME` or
+installation's defaults, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+select your Worker, then open **Settings → Variables and Secrets**, remove the
+setting, and deploy the change. Alternatively, use
+`cf workers secrets delete ADMIN_NAME` or
 `cf workers secrets delete ADMIN_HEADER_COLOR` with the same Worker selection.
 For local development, remove the setting from `.dev.vars`. Custom logos and
 page-wide themes are not supported.

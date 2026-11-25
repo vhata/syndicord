@@ -20,7 +20,9 @@ feeds and stays idle until you add them.
 
 ### Find and keep your Worker address
 
-Open **Cloudflare Dashboard → Workers & Pages → your Worker → Domains** and copy
+Open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then open **Domains** and copy
 the HTTPS address for its `workers.dev` domain, for example
 `https://syndicord.my-community.workers.dev`. Cloudflare's
 [Domains tab](https://developers.cloudflare.com/changelog/post/2026-05-14-domains-tab/)
@@ -141,10 +143,12 @@ key makes saved webhooks unreadable and prevents delivery.
 
 Choose **Cloudflare Dashboard** or **CLI**; both save the same settings:
 
-- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Settings →
-  Variables and Secrets**. Add each setting as a **Secret**, with the name and
-  value above, then deploy the settings changes. IDs and the callback URL are
-  not confidential, but the Secret type preserves them during code deployment.
+- **Cloudflare Dashboard:** Open
+  [**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+  select your Worker, then open **Settings → Variables and Secrets**. Add each
+  setting as a **Secret**, with the name and value above, then deploy the
+  settings changes. IDs and the callback URL are not confidential, but the
+  Secret type preserves them during code deployment.
 - **CLI:** Use the terminal where you set `CLOUDFLARE_ACCOUNT_ID` and
   `SYNDICORD_WORKER_NAME` during setup. If you opened a new terminal,
   [select the installation again](OPERATIONS.md#select-a-cloudflare-installation).
@@ -253,10 +257,11 @@ error shows how many seconds to wait. Keep the open form, wait, then save again;
 the editor preserves an unsuccessful save's entered values and does not retry
 saves automatically.
 
-To disable administration without stopping the relay, delete
-`DISCORD_CLIENT_SECRET` in **Cloudflare Dashboard → Workers & Pages → your
-Worker → Settings → Variables and Secrets**, then deploy that settings change.
-Alternatively, use the Cloudflare CLI command:
+To disable administration without stopping the relay, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then open **Settings →
+Variables and Secrets**. Delete `DISCORD_CLIENT_SECRET` and deploy that settings
+change. Alternatively, use the Cloudflare CLI command:
 
 ```sh
 npm run syndicord -- cf workers secrets delete DISCORD_CLIENT_SECRET \

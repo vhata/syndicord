@@ -122,9 +122,10 @@ login; it does not need the API-token helper above.
 
 This is the default `workers.dev` address without `/admin`. Use it when
 `subdomain.enabled` is `true`; Cloudflare may return a URL even when that route
-is disabled. If you use a custom domain, copy that HTTPS address from
-**Cloudflare Dashboard → Workers & Pages → your Worker → Domains** instead. See
-the
+is disabled. If you use a custom domain, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then open **Domains** and copy
+that HTTPS address instead. See the
 [Worker response fields](https://developers.cloudflare.com/api/resources/workers/).
 
 Continue with
@@ -172,8 +173,9 @@ cf_api "workers/scripts/$SYNDICORD_WORKER_NAME/schedules" \
 ```
 
 Read back the schedules before resuming deployment. This needs Workers Scripts
-Write permission. The dashboard alternative is the Worker's **Settings →
-Triggers → Cron Triggers**.
+Write permission. For the dashboard alternative, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+select your Worker, then open **Settings → Triggers → Cron Triggers**.
 [Schedules API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/schedules/)
 ·
 [Cron propagation](https://developers.cloudflare.com/workers/configuration/cron-triggers/)
