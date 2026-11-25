@@ -68,10 +68,10 @@ shared feed catalog (the list of sources), specific destination channels, or
 both. Your matching roles combine; having feed permission does not by itself
 give you permission to manage a channel.
 
-| The editor shows…                                               | Your mode                             | Follow                                                                         |
-| --------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ |
-| **Feed catalog**, **Your destinations**, **Your subscriptions** | Separate feed and channel permissions | [Manage the catalog and your channels](#separate-feed-and-channel-permissions) |
-| **Feeds** and **Webhooks**, with **Add webhook**                | One admin role                        | [Manage all feeds and destinations](#one-admin-role)                           |
+| The editor shows…                                               | Your mode                             | Follow                                                                          |
+| --------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------- |
+| **Feed catalog**, **Your destinations**, **Your subscriptions** | Separate feed and channel permissions | [Separate feed and channel permissions](#separate-feed-and-channel-permissions) |
+| **Feeds** and **Webhooks**, with **Add webhook**                | One admin role                        | [One admin role](#one-admin-role)                                               |
 
 The installation owner chooses the mode. If you see **Verify and initialize
 catalog**, choose it to

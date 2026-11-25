@@ -59,7 +59,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Manage feeds', link: '/docs/USAGE.html' },
-      { text: 'Host it', link: '/docs/SETUP.html' },
+      { text: 'Host an installation', link: '/docs/SETUP.html' },
       { text: 'Docs', link: '/docs/' },
       { text: 'GitHub', link: repository },
     ],

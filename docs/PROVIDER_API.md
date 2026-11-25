@@ -1,10 +1,11 @@
 # Advanced provider operations
 
 **For the installation owner. Optional.** These recipes cover account-token
-policies and provider API tasks that the dashboard and syndicord CLI do not.
-Normal setup is in [Set up an installation](SETUP.md); routine feed and webhook
-edits are in [Manage feeds and channels](USAGE.md). The recipes use Bash,
-`curl`, and `jq`, and operate on your selected hosted installation.
+policies and provider API tasks that the dashboard and syndicord CLI do not
+cover, or that are easier to script than to click. Normal setup is in
+[Set up an installation](SETUP.md); routine feed and webhook edits are in
+[Manage feeds and channels](USAGE.md). The recipes use Bash, `curl`, and `jq`,
+and operate on your selected hosted installation.
 
 - [Create a deployment token with the CLI](#create-a-deployment-token-with-the-cli)
 - [Find the Worker address](#find-the-worker-address)

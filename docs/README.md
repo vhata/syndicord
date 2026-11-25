@@ -4,14 +4,14 @@ syndicord sends new RSS and Atom entries to Discord channels. If you only read
 those messages, there is nothing to install. Start with the row that matches
 what you do:
 
-| You want to                                    | Start with                               | You need                                                                    |
-| ---------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------- |
-| Add feeds or choose what reaches your channels | [Manage feeds and channels](USAGE.md)    | The web-editor link from your host and an authorized Discord account        |
-| Host syndicord for a community                 | [Set up an installation](SETUP.md)       | A Cloudflare account, Discord server administration, Node.js 26, and npm 11 |
-| Work on syndicord itself                       | [Develop and contribute](DEVELOPMENT.md) | Git, the pinned Node.js version, and npm; no cloud credentials for tests    |
+| You want to                                    | Start with                               | You need                                                                         |
+| ---------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
+| Add feeds or choose what reaches your channels | [Manage feeds and channels](USAGE.md)    | The web-editor link from your host and an authorized Discord account             |
+| Host syndicord for a community                 | [Set up an installation](SETUP.md)       | A Cloudflare account, Discord server administration, Git, Node.js 26, and npm 11 |
+| Work on syndicord itself                       | [Develop and contribute](DEVELOPMENT.md) | Git, the pinned Node.js version, and npm; no cloud credentials for tests         |
 
-The guides use three roles. A **feed administrator** adds shared sources. A
-**channel administrator** chooses what reaches their channels. The
+The guides refer to three kinds of user. A **feed administrator** adds shared
+sources. A **channel administrator** chooses what reaches their channels. The
 **installation owner** hosts syndicord, manages its Cloudflare resources, and
 decides which Discord roles get which permissions. Feed and channel
 administrators never need Cloudflare access, and a small installation can give
@@ -44,17 +44,17 @@ and brings you back to verify delivery.
 
 ## Operate an installation
 
-| Task                                                        | Guide                                                                      |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Point a terminal at the right Cloudflare installation       | [Run an installation](OPERATIONS.md#select-a-cloudflare-installation)      |
-| Update the deployed code                                    | [Update the installation](SETUP.md#update-the-installation)                |
-| Grant or revoke someone's editing access                    | [Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access)      |
-| Change the editor's name or colour                          | [Installation name and colour](OPERATIONS.md#installation-name-and-colour) |
-| Check health and pending deliveries                         | [Operational status](STATUS.md)                                            |
-| Find out why messages stopped or a destination is suspended | [Troubleshooting and recovery](RECOVERY.md)                                |
-| Pause delivery or roll back the code                        | [Pause and roll back](RECOVERY.md#pause-and-roll-back)                     |
-| Restore the database                                        | [Restore D1](RECOVERY.md#restore-d1)                                       |
-| Script tasks the dashboard and CLI do not cover             | [Advanced provider operations](PROVIDER_API.md)                            |
+| Task                                                        | Guide                                                                              |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Point a terminal at the right Cloudflare installation       | [Select a Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation) |
+| Update the deployed code                                    | [Update the installation](SETUP.md#update-the-installation)                        |
+| Grant or revoke someone's editing access                    | [Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access)              |
+| Change the editor's name or colour                          | [Installation name and colour](OPERATIONS.md#installation-name-and-colour)         |
+| Check health and pending deliveries                         | [Operational status](STATUS.md)                                                    |
+| Find out why messages stopped or a destination is suspended | [Troubleshooting and recovery](RECOVERY.md)                                        |
+| Pause delivery or roll back the code                        | [Pause and roll back](RECOVERY.md#pause-and-roll-back)                             |
+| Restore the database                                        | [Restore D1](RECOVERY.md#restore-d1)                                               |
+| Script provider tasks                                       | [Advanced provider operations](PROVIDER_API.md)                                    |
 
 ## Reference
 

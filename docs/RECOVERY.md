@@ -16,8 +16,8 @@ matches the symptom. Everyday feed edits are in
 | Recover lost or damaged data             | [Restore D1](#restore-d1)                                                    |
 
 Select the installation as described in
-[Run an installation](OPERATIONS.md#select-a-cloudflare-installation). Feed and
-webhook commands also need the
+[Select a Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation).
+Feed and webhook commands also need the
 [configuration API selection](USAGE.md#select-an-installation). For optional
 GitHub deployment commands, select its repository:
 
