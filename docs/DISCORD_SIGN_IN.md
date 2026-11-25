@@ -14,9 +14,9 @@ maintaining sign-in after setup.
 ## Enable administration
 
 Start with a deployed Worker. If you have not deployed yet, complete
-[first deployment](SETUP.md#create-the-database-and-deploy). Administration
-stays disabled until you finish the steps below. A fresh installation has no
-feeds and stays idle until you add them.
+[Create the database and deploy](SETUP.md#create-the-database-and-deploy).
+Administration stays disabled until you finish the steps below. A fresh
+installation has no feeds and stays idle until you add them.
 
 ### Find and keep your Worker address
 
@@ -31,10 +31,10 @@ this is the **Worker origin** used below. If you already connected your own
 HTTPS domain to this Worker, you can use that address instead. No custom domain
 is needed for setup.
 
-Create a password-manager entry for this installation and save the address as
-**Worker URL**. Keep this entry open: you will collect the Discord credentials
-and IDs there, then paste them into the Worker settings later in this guide. The
-address also gives you two links:
+In your installation's password-manager entry (create one now if you have not),
+save the address as **Worker URL**. Keep this entry open: you will collect the
+Discord credentials and IDs there, then paste them into the Worker settings
+later in this guide. The address also gives you two links:
 
 | Link             | Make it by                                   | Example                                                          |
 | ---------------- | -------------------------------------------- | ---------------------------------------------------------------- |
@@ -55,8 +55,8 @@ npm run syndicord -- cf workers get "$SYNDICORD_WORKER_NAME" -q
 Copy the `subdomain.url` value from the JSON output. The optional
 [Worker address lookup](PROVIDER_API.md#find-the-worker-address) shows how to
 extract just the URL with `jq`. For an
-[npm-installed CLI](SETUP.md#optional-npm-installation), replace
-`npm run syndicord --` with `npx syndicord`.
+[npm-installed CLI](CLI.md#npm-installation), replace `npm run syndicord --`
+with `npx syndicord`.
 
 ### Choose an access model
 
@@ -153,7 +153,7 @@ Choose **Cloudflare Dashboard** or **CLI**; both save the same settings:
   `SYNDICORD_WORKER_NAME` during setup. If you opened a new terminal,
   [select the installation again](OPERATIONS.md#select-a-cloudflare-installation).
   Run each command below and paste that setting's value at its hidden prompt.
-  For an [npm-installed CLI](SETUP.md#optional-npm-installation), replace
+  For an [npm-installed CLI](CLI.md#npm-installation), replace
   `npm run syndicord --` with `npx syndicord`.
 
   ```sh
@@ -216,15 +216,12 @@ An authorized account sees its Discord identity, a **Sign out** control, and the
 editor. If access is denied, check the server/role IDs and your role assignment,
 or try another Discord account.
 
-**Sign-in setup is complete. Continue to [Manage feeds and channels](FEEDS.md)**
-to add a destination webhook and feed, in the browser or CLI. CLI login is
-optional and is explained there when you choose terminal editing. Once you have
-a feed and destination, return to [Verify delivery](SETUP.md#verify-delivery) to
-check that new entries reach Discord.
-
 Share the web-editor link with anyone else who should manage feeds and assign
 them the configured roles. They need that link and their Discord account; keep
 your Worker settings and secrets private.
+
+**Next:** sign-in setup is complete. For a new installation, return to
+[Add a first feed and destination](SETUP.md#add-a-first-feed-and-destination).
 
 ## Grant and revoke access
 

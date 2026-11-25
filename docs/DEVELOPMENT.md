@@ -223,8 +223,8 @@ recovery, and [CI and hosting](QUALITY.md#ci-and-hosting) for workflow details.
 Use `npm run syndicord -- --help` to explore the source CLI. See
 [CLI and package development](QUALITY.md#cli-and-package-development) for
 package builds, installation checks, local status, and deployment dry-runs.
-Normal [CLI installation](SETUP.md#optional-npm-installation) and
-[hosted deployment](SETUP.md) have separate guides.
+Normal [CLI installation](CLI.md) and [hosted deployment](SETUP.md) have
+separate guides.
 
 ## Tooling references
 

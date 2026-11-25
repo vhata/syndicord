@@ -117,8 +117,8 @@ then cleans up. It also packs from Git, installs that tarball globally into a
 temporary prefix, and runs `npx syndicord` from an unrelated directory with a
 fresh offline npm cache. No installation identifiers, live feeds, secrets, or
 local state are packaged. Registry publication is a separate release operation;
-normal [installation from GitHub](SETUP.md#optional-npm-installation) needs no
-registry release.
+normal [installation from GitHub](CLI.md#npm-installation) needs no registry
+release.
 
 ## Test policy
 
