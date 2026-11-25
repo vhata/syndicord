@@ -2,29 +2,25 @@
 
 **For the installation owner, with access to the installation's Cloudflare
 account.** If you only manage feeds or channels, ask the installation owner to
-run this check. For live logs and CPU errors, open
-[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
-in the Cloudflare dashboard, select your Worker, then use **Logs → Live** and
-**Metrics**, or [tail events in the CLI](RECOVERY.md#inspect-a-run). The status
-report below summarizes saved D1 health; it is not a live delivery test.
+run this check.
 
-Inspect polling health and pending deliveries without invoking the Worker or
-sending a Discord message:
+The status report summarizes polling health and pending deliveries saved in D1,
+without invoking the Worker or sending a Discord message. It is not a live
+delivery test; for live logs and CPU errors, see
+[Inspect a run](RECOVERY.md#inspect-a-run).
+
+[Select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation)
+first, then run:
 
 ```sh
-export CLOUDFLARE_ACCOUNT_ID='your-account-id'
-export SYNDICORD_DATABASE_ID='your-existing-database-uuid'
 npm run syndicord -- status
 ```
 
-First [sign in to Cloudflare](OPERATIONS.md#select-a-cloudflare-installation) if
-needed. The command uses the project's pinned `cf` dependency. For the
-[npm-installed CLI](CLI.md#npm-installation), use `npx syndicord status`. It
-only queries D1; it needs no webhook secret or `.dev.vars` file. Hosted reads
-count toward D1 usage. The database ID is non-secret deployment configuration;
-use the ID recorded for the deployment rather than creating a new database. Use
-`npm run syndicord -- status --local` from a development checkout for its local
-D1 state instead. Remote is the default for the CLI; the command never changes
+The command uses the project's pinned `cf` dependency and only queries D1; it
+needs no webhook secret or `.dev.vars` file. Hosted reads count toward D1 usage.
+Use the database ID recorded for the installation rather than creating a new
+database. Use `npm run syndicord -- status --local` from a development checkout
+for its local D1 state instead. Remote is the default; the command never changes
 migrations, releases a lease, or resumes a suspended destination.
 
 Deployment applies migrations. A fresh installation has no feeds and reports
@@ -63,12 +59,13 @@ their retained pending deliveries resume if the same configuration is restored.
 Feed indices are zero-based positions in the current relay feed list. How you
 match them to configuration depends on the installation's editing permissions:
 
-- With **one admin role**, members can edit all feeds and destinations: inspect
-  the list with `npm run syndicord -- feeds get`.
-- With **separate feed and channel permissions**, roles manage the shared feed
-  catalog, specified channels, or both. The report omits catalog feeds without
-  subscriptions, so its feed indices are **not catalog IDs**. The bulk
-  `feeds get` command is unavailable.
+- With **one admin role**, inspect the list with
+  `npm run syndicord -- feeds get`.
+- With **separate feed and channel permissions**, the report omits catalog feeds
+  without subscriptions, so its feed indices are **not catalog IDs**. The bulk
+  `feeds get` command is unavailable; see
+  [Inspect a run](RECOVERY.md#inspect-a-run) for matching indices to the
+  catalog.
 
 Destination names in this report are delivery-tracking keys, which may differ
 from destination labels and IDs shown in the editor or by `destinations list`.

@@ -12,9 +12,8 @@ Signing in with Discord gives access to the feed editor, not to Cloudflare. Use
 the account ID, Worker name, and D1 database UUID saved during
 [setup](SETUP.md#steps). Reuse the existing database ID.
 
-The examples use a source checkout. For the
-[npm-installed CLI](CLI.md#npm-installation), replace `npm run syndicord --`
-with `npx syndicord`.
+Commands use the checkout form; see [Install the CLI](CLI.md#npm-installation)
+for the `npx syndicord` form.
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID='your-account-id'

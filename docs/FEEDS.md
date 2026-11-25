@@ -60,19 +60,17 @@ out of Discord itself. For session limits and role changes, see
 
 ## Choose the section matching your editor
 
-Your installation uses one of two [access models](PERMISSIONS.md#access-models).
-**One admin role** lets members of that Discord role edit all feeds, webhooks,
-and routes. **Separate feed and channel permissions** let roles manage the
-shared feed catalog (the list of sources), specific destination channels, or
-both. Your matching roles combine; having feed permission does not by itself
-give you permission to manage a channel.
+Your installation uses one of two [access models](PERMISSIONS.md#access-models),
+and the editor looks different in each. With separate feed and channel
+permissions, your matching roles combine; having feed permission does not by
+itself let you manage a channel.
 
 | The editor shows…                                               | Your mode                             | Follow                                                                          |
 | --------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------- |
 | **Feed catalog**, **Your destinations**, **Your subscriptions** | Separate feed and channel permissions | [Separate feed and channel permissions](#separate-feed-and-channel-permissions) |
 | **Feeds** and **Webhooks**, with **Add webhook**                | One admin role                        | [One admin role](#one-admin-role)                                               |
 
-The installation owner chooses the mode. If you see **Verify and initialize
+The installation owner chooses the model. If you see **Verify and initialize
 catalog**, choose it to
 [initialize the catalog](PERMISSIONS.md#initialize-an-existing-installation). If
 that fails, ask the installation owner for help.
@@ -282,8 +280,8 @@ New feed/destination pairs silently record their current entries, then send new
 ones. Removing a route stops future delivery attempts; restoring the same route
 resumes pending entries. Renaming a destination creates a new baseline. In the
 editor, **Remove** deletes a feed and its routes. To pause polling and delivery,
-remove all feeds or save a CLI feed file containing `[]`. A run already in
-progress may finish using the configuration it read at its start.
+remove all feeds or save a CLI feed file containing `[]`; see
+[Pause delivery](RECOVERY.md#pause-delivery) for the full steps.
 
 **Setting up a new installation?** Return to
 [Verify delivery](SETUP.md#verify-delivery).
@@ -300,15 +298,12 @@ progress may finish using the configuration it read at its start.
 - Keep source URLs and webhook URLs private. Save backups in your password
   manager and delete temporary JSON files after use. File-based input also
   accepts `--file -` for stdin.
+- By default, one feed is checked and up to five deliveries are attempted each
+  minute, so larger feed lists take longer to revisit. See
+  [polling limits](DELIVERY.md#polling-limits) for sizes, timeouts, and storage
+  behavior.
 
 Installation owners checking a first real message can follow
 [Verify delivery](SETUP.md#verify-delivery). For missing messages, ask the
 installation owner to check [Operational status](STATUS.md) and
 [Troubleshooting and recovery](RECOVERY.md).
-
-## Polling limits
-
-By default, one feed is checked and up to five deliveries are attempted each
-minute. Larger feed lists take longer to revisit. See
-[capacity and limits](DELIVERY.md#polling-limits) for request/configuration
-sizes, feed bounds, timeouts, and storage behavior.

@@ -50,6 +50,7 @@ and brings you back to verify delivery.
 | Point a terminal at the right Cloudflare installation       | [Select a Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation) |
 | Update the deployed code                                    | [Update the installation](OPERATIONS.md#update-the-installation)                   |
 | Grant or revoke someone's editing access                    | [Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access)              |
+| Turn off editing without stopping delivery                  | [Disable editing](DISCORD_SIGN_IN.md#disable-editing)                              |
 | Change the editor's name or colour                          | [Installation name and colour](OPERATIONS.md#installation-name-and-colour)         |
 | Check health and pending deliveries                         | [Operational status](STATUS.md)                                                    |
 | Find out why messages stopped or a destination is suspended | [Troubleshooting and recovery](RECOVERY.md)                                        |
