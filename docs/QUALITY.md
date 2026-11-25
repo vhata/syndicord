@@ -1,8 +1,8 @@
 # Quality and tooling reference
 
-For the first clone and a contribution walkthrough, start with
-[development](DEVELOPMENT.md). Use this reference when you need the exact
-checks, tooling behavior, or review requirements.
+**For contributors.** For the first clone and a contribution walkthrough, start
+with [Develop and contribute](DEVELOPMENT.md). Use this reference when you need
+the exact checks, tooling behavior, or review requirements.
 
 Changes use GitHub pull requests and independent review under
 [Docket's contract](../docket/CONTRACT.md). The user controls merging and hosted
@@ -136,15 +136,15 @@ registry release.
   passing main run.
 
 Local tests establish neither hosted CPU headroom nor real Discord delivery.
-Those require the checks run by the person hosting syndicord in
+Those require the checks run by the installation owner in
 [setup](SETUP.md#verify-delivery) and [status](STATUS.md).
 
 ## Review inputs
 
-Read [relay behavior](BEHAVIOR.md), the [source layout](DEVELOPMENT.md#layout),
-and the guides for [setup](SETUP.md), [configuration](USAGE.md),
-[deployment](GITHUB_DEPLOYMENT.md), [status](STATUS.md), and
-[recovery](RECOVERY.md).
+Read [How delivery works](BEHAVIOR.md), the
+[source layout](DEVELOPMENT.md#layout), and the guides for [setup](SETUP.md),
+[configuration](USAGE.md), [deployment](GITHUB_DEPLOYMENT.md),
+[status](STATUS.md), and [recovery](RECOVERY.md).
 
 Focus on these boundaries:
 

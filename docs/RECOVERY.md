@@ -1,8 +1,9 @@
 # Troubleshooting and recovery
 
-**For the person who hosts syndicord and manages its Cloudflare resources.**
-Start with [status](STATUS.md), then follow the row that matches the symptom.
-Everyday feed edits are in [manage feeds and channels](USAGE.md).
+**For the installation owner, with access to the installation's Cloudflare
+account.** Start with [Operational status](STATUS.md), then follow the row that
+matches the symptom. Everyday feed edits are in
+[Manage feeds and channels](USAGE.md).
 
 | Symptom or task                          | Start here                                                                   |
 | ---------------------------------------- | ---------------------------------------------------------------------------- |
@@ -15,8 +16,8 @@ Everyday feed edits are in [manage feeds and channels](USAGE.md).
 | Recover lost or damaged data             | [Restore D1](#restore-d1)                                                    |
 
 Select the installation as described in
-[Cloudflare operations](OPERATIONS.md#select-a-cloudflare-installation). Feed
-and webhook commands also need the
+[Run an installation](OPERATIONS.md#select-a-cloudflare-installation). Feed and
+webhook commands also need the
 [configuration API selection](USAGE.md#select-an-installation). For optional
 GitHub deployment commands, select its repository:
 

@@ -1,57 +1,78 @@
 # Documentation
 
 syndicord sends new RSS and Atom entries to Discord channels. If you only read
-those messages, there is nothing to install. To change what gets posted, ask the
-person who hosts syndicord for a link to the web editor and which Discord role
-you need.
+those messages, there is nothing to install. Start with the row that matches
+what you do:
 
-## Choose your starting point
+| You want to                                    | Start with                               | You need                                                                    |
+| ---------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------- |
+| Add feeds or choose what reaches your channels | [Manage feeds and channels](USAGE.md)    | The web-editor link from your host and an authorized Discord account        |
+| Host syndicord for a community                 | [Set up an installation](SETUP.md)       | A Cloudflare account, Discord server administration, Node.js 26, and npm 11 |
+| Work on syndicord itself                       | [Develop and contribute](DEVELOPMENT.md) | Git, the pinned Node.js version, and npm; no cloud credentials for tests    |
 
-| Your job                       | Start here                                                       | You need                                                                 |
-| ------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Manage feeds and channels      | [Using syndicord](USAGE.md)                                      | A link to the web editor and an authorized Discord account               |
-| Host an installation           | [First deployment](SETUP.md)                                     | Cloudflare access, a Discord application, and a place to run the CLI     |
-| Grant or remove editing access | [Sign-in and access](DISCORD_SIGN_IN.md#grant-and-revoke-access) | Discord server administration; Cloudflare access to change the policy    |
-| Develop or contribute          | [Developer quick start](DEVELOPMENT.md)                          | Git, the pinned Node.js version, and npm; no cloud credentials for tests |
+The guides use three roles. A **feed administrator** adds shared sources. A
+**channel administrator** chooses what reaches their channels. The
+**installation owner** hosts syndicord, manages its Cloudflare resources, and
+decides which Discord roles get which permissions. Feed and channel
+administrators never need Cloudflare access, and a small installation can give
+one Discord role every editing permission. See
+[access models](PERMISSIONS.md#access-models).
 
-A feed administrator adds shared sources; a channel administrator chooses what
-reaches their channels. The **installation owner** is the person who hosts
-syndicord, manages its Cloudflare resources, and sets up access. A feed or
-channel administrator does not need Cloudflare access. A small installation can
-give one Discord role all editing permissions, or assign roles
-[separate feed and channel permissions](PERMISSIONS.md#access-models): managing
-the shared list of feeds, specified channels, or both.
+## Manage feeds and channels
 
-## Run an installation
+| Task                                                    | Guide                                                                                       |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Sign in with the web editor or CLI                      | [Sign in](USAGE.md#sign-in)                                                                 |
+| Find out which editing mode your installation uses      | [Choose the section matching your editor](USAGE.md#choose-the-section-matching-your-editor) |
+| Add a feed, register a channel, and subscribe it        | [Separate feed and channel permissions](USAGE.md#separate-feed-and-channel-permissions)     |
+| Add feeds and webhooks when one role manages everything | [One admin role](USAGE.md#one-admin-role)                                                   |
+| Rename, rotate, unsubscribe, or delete                  | [Change or remove something](USAGE.md#change-or-remove-something)                           |
+| Understand why a new feed posts nothing at first        | [Baselines and entry identity](BEHAVIOR.md#baselines-and-entry-identity)                    |
 
-Follow [setup](SETUP.md) once, then use [the everyday guide](USAGE.md) to manage
-content. [Running an installation](OPERATIONS.md) covers selecting its
-Cloudflare resources and finding maintenance tasks. These references cover the
-other common jobs:
+## Host an installation
 
-| Task                                                            | Guide                                                                 |
-| --------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Configure Discord login or maintain editing access              | [Sign-in and access](DISCORD_SIGN_IN.md)                              |
-| Change the editor’s name or colour                              | [Installation appearance](OPERATIONS.md#installation-name-and-colour) |
-| Delegate feeds and particular channels across servers           | [Permission policy](PERMISSIONS.md)                                   |
-| Inspect health and pending deliveries                           | [Operational status](STATUS.md)                                       |
-| Diagnose failures, pause delivery, roll back, or restore D1     | [Troubleshooting and recovery](RECOVERY.md)                           |
-| Deploy automatically from your GitHub repository                | [Automatic deployment](GITHUB_DEPLOYMENT.md)                          |
-| Understand baselines, retries, message formatting, and capacity | [Relay behavior](BEHAVIOR.md)                                         |
+For a new installation, follow [Set up an installation](SETUP.md) from start to
+finish. It sends you to the sign-in and permissions guides at the right points
+and brings you back to verify delivery.
 
-## Go deeper
+| Task                                             | Guide                                                                  |
+| ------------------------------------------------ | ---------------------------------------------------------------------- |
+| Deploy a new installation                        | [Set up an installation](SETUP.md)                                     |
+| Connect Discord sign-in and choose who can edit  | [Discord sign-in and access](DISCORD_SIGN_IN.md#enable-administration) |
+| Give roles separate feed and channel permissions | [Feed and channel permissions](PERMISSIONS.md#configure-access)        |
+| Deploy automatically from your GitHub repository | [Automatic deployment from GitHub](GITHUB_DEPLOYMENT.md)               |
 
-| Reference                                                               | What it contains                                                                       |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [Development](DEVELOPMENT.md)                                           | Local setup, contribution steps, and source layout                                     |
-| [Website](WEBSITE.md)                                                   | Preview, content and theme changes, and GitHub Pages publication                       |
-| [Quality and validation](QUALITY.md)                                    | Checks, hooks, package verification, and evidence limits                               |
-| [Provider API recipes](PROVIDER_API.md)                                 | Optional advanced automation when dashboard or direct CLI commands do not cover a task |
-| [Docket contract](../docket/CONTRACT.md)                                | Branch, worktree, review, and landing rules                                            |
-| [Work queue](../TODO.md)                                                | Deferred work and ideas                                                                |
-| [Review index](../review/README.md) and [backlog](../review/BACKLOG.md) | Dated review evidence and follow-up work                                               |
-| [Permission design](specs/2026-11-22-discord-permissions.md)            | Design rationale and original acceptance requirements                                  |
-| [Artwork](../assets/README.md)                                          | Branding assets and their use                                                          |
+## Operate an installation
+
+| Task                                                        | Guide                                                                      |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Point a terminal at the right Cloudflare installation       | [Run an installation](OPERATIONS.md#select-a-cloudflare-installation)      |
+| Update the deployed code                                    | [Update the installation](SETUP.md#update-the-installation)                |
+| Grant or revoke someone's editing access                    | [Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access)      |
+| Change the editor's name or colour                          | [Installation name and colour](OPERATIONS.md#installation-name-and-colour) |
+| Check health and pending deliveries                         | [Operational status](STATUS.md)                                            |
+| Find out why messages stopped or a destination is suspended | [Troubleshooting and recovery](RECOVERY.md)                                |
+| Pause delivery or roll back the code                        | [Pause and roll back](RECOVERY.md#pause-and-roll-back)                     |
+| Restore the database                                        | [Restore D1](RECOVERY.md#restore-d1)                                       |
+| Script tasks the dashboard and CLI do not cover             | [Advanced provider operations](PROVIDER_API.md)                            |
+
+## Reference
+
+[How delivery works](BEHAVIOR.md) describes message formatting, baselines,
+retries, polling limits, and storage growth. It applies to every installation.
+
+## Contribute
+
+| Reference                                                               | What it contains                                                 |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [Develop and contribute](DEVELOPMENT.md)                                | Local setup, contribution steps, and source layout               |
+| [Quality and tooling reference](QUALITY.md)                             | Checks, hooks, package verification, and evidence limits         |
+| [Website](WEBSITE.md)                                                   | Preview, content and theme changes, and GitHub Pages publication |
+| [Docket contract](../docket/CONTRACT.md)                                | Branch, worktree, review, and landing rules                      |
+| [Work queue](../TODO.md)                                                | Deferred work and ideas                                          |
+| [Review index](../review/README.md) and [backlog](../review/BACKLOG.md) | Dated review evidence and follow-up work                         |
+| [Permission design](specs/2026-11-22-discord-permissions.md)            | Design rationale and original acceptance requirements            |
+| [Artwork](../assets/README.md)                                          | Branding assets and their use                                    |
 
 The guides describe the current software. Design documents and review snapshots
 record decisions and evidence at their stated revisions.

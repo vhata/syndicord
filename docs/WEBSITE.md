@@ -1,9 +1,9 @@
 # Website
 
-The product website is built from this repository's README, documentation, and
-artwork. Edit those files once to update the content available locally, on
-GitHub, and on the next website build. The website is static and needs no
-Cloudflare or Discord credentials.
+**For contributors.** The product website is built from this repository's
+README, documentation, and artwork. Edit those files once to update the content
+available locally, on GitHub, and on the next website build. The website is
+static and needs no Cloudflare or Discord credentials.
 
 ## Preview locally
 

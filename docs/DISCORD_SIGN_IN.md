@@ -1,13 +1,13 @@
-# Configure Discord sign-in
+# Discord sign-in and access
 
-This guide is for the person hosting syndicord. It connects a deployed Worker to
-Discord and sets which roles can manage feeds and channels, in both the web
-editor and CLI. If someone has already set up your installation, go straight to
-[managing feeds](USAGE.md).
+**For the installation owner.** This guide connects a deployed Worker to Discord
+and sets which roles can manage feeds and channels, in both the web editor and
+CLI. If someone has already set up your installation, go straight to
+[Manage feeds and channels](USAGE.md).
 
 For a new installation, follow the setup steps below, then continue to
-[Using syndicord](USAGE.md) to add your first feed and destination. The later
-[grant and revoke access](#grant-and-revoke-access) and
+[Manage feeds and channels](USAGE.md) to add your first feed and destination.
+The later [grant and revoke access](#grant-and-revoke-access) and
 [troubleshooting](#troubleshooting-and-acceptance) sections are references for
 maintaining sign-in after setup.
 
@@ -216,11 +216,11 @@ An authorized account sees its Discord identity, a **Sign out** control, and the
 editor. If access is denied, check the server/role IDs and your role assignment,
 or try another Discord account.
 
-**Sign-in setup is complete. Continue to [Using syndicord](USAGE.md)** to add a
-destination webhook and feed, in the browser or CLI. CLI login is optional and
-is explained there when you choose terminal editing. Once you have a feed and
-destination, return to [Verify delivery](SETUP.md#verify-delivery) to check that
-new entries reach Discord.
+**Sign-in setup is complete. Continue to [Manage feeds and channels](USAGE.md)**
+to add a destination webhook and feed, in the browser or CLI. CLI login is
+optional and is explained there when you choose terminal editing. Once you have
+a feed and destination, return to [Verify delivery](SETUP.md#verify-delivery) to
+check that new entries reach Discord.
 
 Share the web-editor link with anyone else who should manage feeds and assign
 them the configured roles. They need that link and their Discord account; keep
@@ -295,10 +295,8 @@ application and Cloudflare deployment.
 
 ## Related guides
 
-- [Manage feeds and sign in with the CLI](USAGE.md#sign-in).
-- [Change the installation name and colour](OPERATIONS.md#installation-name-and-colour).
-- [Preview locally](DEVELOPMENT.md#run-locally).
-- [Authentication design](DEVELOPMENT.md#authentication-design).
-
-[Documentation index](README.md) ·
-[Feed and channel permissions](PERMISSIONS.md)
+- [Feed and channel permissions](PERMISSIONS.md)
+- [Sign in with the CLI](USAGE.md#sign-in)
+- [Installation name and colour](OPERATIONS.md#installation-name-and-colour)
+- [Preview sign-in locally](DEVELOPMENT.md#run-locally)
+- [Authentication design](DEVELOPMENT.md#authentication-design)

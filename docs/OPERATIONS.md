@@ -1,9 +1,9 @@
 # Run an installation
 
-For the person who hosts syndicord and manages its Cloudflare resources. This is
-the **installation owner** in these guides. If you manage feeds or channels, use
-[Using syndicord](USAGE.md); those tasks only need Discord sign-in. To host a
-new installation, start with [setup](SETUP.md).
+**For the installation owner, with access to the installation's Cloudflare
+account.** If you manage feeds or channels, use
+[Manage feeds and channels](USAGE.md); those tasks only need Discord sign-in. To
+host a new installation, start with [Set up an installation](SETUP.md).
 
 ## Select a Cloudflare installation
 
@@ -29,17 +29,8 @@ between feed editing and infrastructure commands, check that the
 [web-editor address](USAGE.md#select-an-installation) and Cloudflare identifiers
 refer to the same installation. The status command reads saved D1 health without
 sending a Discord message; [reading the report](STATUS.md#reading-the-report)
-explains its results.
-
-## Maintain the installation
-
-| Task                                                 | Guide                                                       |
-| ---------------------------------------------------- | ----------------------------------------------------------- |
-| Configure sign-in or change who can edit             | [Sign-in and access](DISCORD_SIGN_IN.md)                    |
-| Update the deployed code                             | [Update the installation](SETUP.md#update-the-installation) |
-| Deploy automatically from GitHub                     | [Automatic deployment](GITHUB_DEPLOYMENT.md)                |
-| Check health and pending deliveries                  | [Operational status](STATUS.md)                             |
-| Diagnose failures, pause, roll back, or restore data | [Troubleshooting and recovery](RECOVERY.md)                 |
+explains its results. The [documentation](README.md#operate-an-installation)
+lists the other operating tasks.
 
 ## Where settings and state live
 

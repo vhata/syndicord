@@ -1,8 +1,9 @@
 # Automatic deployment from GitHub
 
-Optional: use this when you want pushes to your repository's `main` branch to
-update the running service. Complete [first deployment](SETUP.md) first. Feed
-and webhook edits use [syndicord](USAGE.md) and never need a GitHub change.
+**For the installation owner. Optional.** Use this when you want pushes to your
+repository's `main` branch to update the running service. Complete
+[Set up an installation](SETUP.md) first. Feed and webhook edits use
+[Manage feeds and channels](USAGE.md) and never need a GitHub change.
 
 > **Once configured, pushes to `main` deploy automatically after checks pass.**
 > Merging a pull request into `main` therefore updates the running Worker;
@@ -152,7 +153,5 @@ compatible with the running Worker, which keeps polling until deployment
 completes. Migration failure stops upload. An upload failure leaves completed
 migrations in place; the next attempt applies only outstanding ones. CI never
 rolls back the database automatically. See [recovery](RECOVERY.md) for failed
-deployments.
-
-[Documentation index](README.md) ·
-[Manual deployment](SETUP.md#update-the-installation)
+deployments. To deploy by hand instead, see
+[Update the installation](SETUP.md#update-the-installation).

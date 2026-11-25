@@ -1,7 +1,8 @@
-# Discord access models and permissions
+# Feed and channel permissions
 
-**For the person who hosts syndicord and configures editing access.** To add
-feeds, destinations, or subscriptions, use the [everyday guide](USAGE.md).
+**For the installation owner.** This guide explains the two access models and
+configures separate feed and channel permissions. To add feeds, destinations, or
+subscriptions, use [Manage feeds and channels](USAGE.md).
 
 ## Access models
 
@@ -29,8 +30,9 @@ permission; the distinction is what it permits, not how many roles exist.
 
 The browser and CLI enforce the same permissions. Neither model grants access to
 Cloudflare Worker secrets or the authorization policy. To configure one admin
-role, follow [Discord sign-in setup](DISCORD_SIGN_IN.md#enable-administration).
-The remaining sections explain separate feed and channel permissions.
+role, follow
+[Discord sign-in and access](DISCORD_SIGN_IN.md#enable-administration). The
+remaining sections explain separate feed and channel permissions.
 
 ## Configure access
 
@@ -170,8 +172,8 @@ uploads and scoped webhook lookups, refreshing expired permissions through
 Discord. Once the window expires, outages, rate limits, or malformed responses
 block access until verification succeeds; stale grants are never a fallback.
 Local logout and known session expiry remain immediate. See
-[granting and revoking access](DISCORD_SIGN_IN.md#grant-and-revoke-access) for
-the browser, CLI, and token-revocation behavior. Existing routes continue after
+[Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access) for the
+browser, CLI, and token-revocation behavior. Existing routes continue after
 management access is revoked.
 
 ## Initialize an existing installation

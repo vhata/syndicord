@@ -1,8 +1,8 @@
-# Using syndicord
+# Manage feeds and channels
 
-Use this guide to manage feeds and channels in an **existing installation**. Ask
-the person who hosts syndicord for a link to the web editor and which Discord
-role you need. Hosting a new installation? Start with [setup](SETUP.md).
+**For feed and channel administrators of an existing installation.** Ask the
+installation owner for a link to the web editor and which Discord role you need.
+Hosting a new installation? Start with [Set up an installation](SETUP.md).
 
 A feed supplies articles; a webhook posts to a Discord channel; a subscription
 (or route) connects them. The browser and CLI edit the same saved configuration.
@@ -57,7 +57,7 @@ npm run syndicord -- logout
 
 Browser sign-out and CLI logout end their respective sessions; neither signs you
 out of Discord itself. For session limits and role changes, see
-[grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access).
+[Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access).
 
 ## Choose the section matching your editor
 
@@ -73,10 +73,10 @@ give you permission to manage a channel.
 | **Feed catalog**, **Your destinations**, **Your subscriptions** | Separate feed and channel permissions | [Manage the catalog and your channels](#separate-feed-and-channel-permissions) |
 | **Feeds** and **Webhooks**, with **Add webhook**                | One admin role                        | [Manage all feeds and destinations](#one-admin-role)                           |
 
-The person who hosts syndicord chooses the mode. If you see **Verify and
-initialize catalog**, choose it to
+The installation owner chooses the mode. If you see **Verify and initialize
+catalog**, choose it to
 [initialize the catalog](PERMISSIONS.md#initialize-an-existing-installation). If
-that fails, ask the person who hosts syndicord for help.
+that fails, ask the installation owner for help.
 
 ## Separate feed and channel permissions
 
@@ -186,7 +186,7 @@ used by channels you cannot administer. Deleting a destination in syndicord does
 not delete its webhook in Discord. Removing all subscriptions pauses polling and
 delivery, but a run already in progress may finish. Restoring the same
 subscription resumes pending entries; label changes preserve delivery history.
-See [permissions and verification](PERMISSIONS.md) for the exact rules.
+See [Feed and channel permissions](PERMISSIONS.md) for the exact rules.
 
 ## One admin role
 
@@ -297,8 +297,8 @@ progress may finish using the configuration it read at its start.
   accepts `--file -` for stdin.
 
 For a first real message, follow [verify delivery](SETUP.md#verify-delivery).
-For missing messages, ask the person who hosts syndicord to check
-[status](STATUS.md) and [troubleshooting](RECOVERY.md).
+For missing messages, ask the installation owner to check
+[Operational status](STATUS.md) and [Troubleshooting and recovery](RECOVERY.md).
 
 ## Polling limits
 

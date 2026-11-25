@@ -1,8 +1,8 @@
 # Set up an installation
 
-This guide is for the person hosting syndicord. If someone has already set it
-up, ask them for a link to the web editor and start with
-[managing feeds](USAGE.md).
+**For the installation owner setting up a new installation.** If someone has
+already set it up, ask them for a link to the web editor and start with
+[Manage feeds and channels](USAGE.md).
 
 You need a Cloudflare account, permission to manage roles and webhooks in your
 Discord server, and Node.js 26.12 or newer in the 26.x line with npm 11. An
@@ -93,7 +93,9 @@ an existing installation, reuse its database ID and skip creation.
 The dashboard links below open Cloudflare for your signed-in account. If
 prompted, sign in and choose the account for this installation.
 
-Choose one way to create the database:
+Choose one way to create the database
+([Cloudflare's D1 guide](https://developers.cloudflare.com/d1/get-started/) has
+more detail):
 
 - **Cloudflare Dashboard:** Open
   [**D1 SQL database**](https://dash.cloudflare.com/?to=/:account/workers/d1),
@@ -129,14 +131,14 @@ to find it again, including a CLI option.
 
 ## Enable configuration access
 
-Next, follow [Configure Discord sign-in](DISCORD_SIGN_IN.md). It walks you
+Next, follow [Discord sign-in and access](DISCORD_SIGN_IN.md). It walks you
 through collecting the Discord application credentials, choosing who can edit,
 and saving the settings on your Worker. Keep using the same password-manager
 entry for those values and the encryption key generated there.
 
-That guide ends by sending you to [Using syndicord](USAGE.md) to create a
-destination webhook and add your first feed in the browser or CLI. For the
-delivery check below, use a feed you can publish to, such as your own
+That guide ends by sending you to [Manage feeds and channels](USAGE.md) to
+create a destination webhook and add your first feed in the browser or CLI. For
+the delivery check below, use a feed you can publish to, such as your own
 repository's commit feed. Save the webhook URL in your password manager too;
 saved URLs are never returned by either client.
 
@@ -170,7 +172,7 @@ report. A successful cron invocation alone does not prove delivery.
 For invocation outcomes and CPU time, use **your Worker → Metrics**, or the live
 tail's `$workers` fields (`outcome`, `cpuTimeMs`, `wallTimeMs`). Missing or
 sampled logs do not prove health, and local tests do not establish hosted CPU
-headroom. If something fails, use [troubleshooting](RECOVERY.md).
+headroom. If something fails, use [Troubleshooting and recovery](RECOVERY.md).
 
 ## Update the installation
 
@@ -186,7 +188,4 @@ For an npm installation, repeat the
 [packing and global-install steps](#optional-npm-installation), then run
 `npx syndicord deploy`. Keep the same account, Worker, and database identifiers.
 Deployments preserve feeds, webhook URLs, and Worker secrets. You can also
-enable [automatic deployment from GitHub](GITHUB_DEPLOYMENT.md).
-
-[Documentation index](README.md) · [Manage feeds](USAGE.md) ·
-[Cloudflare database setup](https://developers.cloudflare.com/d1/get-started/)
+enable [Automatic deployment from GitHub](GITHUB_DEPLOYMENT.md).
