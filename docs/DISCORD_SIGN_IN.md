@@ -5,9 +5,10 @@ and sets which roles can manage feeds and channels, in both the web editor and
 CLI. If someone has already set up your installation, go straight to
 [Manage feeds and channels](FEEDS.md).
 
-For a new installation, follow the setup steps below, then continue to
-[Manage feeds and channels](FEEDS.md) to add your first feed and destination.
-The later [grant and revoke access](#grant-and-revoke-access) and
+For a new installation, follow the setup steps below, then return to
+[Set up an installation](SETUP.md#add-a-first-feed-and-destination) to add your
+first feed and destination. The later
+[grant and revoke access](#grant-and-revoke-access) and
 [troubleshooting](#troubleshooting-and-acceptance) sections are references for
 maintaining sign-in after setup.
 
@@ -206,7 +207,7 @@ The policy lists server/role pairs and what each may manage. It replaces the
 single server/role pair, so this path does not set `DISCORD_GUILD_ID` or
 `DISCORD_ROLE_ID`: those two values can express only unrestricted access for one
 role. The four common settings above are still needed for sign-in and
-encryption. After the policy steps, continue below.
+encryption. That guide returns you to setup when the policy is in place.
 
 ### Sign in and start managing feeds
 

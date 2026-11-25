@@ -5,7 +5,7 @@ already set it up, ask them for a link to the web editor and start with
 [Manage feeds and channels](FEEDS.md).
 
 You need a Cloudflare account, permission to manage roles and webhooks in your
-Discord server, and Node.js 26.12 or newer in the 26.x line with npm 11. An
+Discord server, Git, and Node.js 26.12 or newer in the 26.x line with npm 11. An
 installation is one **Worker** (the running service) and one **D1 database**
 (feeds, encrypted webhook URLs, routing, and delivery history).
 
@@ -22,7 +22,7 @@ here when they are done.
 1. [Install the CLI](#install-the-cli)
 2. [Choose the Cloudflare account](#choose-the-cloudflare-account)
 3. [Create the database and deploy](#create-the-database-and-deploy)
-4. [Configure Discord sign-in](#configure-discord-sign-in), in
+4. [Connect Discord sign-in](#connect-discord-sign-in), in
    [Discord sign-in and access](DISCORD_SIGN_IN.md)
 5. [Add a first feed and destination](#add-a-first-feed-and-destination), in
    [Manage feeds and channels](FEEDS.md)
@@ -98,7 +98,7 @@ handles its code, migrations, and bindings together.
 
 The fresh service has no feeds and stays idle until you configure it.
 
-## Configure Discord sign-in
+## Connect Discord sign-in
 
 Follow [Discord sign-in and access](DISCORD_SIGN_IN.md). It starts by finding
 your Worker's address, then walks you through the Discord application, choosing
@@ -113,9 +113,10 @@ In [Manage feeds and channels](FEEDS.md), follow the section that matches the
 editor you see after signing in. Create a destination webhook and add one feed,
 in the browser or CLI. For the delivery check below, use a feed you can publish
 to, such as your own repository's commit feed. Save the webhook URL in your
-password-manager entry; saved URLs are never returned by either client.
+password-manager entry; saved URLs are never returned by either client. CLI
+login is optional; that guide explains it if you prefer the terminal.
 
-Then continue with the next step.
+Both sections of that guide include a link back to the next step.
 
 ## Verify delivery
 

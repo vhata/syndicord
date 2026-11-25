@@ -17,10 +17,9 @@ npm run syndicord -- --help
 ```
 
 These commands build the CLI and Worker locally. The guides' examples use this
-form, `npm run syndicord -- COMMAND`, run from the checkout. The checkout's
-`.npmrc` suppresses npm script banners so command output stays usable as JSON.
-For local checks and code contributions, see
-[Develop and contribute](DEVELOPMENT.md).
+checkout form: `npm run syndicord -- COMMAND`. The checkout's `.npmrc`
+suppresses npm script banners so command output stays usable as JSON. For local
+checks and code contributions, see [Develop and contribute](DEVELOPMENT.md).
 
 ## npm installation
 

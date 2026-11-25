@@ -10,7 +10,7 @@ host a new installation, start with [Set up an installation](SETUP.md).
 Deployment, migrations, and operational status require Cloudflare access.
 Signing in with Discord gives access to the feed editor, not to Cloudflare. Use
 the account ID, Worker name, and D1 database UUID saved during
-[setup](SETUP.md#choose-the-cloudflare-account). Reuse the existing database ID.
+[setup](SETUP.md#steps). Reuse the existing database ID.
 
 The examples use a source checkout. For the
 [npm-installed CLI](CLI.md#npm-installation), replace `npm run syndicord --`
