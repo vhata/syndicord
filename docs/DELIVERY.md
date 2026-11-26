@@ -1,7 +1,7 @@
 # How delivery works
 
 **For anyone who wants the exact rules for when and how messages are sent.**
-Day-to-day editing is in [Manage feeds and channels](USAGE.md); health checks
+Day-to-day editing is in [Manage feeds and channels](FEEDS.md); health checks
 are in [Operational status](STATUS.md).
 
 Each subscribed RSS or Atom feed has one or more Discord destinations. A

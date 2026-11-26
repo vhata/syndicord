@@ -3,7 +3,7 @@
 **For the installation owner, with access to the installation's Cloudflare
 account.** Start with [Operational status](STATUS.md), then follow the row that
 matches the symptom. Everyday feed edits are in
-[Manage feeds and channels](USAGE.md).
+[Manage feeds and channels](FEEDS.md).
 
 | Symptom or task                          | Start here                                                                   |
 | ---------------------------------------- | ---------------------------------------------------------------------------- |
@@ -18,7 +18,7 @@ matches the symptom. Everyday feed edits are in
 Select the installation as described in
 [Select a Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation).
 Feed and webhook commands also need the
-[configuration API selection](USAGE.md#select-an-installation). For optional
+[configuration API selection](FEEDS.md#select-an-installation). For optional
 GitHub deployment commands, select its repository:
 
 ```sh
@@ -79,9 +79,9 @@ Add `--local` to inspect local development state instead.
 
 ## Resume a suspended destination
 
-[Rotate the webhook](USAGE.md#change-or-remove-something) when roles have
+[Rotate the webhook](FEEDS.md#change-or-remove-something) when roles have
 separate feed and channel permissions, or
-[replace its URL](USAGE.md#add-or-change-webhooks) when one admin role manages
+[replace its URL](FEEDS.md#add-or-change-webhooks) when one admin role manages
 everything, and update its backup. A changed URL clears suspension and its
 destination cooldown on the next poll; pending entries retain their retry times.
 

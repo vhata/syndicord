@@ -12,9 +12,9 @@ const MAX_BYTES = 128 * 1024;
 const INVALID_RESPONSE =
   'The administration API returned an invalid response. Check SYNDICORD_ADMIN_URL and the Worker configuration.';
 const LOGIN_REQUIRED =
-  'No valid administration session is saved for this installation. Run syndicord login. See docs/USAGE.md#select-an-installation.';
+  'No valid administration session is saved for this installation. Run syndicord login. See docs/FEEDS.md#select-an-installation.';
 const PRIVATE_SESSION =
-  'Cannot read the private CLI session. Run syndicord login to create a new session. See docs/USAGE.md#select-an-installation.';
+  'Cannot read the private CLI session. Run syndicord login to create a new session. See docs/FEEDS.md#select-an-installation.';
 const TOKEN = /^[A-Za-z0-9_-]{32,256}$/;
 
 interface Session {
@@ -50,7 +50,7 @@ export function adminEndpoint(env: Environment) {
     return { origin: url.origin, url: new URL('/admin/api/config', url).href };
   } catch {
     throw new Error(
-      'SYNDICORD_ADMIN_URL must be an HTTPS origin without credentials, path, query, or fragment. HTTP is allowed for localhost, 127.0.0.1, or [::1]. See docs/USAGE.md#select-an-installation.',
+      'SYNDICORD_ADMIN_URL must be an HTTPS origin without credentials, path, query, or fragment. HTTP is allowed for localhost, 127.0.0.1, or [::1]. See docs/FEEDS.md#select-an-installation.',
     );
   }
 }

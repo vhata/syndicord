@@ -141,9 +141,9 @@ Those require the checks run by the installation owner in
 
 ## Review inputs
 
-Read [How delivery works](BEHAVIOR.md), the
+Read [How delivery works](DELIVERY.md), the
 [source layout](DEVELOPMENT.md#layout), and the guides for [setup](SETUP.md),
-[managing feeds](USAGE.md), [automatic deployment](GITHUB_DEPLOYMENT.md),
+[managing feeds](FEEDS.md), [automatic deployment](GITHUB_DEPLOYMENT.md),
 [status](STATUS.md), and [recovery](RECOVERY.md).
 
 Focus on these boundaries:

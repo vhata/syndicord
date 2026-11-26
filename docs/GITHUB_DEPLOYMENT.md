@@ -3,7 +3,7 @@
 **For the installation owner. Optional.** Use this when you want pushes to your
 repository's `main` branch to update the running service. Complete
 [Set up an installation](SETUP.md) first. Feed and webhook edits use
-[Manage feeds and channels](USAGE.md) and never need a GitHub change.
+[Manage feeds and channels](FEEDS.md) and never need a GitHub change.
 
 > **Once configured, pushes to `main` deploy automatically after checks pass.**
 > Merging a pull request into `main` therefore updates the running Worker;

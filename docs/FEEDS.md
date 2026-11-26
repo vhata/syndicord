@@ -304,5 +304,5 @@ For missing messages, ask the installation owner to check
 
 By default, one feed is checked and up to five deliveries are attempted each
 minute. Larger feed lists take longer to revisit. See
-[capacity and limits](BEHAVIOR.md#polling-limits) for request/configuration
+[capacity and limits](DELIVERY.md#polling-limits) for request/configuration
 sizes, feed bounds, timeouts, and storage behavior.

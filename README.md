@@ -7,7 +7,7 @@
 <p align="center"><strong>Your feeds. In the conversation.</strong><br>RSS and Atom updates, delivered to Discord.</p>
 
 <p align="center">
-  <a href="docs/USAGE.md">Manage feeds and channels</a> ·
+  <a href="docs/FEEDS.md">Manage feeds and channels</a> ·
   <a href="docs/SETUP.md">Set up an installation</a> ·
   <a href="docs/README.md">Documentation</a>
 </p>
@@ -31,7 +31,7 @@ choose. Messages include the feed name, title, link, and a short excerpt.
 
 | I want to…                                      | Read                                                                                                        |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Add feeds or choose which channels receive them | [Manage feeds and channels](docs/USAGE.md)                                                                  |
+| Add feeds or choose which channels receive them | [Manage feeds and channels](docs/FEEDS.md)                                                                  |
 | Host syndicord for my community                 | [Set up an installation](docs/SETUP.md)                                                                     |
 | Give people access to manage it                 | [Discord sign-in and access](docs/DISCORD_SIGN_IN.md) · [Feed and channel permissions](docs/PERMISSIONS.md) |
 | Check why updates have stopped                  | [Operational status](docs/STATUS.md) · [Troubleshooting and recovery](docs/RECOVERY.md)                     |
@@ -51,7 +51,7 @@ Hosting access is separate from editing access.
 The first successful check of a new route quietly records existing entries; **it
 does not post the old backlog**. Subsequent checks send new entries. By default,
 one feed is checked each minute and destinations retry independently. See
-[how delivery works](docs/BEHAVIOR.md) for timing, limits, and retry details.
+[how delivery works](docs/DELIVERY.md) for timing, limits, and retry details.
 
 The [documentation](docs/README.md) lists every guide by task, including
 day-to-day operation, optional GitHub deployment, and contribution.

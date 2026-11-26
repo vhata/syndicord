@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const repository = 'https://github.com/vhata/syndicord';
 export const groups = [
-  { text: 'Start here', files: ['README', 'USAGE'] },
+  { text: 'Start here', files: ['README', 'FEEDS'] },
   {
     text: 'Host an installation',
     files: ['SETUP', 'DISCORD_SIGN_IN', 'PERMISSIONS', 'GITHUB_DEPLOYMENT'],
@@ -14,7 +14,7 @@ export const groups = [
     text: 'Operate',
     files: ['OPERATIONS', 'STATUS', 'RECOVERY', 'PROVIDER_API'],
   },
-  { text: 'Reference', files: ['BEHAVIOR'] },
+  { text: 'Reference', files: ['DELIVERY'] },
   { text: 'Contribute', files: ['DEVELOPMENT', 'QUALITY', 'WEBSITE'] },
 ];
 export const sources = [

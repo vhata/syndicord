@@ -2,7 +2,7 @@
 
 **For the installation owner, with access to the installation's Cloudflare
 account.** If you manage feeds or channels, use
-[Manage feeds and channels](USAGE.md); those tasks only need Discord sign-in. To
+[Manage feeds and channels](FEEDS.md); those tasks only need Discord sign-in. To
 host a new installation, start with [Set up an installation](SETUP.md).
 
 ## Select a Cloudflare installation
@@ -26,7 +26,7 @@ npm run syndicord -- status
 
 Each independent installation has its own Worker and D1 database. When switching
 between feed editing and infrastructure commands, check that the
-[web-editor address](USAGE.md#select-an-installation) and Cloudflare identifiers
+[web-editor address](FEEDS.md#select-an-installation) and Cloudflare identifiers
 refer to the same installation. The status command reads saved D1 health without
 sending a Discord message; [reading the report](STATUS.md#reading-the-report)
 explains its results. The [documentation](README.md#operate-an-installation)

@@ -3,10 +3,10 @@
 **For the installation owner.** This guide connects a deployed Worker to Discord
 and sets which roles can manage feeds and channels, in both the web editor and
 CLI. If someone has already set up your installation, go straight to
-[Manage feeds and channels](USAGE.md).
+[Manage feeds and channels](FEEDS.md).
 
 For a new installation, follow the setup steps below, then continue to
-[Manage feeds and channels](USAGE.md) to add your first feed and destination.
+[Manage feeds and channels](FEEDS.md) to add your first feed and destination.
 The later [grant and revoke access](#grant-and-revoke-access) and
 [troubleshooting](#troubleshooting-and-acceptance) sections are references for
 maintaining sign-in after setup.
@@ -216,7 +216,7 @@ An authorized account sees its Discord identity, a **Sign out** control, and the
 editor. If access is denied, check the server/role IDs and your role assignment,
 or try another Discord account.
 
-**Sign-in setup is complete. Continue to [Manage feeds and channels](USAGE.md)**
+**Sign-in setup is complete. Continue to [Manage feeds and channels](FEEDS.md)**
 to add a destination webhook and feed, in the browser or CLI. CLI login is
 optional and is explained there when you choose terminal editing. Once you have
 a feed and destination, return to [Verify delivery](SETUP.md#verify-delivery) to
@@ -296,7 +296,7 @@ application and Cloudflare deployment.
 ## Related guides
 
 - [Feed and channel permissions](PERMISSIONS.md)
-- [Sign in with the CLI](USAGE.md#sign-in)
+- [Sign in with the CLI](FEEDS.md#sign-in)
 - [Installation name and colour](OPERATIONS.md#installation-name-and-colour)
 - [Preview sign-in locally](DEVELOPMENT.md#run-locally)
 - [Authentication design](DEVELOPMENT.md#authentication-design)

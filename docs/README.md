@@ -6,7 +6,7 @@ what you do:
 
 | You want to                                    | Start with                               | You need                                                                         |
 | ---------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
-| Add feeds or choose what reaches your channels | [Manage feeds and channels](USAGE.md)    | The web-editor link from your host and an authorized Discord account             |
+| Add feeds or choose what reaches your channels | [Manage feeds and channels](FEEDS.md)    | The web-editor link from your host and an authorized Discord account             |
 | Host syndicord for a community                 | [Set up an installation](SETUP.md)       | A Cloudflare account, Discord server administration, Git, Node.js 26, and npm 11 |
 | Work on syndicord itself                       | [Develop and contribute](DEVELOPMENT.md) | Git, the pinned Node.js version, and npm; no cloud credentials for tests         |
 
@@ -22,12 +22,12 @@ one Discord role every editing permission. See
 
 | Task                                                    | Guide                                                                                       |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Sign in with the web editor or CLI                      | [Sign in](USAGE.md#sign-in)                                                                 |
-| Find out which editing mode your installation uses      | [Choose the section matching your editor](USAGE.md#choose-the-section-matching-your-editor) |
-| Add a feed, register a channel, and subscribe it        | [Separate feed and channel permissions](USAGE.md#separate-feed-and-channel-permissions)     |
-| Add feeds and webhooks when one role manages everything | [One admin role](USAGE.md#one-admin-role)                                                   |
-| Rename, rotate, unsubscribe, or delete                  | [Change or remove something](USAGE.md#change-or-remove-something)                           |
-| Understand why a new feed posts nothing at first        | [Baselines and entry identity](BEHAVIOR.md#baselines-and-entry-identity)                    |
+| Sign in with the web editor or CLI                      | [Sign in](FEEDS.md#sign-in)                                                                 |
+| Find out which editing mode your installation uses      | [Choose the section matching your editor](FEEDS.md#choose-the-section-matching-your-editor) |
+| Add a feed, register a channel, and subscribe it        | [Separate feed and channel permissions](FEEDS.md#separate-feed-and-channel-permissions)     |
+| Add feeds and webhooks when one role manages everything | [One admin role](FEEDS.md#one-admin-role)                                                   |
+| Rename, rotate, unsubscribe, or delete                  | [Change or remove something](FEEDS.md#change-or-remove-something)                           |
+| Understand why a new feed posts nothing at first        | [Baselines and entry identity](DELIVERY.md#baselines-and-entry-identity)                    |
 
 ## Host an installation
 
@@ -58,7 +58,7 @@ and brings you back to verify delivery.
 
 ## Reference
 
-[How delivery works](BEHAVIOR.md) describes message formatting, baselines,
+[How delivery works](DELIVERY.md) describes message formatting, baselines,
 retries, polling limits, and storage growth. It applies to every installation.
 
 ## Contribute

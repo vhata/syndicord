@@ -29,7 +29,7 @@ default for the CLI; the command never changes migrations, releases a lease, or
 resumes a suspended destination.
 
 Deployment applies migrations. A fresh installation has no feeds and reports
-`disabled`. Add configuration with [Manage feeds and channels](USAGE.md). Until
+`disabled`. Add configuration with [Manage feeds and channels](FEEDS.md). Until
 the Worker records completed polls, active feeds have status `unknown`; older
 delivery history does not establish current health.
 

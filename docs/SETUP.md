@@ -2,7 +2,7 @@
 
 **For the installation owner setting up a new installation.** If someone has
 already set it up, ask them for a link to the web editor and start with
-[Manage feeds and channels](USAGE.md).
+[Manage feeds and channels](FEEDS.md).
 
 You need a Cloudflare account, permission to manage roles and webhooks in your
 Discord server, and Node.js 26.12 or newer in the 26.x line with npm 11. An
@@ -136,7 +136,7 @@ through collecting the Discord application credentials, choosing who can edit,
 and saving the settings on your Worker. Keep using the same password-manager
 entry for those values and the encryption key generated there.
 
-That guide ends by sending you to [Manage feeds and channels](USAGE.md) to
+That guide ends by sending you to [Manage feeds and channels](FEEDS.md) to
 create a destination webhook and add your first feed in the browser or CLI. For
 the delivery check below, use a feed you can publish to, such as your own
 repository's commit feed. Save the webhook URL in your password manager too;

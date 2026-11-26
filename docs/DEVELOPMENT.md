@@ -143,7 +143,7 @@ npm run syndicord -- login
 ```
 
 The browser editor and CLI both connect to the development Worker and edit the
-same local D1 database. Use [Manage feeds and channels](USAGE.md) to add feeds
+same local D1 database. Use [Manage feeds and channels](FEEDS.md) to add feeds
 and destinations.
 
 `npm run db:migrate:local` always passes `--local`, even if invoked in CI. The
@@ -206,7 +206,7 @@ with the earlier commands. Keep the encryption key that belongs to each dataset.
 | `migrations/`                 | D1 schema migrations                                    |
 | `cloudflare.config.ts`        | Worker, bindings, schedule, and logging                 |
 
-Read [How delivery works](BEHAVIOR.md) for the polling and delivery model,
+Read [How delivery works](DELIVERY.md) for the polling and delivery model,
 [authentication design](#authentication-design) for sign-in, and
 [Feed and channel permissions](PERMISSIONS.md) for the shared catalog and
 channel grants.

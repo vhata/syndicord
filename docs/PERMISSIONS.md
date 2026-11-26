@@ -2,7 +2,7 @@
 
 **For the installation owner.** This guide explains the two access models and
 configures separate feed and channel permissions. To add feeds, destinations, or
-subscriptions, use [Manage feeds and channels](USAGE.md).
+subscriptions, use [Manage feeds and channels](FEEDS.md).
 
 ## Access models
 
@@ -141,7 +141,7 @@ saved configuration; read
 Initialization sends no Discord messages.
 
 For the CLI alternative,
-[sign in from the terminal](USAGE.md#select-an-installation), then run:
+[sign in from the terminal](FEEDS.md#select-an-installation), then run:
 
 ```sh
 npm run syndicord -- catalog initialize
@@ -152,7 +152,7 @@ policy does not switch it back to the one-admin-role editor; restore a valid
 policy to regain editing access.
 
 **Access setup is complete. Continue to
-[managing the catalog and your channels](USAGE.md#separate-feed-and-channel-permissions)**
+[managing the catalog and your channels](FEEDS.md#separate-feed-and-channel-permissions)**
 to add a feed, destination, and subscription. Then return to
 [Verify delivery](SETUP.md#verify-delivery).
 
@@ -229,16 +229,16 @@ is kept in the catalog without being polled. Removing all subscriptions pauses
 polling and delivery; a run already in progress may finish using its snapshot.
 
 For the browser steps, JSON input examples, and CLI commands, see
-[manage feeds and channels](USAGE.md#separate-feed-and-channel-permissions).
+[manage feeds and channels](FEEDS.md#separate-feed-and-channel-permissions).
 Both clients offer adding, renaming, deleting unused feeds, and adding/removing
 subscriptions. Secret-bearing input files accept `--file -`; back up URLs
 privately and delete temporary files after use.
 
 ## Destinations and webhook rotation
 
-Follow [register a destination](USAGE.md#2-register-a-destination) for browser
+Follow [register a destination](FEEDS.md#2-register-a-destination) for browser
 and CLI steps, and
-[change or remove something](USAGE.md#change-or-remove-something) for rotation,
+[change or remove something](FEEDS.md#change-or-remove-something) for rotation,
 renaming, and deletion. The guarantees below explain those rules.
 
 Syndicord uses Discord's
