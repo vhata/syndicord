@@ -1,6 +1,8 @@
-# Relay behavior
+# How delivery works
 
-[Documentation](README.md) · [Manage feeds](USAGE.md) · [Status](STATUS.md)
+**For anyone who wants the exact rules for when and how messages are sent.**
+Day-to-day editing is in [Manage feeds and channels](FEEDS.md); health checks
+are in [Operational status](STATUS.md).
 
 Each subscribed RSS or Atom feed has one or more Discord destinations. A
 **destination** is a saved webhook that posts to a channel; a **subscription**
@@ -150,5 +152,5 @@ D1 retains entry identities indefinitely and clears pending payloads after
 successful delivery. Keeping identities prevents old entries from being sent
 again if they reappear in a feed; keeping pending payloads allows retries after
 an entry leaves the source feed. Both can grow the database for busy feeds.
-Monitor database growth and use [status](STATUS.md) to inspect pending delivery
-counts and ages.
+Monitor database growth and use [Operational status](STATUS.md) to inspect
+pending delivery counts and ages.

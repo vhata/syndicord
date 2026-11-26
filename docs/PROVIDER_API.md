@@ -1,12 +1,11 @@
 # Advanced provider operations
 
-Use [setup](SETUP.md) for the normal dashboard and CLI instructions. Routine
-feed and webhook edits use the [web editor or syndicord CLI](USAGE.md).
-
-Use this optional reference for account-token policies and provider API tasks.
-Normal setup uses [dashboard steps and native CLI commands](SETUP.md). The API
-recipes below use Bash, `curl`, and `jq`; they operate on your selected hosted
-installation.
+**For the installation owner. Optional.** These recipes cover account-token
+policies and provider API tasks that the dashboard and syndicord CLI do not
+cover, or that are easier to script than to click. Normal setup is in
+[Set up an installation](SETUP.md); routine feed and webhook edits are in
+[Manage feeds and channels](FEEDS.md). The recipes use Bash, `curl`, and `jq`,
+and operate on your selected hosted installation.
 
 - [Create a deployment token with the CLI](#create-a-deployment-token-with-the-cli)
 - [Find the Worker address](#find-the-worker-address)
@@ -129,8 +128,8 @@ that HTTPS address instead. See the
 [Worker response fields](https://developers.cloudflare.com/api/resources/workers/).
 
 Continue with
-[Discord sign-in setup](DISCORD_SIGN_IN.md#find-and-keep-your-worker-address) to
-make the callback and web-editor links from this address.
+[Discord sign-in and access](DISCORD_SIGN_IN.md#find-and-keep-your-worker-address)
+to make the callback and web-editor links from this address.
 
 ## Pause and restore cron triggers
 
@@ -223,12 +222,12 @@ uncertain outcome, inspect the channel's webhooks before repeating it. Save the
 URL in your password manager, then choose your installation's access model:
 
 - **One admin role** (members can edit every feed and destination):
-  [Configure the destination](USAGE.md#add-or-change-webhooks) with
+  [Configure the destination](FEEDS.md#add-or-change-webhooks) with
   `npm run syndicord -- webhooks set --file .webhooks.json`, or enter the URL in
   the web interface.
 - **Separate feed and channel permissions** (roles manage the shared feed
   catalog, specified channels, or both): Copy the URL from the file's `updates`
-  value and [register a destination](USAGE.md#2-register-a-destination) in the
+  value and [register a destination](FEEDS.md#2-register-a-destination) in the
   web interface or with `destinations register`. That command takes a label and
   `webhookUrl`; this access model rejects the whole-configuration mapping and
   `webhooks set` command.

@@ -1,7 +1,8 @@
-# Discord access models and permissions
+# Feed and channel permissions
 
-**For the person who hosts syndicord and configures editing access.** To add
-feeds, destinations, or subscriptions, use the [everyday guide](USAGE.md).
+**For the installation owner.** This guide explains the two access models and
+configures separate feed and channel permissions. To add feeds, destinations, or
+subscriptions, use [Manage feeds and channels](FEEDS.md).
 
 ## Access models
 
@@ -29,8 +30,9 @@ permission; the distinction is what it permits, not how many roles exist.
 
 The browser and CLI enforce the same permissions. Neither model grants access to
 Cloudflare Worker secrets or the authorization policy. To configure one admin
-role, follow [Discord sign-in setup](DISCORD_SIGN_IN.md#enable-administration).
-The remaining sections explain separate feed and channel permissions.
+role, follow
+[Discord sign-in and access](DISCORD_SIGN_IN.md#enable-administration). The
+remaining sections explain separate feed and channel permissions.
 
 ## Configure access
 
@@ -139,7 +141,7 @@ saved configuration; read
 Initialization sends no Discord messages.
 
 For the CLI alternative,
-[sign in from the terminal](USAGE.md#select-an-installation), then run:
+[sign in from the terminal](FEEDS.md#select-an-installation), then run:
 
 ```sh
 npm run syndicord -- catalog initialize
@@ -150,7 +152,7 @@ policy does not switch it back to the one-admin-role editor; restore a valid
 policy to regain editing access.
 
 **Access setup is complete. Continue to
-[managing the catalog and your channels](USAGE.md#separate-feed-and-channel-permissions)**
+[managing the catalog and your channels](FEEDS.md#separate-feed-and-channel-permissions)**
 to add a feed, destination, and subscription. Then return to
 [Verify delivery](SETUP.md#verify-delivery).
 
@@ -170,8 +172,8 @@ uploads and scoped webhook lookups, refreshing expired permissions through
 Discord. Once the window expires, outages, rate limits, or malformed responses
 block access until verification succeeds; stale grants are never a fallback.
 Local logout and known session expiry remain immediate. See
-[granting and revoking access](DISCORD_SIGN_IN.md#grant-and-revoke-access) for
-the browser, CLI, and token-revocation behavior. Existing routes continue after
+[Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access) for the
+browser, CLI, and token-revocation behavior. Existing routes continue after
 management access is revoked.
 
 ## Initialize an existing installation
@@ -227,16 +229,16 @@ is kept in the catalog without being polled. Removing all subscriptions pauses
 polling and delivery; a run already in progress may finish using its snapshot.
 
 For the browser steps, JSON input examples, and CLI commands, see
-[manage feeds and channels](USAGE.md#separate-feed-and-channel-permissions).
+[manage feeds and channels](FEEDS.md#separate-feed-and-channel-permissions).
 Both clients offer adding, renaming, deleting unused feeds, and adding/removing
 subscriptions. Secret-bearing input files accept `--file -`; back up URLs
 privately and delete temporary files after use.
 
 ## Destinations and webhook rotation
 
-Follow [register a destination](USAGE.md#2-register-a-destination) for browser
+Follow [register a destination](FEEDS.md#2-register-a-destination) for browser
 and CLI steps, and
-[change or remove something](USAGE.md#change-or-remove-something) for rotation,
+[change or remove something](FEEDS.md#change-or-remove-something) for rotation,
 renaming, and deletion. The guarantees below explain those rules.
 
 Syndicord uses Discord's

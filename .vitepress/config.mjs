@@ -58,8 +58,9 @@ export default defineConfig({
   ],
   themeConfig: {
     nav: [
-      { text: 'Get started', link: '/docs/USAGE.html' },
-      { text: 'Documentation', link: '/docs/' },
+      { text: 'Manage feeds', link: '/docs/FEEDS.html' },
+      { text: 'Host an installation', link: '/docs/SETUP.html' },
+      { text: 'Docs', link: '/docs/' },
       { text: 'GitHub', link: repository },
     ],
     sidebar: groups.map(({ text, files }) => ({

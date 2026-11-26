@@ -1,8 +1,8 @@
 # Operational status
 
-**Requires access to the installation’s Cloudflare account.** If you only manage
-feeds or channels, ask the person who hosts syndicord to run this check. For
-live logs and CPU errors, open
+**For the installation owner, with access to the installation's Cloudflare
+account.** If you only manage feeds or channels, ask the installation owner to
+run this check. For live logs and CPU errors, open
 [**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
 in the Cloudflare dashboard, select your Worker, then use **Logs → Live** and
 **Metrics**, or [tail events in the CLI](RECOVERY.md#inspect-a-run). The status
@@ -29,9 +29,9 @@ default for the CLI; the command never changes migrations, releases a lease, or
 resumes a suspended destination.
 
 Deployment applies migrations. A fresh installation has no feeds and reports
-`disabled`. Add configuration through [the web interface](USAGE.md) or
-[CLI](USAGE.md). Until the Worker records completed polls, active feeds have
-status `unknown`; older delivery history does not establish current health.
+`disabled`. Add configuration with [Manage feeds and channels](FEEDS.md). Until
+the Worker records completed polls, active feeds have status `unknown`; older
+delivery history does not establish current health.
 
 ## Reading the report
 

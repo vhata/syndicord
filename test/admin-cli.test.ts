@@ -573,7 +573,7 @@ test('invalid admin targets, missing sessions, and --local fail before any netwo
   assert.equal(missing.code, 2);
   assert.match(
     missing.stderr,
-    /Run syndicord login.*docs\/USAGE\.md#select-an-installation/,
+    /Run syndicord login.*docs\/FEEDS\.md#select-an-installation/,
   );
   for (const args of [
     ['feeds', 'get', '--local'],
