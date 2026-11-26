@@ -1,8 +1,7 @@
 # Advanced provider operations
 
 Use [setup](SETUP.md) for the normal dashboard and CLI instructions. Routine
-feed and webhook edits use the [web interface](WEB.md) or
-[syndicord CLI](USAGE.md).
+feed and webhook edits use the [web editor or syndicord CLI](USAGE.md).
 
 Use this optional reference for account-token policies and provider API tasks.
 Normal setup uses [dashboard steps and native CLI commands](SETUP.md). The API
@@ -20,7 +19,7 @@ First
 [select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation).
 Your membership needs **API Token Provisioning** (or Super Administrator), with
 the product permissions you want to grant. This creates an account-owned token
-for [GitHub deployment](DEPLOYMENT.md).
+for [GitHub deployment](GITHUB_DEPLOYMENT.md).
 
 The pinned CLI's OAuth scopes support **Workers Scripts Write**. Use the
 dashboard for the narrower **Workers Editor** permission.
@@ -77,7 +76,7 @@ In the JSON printed by `cf`, copy the complete `value` string (beginning with
 `cfat_`), without the surrounding quotes.
 
 Continue with
-[storing the token in GitHub](DEPLOYMENT.md#store-the-token-in-github).
+[storing the token in GitHub](GITHUB_DEPLOYMENT.md#store-the-token-in-github).
 [Account token requirements](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
 
 ## Cloudflare API access
@@ -107,19 +106,31 @@ make no automatic retries; inspect the current state after an ambiguous write.
 
 ## Find the Worker address
 
-With `CLOUDFLARE_ACCOUNT_ID` and `SYNDICORD_WORKER_NAME` set for the
-installation:
+First
+[select the Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation).
+The pinned CLI can retrieve a Worker by name. If you have `jq`, extract its
+address with:
 
 ```sh
-cf_api workers/subdomain |
-  jq -er --arg worker "$SYNDICORD_WORKER_NAME" \
-    'if .success then "https://\($worker).\(.result.subdomain).workers.dev/admin" else error("Subdomain lookup failed") end'
+npm run syndicord -- cf workers get "$SYNDICORD_WORKER_NAME" -q |
+  jq -r '.subdomain.url'
 ```
 
-This needs Workers Scripts Read or Write permission and prints the default
-address. Alternatively, the Worker's Cloudflare overview shows its configured
-addresses.
-[Subdomain API](https://developers.cloudflare.com/api/resources/workers/subresources/subdomains/methods/get/)
+Without `jq`, omit the pipe and read `subdomain.url` in the JSON output. `-q`
+keeps CLI metadata out of the JSON. This lookup uses your existing Cloudflare
+login; it does not need the API-token helper above.
+
+This is the default `workers.dev` address without `/admin`. Use it when
+`subdomain.enabled` is `true`; Cloudflare may return a URL even when that route
+is disabled. If you use a custom domain, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then open **Domains** and copy
+that HTTPS address instead. See the
+[Worker response fields](https://developers.cloudflare.com/api/resources/workers/).
+
+Continue with
+[Discord sign-in setup](DISCORD_SIGN_IN.md#find-and-keep-your-worker-address) to
+make the callback and web-editor links from this address.
 
 ## Pause and restore cron triggers
 
@@ -162,8 +173,9 @@ cf_api "workers/scripts/$SYNDICORD_WORKER_NAME/schedules" \
 ```
 
 Read back the schedules before resuming deployment. This needs Workers Scripts
-Write permission. The dashboard alternative is the Worker's **Settings →
-Triggers → Cron Triggers**.
+Write permission. For the dashboard alternative, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+select your Worker, then open **Settings → Triggers → Cron Triggers**.
 [Schedules API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/schedules/)
 ·
 [Cron propagation](https://developers.cloudflare.com/workers/configuration/cron-triggers/)

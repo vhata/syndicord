@@ -120,7 +120,7 @@ export function adminTransport<T>(
       }
       if (response.status === 401)
         throw new Error(
-          'Your administration session expired or was revoked. Run syndicord login again. See docs/WEB.md.',
+          'Your administration session expired or was revoked. Run syndicord login again. See docs/USAGE.md#select-an-installation.',
         );
       if (response.status === 403)
         throw new Error(

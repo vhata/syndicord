@@ -571,7 +571,10 @@ test('invalid admin targets, missing sessions, and --local fail before any netwo
     dependencies,
   );
   assert.equal(missing.code, 2);
-  assert.match(missing.stderr, /Run syndicord login.*docs\/WEB.md/);
+  assert.match(
+    missing.stderr,
+    /Run syndicord login.*docs\/USAGE\.md#select-an-installation/,
+  );
   for (const args of [
     ['feeds', 'get', '--local'],
     ['feeds', 'set', '--local', '--file', '-'],

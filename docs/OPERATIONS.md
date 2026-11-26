@@ -35,9 +35,9 @@ explains its results.
 
 | Task                                                 | Guide                                                       |
 | ---------------------------------------------------- | ----------------------------------------------------------- |
-| Configure sign-in or change who can edit             | [Sign-in and access](WEB.md)                                |
+| Configure sign-in or change who can edit             | [Sign-in and access](DISCORD_SIGN_IN.md)                    |
 | Update the deployed code                             | [Update the installation](SETUP.md#update-the-installation) |
-| Deploy automatically from GitHub                     | [Automatic deployment](DEPLOYMENT.md)                       |
+| Deploy automatically from GitHub                     | [Automatic deployment](GITHUB_DEPLOYMENT.md)                |
 | Check health and pending deliveries                  | [Operational status](STATUS.md)                             |
 | Diagnose failures, pause, roll back, or restore data | [Troubleshooting and recovery](RECOVERY.md)                 |
 
@@ -48,3 +48,47 @@ explains its results.
 | Feed URLs, routing, encrypted webhook URLs                       | D1 `relay_configuration`  |
 | Discord OAuth settings, authorization policy, and encryption key | Cloudflare Worker secrets |
 | Baselines, pending deliveries, and health                        | D1 delivery ledger        |
+
+## Installation name and colour
+
+The admin editor and its sign-in and access pages can show an installation name
+beside the syndicord mark and use a custom header colour. The name also appears
+in the browser tab. Both settings are optional:
+
+| Setting              | Value                                                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `ADMIN_NAME`         | Installation name, for example `Community updates`. Surrounding spaces are removed; at most 80 characters are shown. |
+| `ADMIN_HEADER_COLOR` | Six-digit hex colour, for example `#304B70`. Header text automatically uses black or white for contrast.             |
+
+Use the
+[HTML Color Codes colour picker](https://htmlcolorcodes.com/color-picker/) to
+choose a colour, then copy its six-digit hex value, including the leading `#`,
+into `ADMIN_HEADER_COLOR`.
+
+Open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then open **Settings →
+Variables and Secrets**. Add either setting as a **Secret** and deploy the
+changes. These values are visible on the page; using the Secret type preserves
+them during code deployments, like the other installation settings.
+
+Alternatively, use the CLI's value prompts:
+
+```sh
+npm run syndicord -- cf workers secrets update ADMIN_NAME \
+  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+npm run syndicord -- cf workers secrets update ADMIN_HEADER_COLOR \
+  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+```
+
+For local development, set these values in `.dev.vars`. Reload the page after
+changing them. An absent or blank name shows only syndicord; an absent or
+invalid colour uses the default dark green header. To restore a hosted
+installation's defaults, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+select your Worker, then open **Settings → Variables and Secrets**, remove the
+setting, and deploy the change. Alternatively, use
+`cf workers secrets delete ADMIN_NAME` or
+`cf workers secrets delete ADMIN_HEADER_COLOR` with the same Worker selection.
+For local development, remove the setting from `.dev.vars`. Custom logos and
+page-wide themes are not supported.

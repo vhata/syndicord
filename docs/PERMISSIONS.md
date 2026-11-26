@@ -29,16 +29,43 @@ permission; the distinction is what it permits, not how many roles exist.
 
 The browser and CLI enforce the same permissions. Neither model grants access to
 Cloudflare Worker secrets or the authorization policy. To configure one admin
-role, follow [Discord sign-in setup](WEB.md#enable-administration). The
-remaining sections explain separate feed and channel permissions.
+role, follow [Discord sign-in setup](DISCORD_SIGN_IN.md#enable-administration).
+The remaining sections explain separate feed and channel permissions.
 
 ## Configure access
 
-To enable separate feed and channel permissions, first configure
-[Discord sign-in and the encryption key](WEB.md#enable-administration). Instead
-of the single `DISCORD_GUILD_ID` / `DISCORD_ROLE_ID` gate, set the
-`DISCORD_AUTH_POLICY` Worker secret to JSON like this, replacing every example
-ID with the corresponding Discord ID:
+Follow this section if you chose **separate feed and channel permissions**.
+First save the four common settings in
+[Configure the Worker](DISCORD_SIGN_IN.md#configure-the-worker): the encryption
+key, client ID, client secret, and callback URL. If you came here from that
+guide, those settings are already in place.
+
+You will now save a JSON document as the `DISCORD_AUTH_POLICY` Worker secret.
+Each entry (a **grant**) names a Discord server and role, then says whether that
+role may manage feeds, particular channels, or both. This replaces the
+`DISCORD_GUILD_ID` / `DISCORD_ROLE_ID` settings used for one unrestricted admin
+role.
+
+### 1. Collect the Discord IDs
+
+Use the IDs saved during sign-in setup. For any you still need, open your
+**Discord client** and enable **User Settings → Advanced → Developer Mode**.
+Right-click each server where you want to deliver feeds and choose **Copy Server
+ID**. Copy role IDs from **Server Settings → Roles**, and channel IDs from each
+channel's context menu. Save them in your installation's password-manager entry,
+labelled by server, role, and channel name.
+
+Assign the relevant roles to yourself under **Server Settings → Members** so you
+can test the permissions. For full setup, your account needs feed permission and
+permission for at least one destination channel; one role or several can supply
+them.
+
+### 2. Build the policy
+
+Copy this example into your installation's password-manager entry as
+`DISCORD_AUTH_POLICY`, then replace the example IDs with your own. This example
+gives one role control of feeds and another role control of two channels in the
+same server:
 
 ```json
 {
@@ -50,47 +77,84 @@ ID with the corresponding Discord ID:
       "addFeeds": true
     },
     {
-      "guildId": "200000000000000001",
-      "roleId": "200000000000000002",
-      "addFeeds": true
-    },
-    {
-      "guildId": "300000000000000001",
-      "roleId": "300000000000000002",
-      "channelIds": ["300000000000000003", "300000000000000004"]
+      "guildId": "100000000000000001",
+      "roleId": "100000000000000003",
+      "channelIds": ["100000000000000004", "100000000000000005"]
     }
   ]
 }
 ```
 
-The first two roles administer the shared feed catalog. The third can register
-webhooks and manage subscriptions for the two listed channels in its own server.
-A grant may have both capabilities. There are no wildcards; names confer no
-permissions. Each server/role pair appears once. The policy supports up to 32
-grants, 16 servers, and 64 channels per grant within 16 KiB of JSON. An empty
-`grants` array denies all administration access.
+| Field        | What to put there                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`    | Keep `1`.                                                                                                                                                     |
+| `grants`     | One entry for each server/role pair you want to authorize.                                                                                                    |
+| `guildId`    | The numeric server ID (Discord calls servers "guilds").                                                                                                       |
+| `roleId`     | The numeric role ID within that server.                                                                                                                       |
+| `addFeeds`   | `true` to let the role add, rename, and delete unused feeds. Omit it for a role that only manages channels.                                                   |
+| `channelIds` | An array of numeric channel IDs in that server where the role may register destinations and manage subscriptions. Omit it for a role that only manages feeds. |
 
-1. In Discord, enable **User Settings → Advanced → Developer Mode**. Copy server
-   IDs from each server's context menu, role IDs from **Server Settings →
-   Roles**, and channel IDs from each channel's context menu.
-2. In **Cloudflare Dashboard → Workers & Pages → your Worker → Settings →
-   Variables and Secrets**, add `DISCORD_AUTH_POLICY` as a **Secret**, paste the
-   JSON, and deploy the setting.
-3. Sign in to the web editor again and choose **Verify and initialize catalog**,
-   or use the CLI with the Worker origin (without `/admin`):
+A grant may have both `addFeeds` and `channelIds`. If one role should do both,
+put both fields in a single grant with that role ID. For roles from other
+servers, add grants with those servers' IDs. Keep IDs quoted as strings; names
+and wildcards do not grant permissions.
 
-   ```sh
-   export SYNDICORD_ADMIN_URL='https://WORKER.ACCOUNT-SUBDOMAIN.workers.dev'
-   npm run syndicord -- login
-   npm run syndicord -- catalog initialize
-   ```
+Each server/role pair appears once. The policy supports up to 32 grants, 16
+servers, and 64 channels per grant within 16 KiB of JSON. An empty `grants`
+array denies all administration access.
 
-For step 2, the CLI offers the same secret-value prompt:
+### 3. Save the policy on the Worker
+
+Choose one method:
+
+- **Cloudflare Dashboard:** Open
+  [**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+  select your Worker, then open **Settings → Variables and Secrets**. Add
+  `DISCORD_AUTH_POLICY` as a **Secret**, paste your complete JSON document, and
+  deploy the setting.
+- **CLI:** In the terminal where you selected your Cloudflare installation, run
+  the command below and paste the JSON as a single line at its hidden prompt:
+
+  ```sh
+  npm run syndicord -- cf workers secrets update DISCORD_AUTH_POLICY \
+    --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+  ```
+
+  If you prefer to keep the formatting, save the JSON as `policy.json` and pass
+  it through the same command's native file input:
+
+  ```sh
+  npm run syndicord -- cf workers secrets update DISCORD_AUTH_POLICY \
+    --worker "$SYNDICORD_WORKER_NAME" --type secret_text < policy.json
+  ```
+
+### 4. Initialize the catalog
+
+Open your Worker URL with `/admin` appended and sign in with an account that has
+one of the policy's roles. Choose **Verify and initialize catalog**. This is
+required even for a new installation: it creates an empty catalog ready for
+feeds and destinations. For an existing installation, it verifies and imports
+saved configuration; read
+[initialization details](#initialize-an-existing-installation) first.
+Initialization sends no Discord messages.
+
+For the CLI alternative,
+[sign in from the terminal](USAGE.md#select-an-installation), then run:
 
 ```sh
-npm run syndicord -- cf workers secrets update DISCORD_AUTH_POLICY \
-  --worker "$SYNDICORD_WORKER_NAME" --type secret_text
+npm run syndicord -- catalog initialize
 ```
+
+After initialization, the installation uses the catalog editor. Removing the
+policy does not switch it back to the one-admin-role editor; restore a valid
+policy to regain editing access.
+
+**Access setup is complete. Continue to
+[managing the catalog and your channels](USAGE.md#separate-feed-and-channel-permissions)**
+to add a feed, destination, and subscription. Then return to
+[Verify delivery](SETUP.md#verify-delivery).
+
+### Policy changes and sessions
 
 Configuring this secret requires access to the installation’s Cloudflare
 account. A present policy replaces the single-server gate; it never adds that
@@ -106,16 +170,17 @@ uploads and scoped webhook lookups, refreshing expired permissions through
 Discord. Once the window expires, outages, rate limits, or malformed responses
 block access until verification succeeds; stale grants are never a fallback.
 Local logout and known session expiry remain immediate. See
-[granting and revoking access](WEB.md#grant-and-revoke-access) for the browser,
-CLI, and token-revocation behavior. Existing routes continue after management
-access is revoked.
+[granting and revoking access](DISCORD_SIGN_IN.md#grant-and-revoke-access) for
+the browser, CLI, and token-revocation behavior. Existing routes continue after
+management access is revoked.
 
 ## Initialize an existing installation
 
-Apply the packaged migrations through the normal [deployment](DEPLOYMENT.md)
-flow before enabling the policy. Keep the existing encryption key and a database
-backup. Enabling policy blocks the old whole-configuration write API
-immediately; it does not change existing deliveries.
+Apply the packaged migrations through the normal
+[deployment](SETUP.md#update-the-installation) flow before enabling the policy.
+Keep the existing encryption key and a database backup. Enabling policy blocks
+the old whole-configuration write API immediately; it does not change existing
+deliveries.
 
 **Verify and initialize catalog** verifies every saved webhook with Discord and
 imports all existing feeds, destinations, and subscriptions in one atomic save.

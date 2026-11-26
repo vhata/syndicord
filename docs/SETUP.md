@@ -10,9 +10,9 @@ installation is one **Worker** (the running service) and one **D1 database**
 (feeds, encrypted webhook URLs, routing, and delivery history).
 
 Discord delivery uses channel webhooks, so you do not invite or authorize a bot
-on your server. [Discord sign-in](WEB.md) uses an OAuth application to check
-members' roles. You choose which roles can edit feeds and channels, then grant
-or revoke people's access by managing those roles in Discord.
+on your server. [Discord sign-in](DISCORD_SIGN_IN.md) uses an OAuth application
+to check members' roles. You choose which roles can edit feeds and channels,
+then grant or revoke people's access by managing those roles in Discord.
 
 Follow the steps below in order. GitHub automatic deployment is optional; you do
 not need your own repository to host syndicord.
@@ -71,8 +71,10 @@ npm run syndicord -- cf auth login
 npm run syndicord -- cf auth whoami
 ```
 
-Copy the account ID from `whoami`, or use
-[**Cloudflare Dashboard → Search → Copy account ID**](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/).
+Copy the account ID from `whoami`, or open the
+[Cloudflare Dashboard](https://dash.cloudflare.com/), select your account, and
+use **Search → Copy account ID**
+([account-ID help](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/)).
 Choose a Worker name and keep these values in your terminal:
 
 ```sh
@@ -88,11 +90,15 @@ identifiers select infrastructure; they do not contain feed configuration.
 **This creates metered Cloudflare resources; usage may fit the free plan.** For
 an existing installation, reuse its database ID and skip creation.
 
+The dashboard links below open Cloudflare for your signed-in account. If
+prompted, sign in and choose the account for this installation.
+
 Choose one way to create the database:
 
-- **Cloudflare Dashboard:** Open **Storage & databases → D1 SQL database →
-  Create Database**, name it `syndicord` (or your chosen Worker name), and copy
-  its UUID from the database's page.
+- **Cloudflare Dashboard:** Open
+  [**D1 SQL database**](https://dash.cloudflare.com/?to=/:account/workers/d1),
+  then choose **Create Database**. Name it `syndicord` (or your chosen Worker
+  name), and copy its UUID from the database's page.
 - **CLI:** Run:
 
   ```sh
@@ -111,42 +117,38 @@ schedule. It builds current source in a checkout or uses the bundled Worker in
 an npm installation. The dashboard can create the database, but syndicord's CLI
 handles its code, migrations, and bindings together.
 
-Open **Cloudflare Dashboard → Workers & Pages → your Worker** and save its HTTPS
-address. The `workers.dev` address is enabled; preview URLs are disabled. The
-fresh service has no feeds and stays idle until you configure it.
+The fresh service has no feeds and stays idle until you configure it. Before
+continuing, open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+select your Worker, then open **Domains** and copy its HTTPS `workers.dev`
+address. Save it as **Worker URL** in a password-manager entry for this
+installation, alongside the account ID, Worker name, and database ID. You will
+use this address next to register Discord sign-in and open the feed editor. The
+[sign-in guide](DISCORD_SIGN_IN.md#find-and-keep-your-worker-address) shows how
+to find it again, including a CLI option.
 
 ## Enable configuration access
 
-Complete [Discord sign-in setup](WEB.md#enable-administration): register the
-Discord application and callback, save the encryption key and OAuth settings,
-and choose who can edit:
+Next, follow [Configure Discord sign-in](DISCORD_SIGN_IN.md). It walks you
+through collecting the Discord application credentials, choosing who can edit,
+and saving the settings on your Worker. Keep using the same password-manager
+entry for those values and the encryption key generated there.
 
-| Access model                              | Use it when                                                                                                                    |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **One admin role**                        | Everyone with one Discord role may manage all feeds and destinations.                                                          |
-| **Separate feed and channel permissions** | Roles should manage the shared feed catalog (list of sources), specified channels, or both. A person’s matching roles combine. |
+That guide ends by sending you to [Using syndicord](USAGE.md) to create a
+destination webhook and add your first feed in the browser or CLI. For the
+delivery check below, use a feed you can publish to, such as your own
+repository's commit feed. Save the webhook URL in your password manager too;
+saved URLs are never returned by either client.
 
-For separate feed and channel permissions,
-[configure the policy and initialize the catalog](PERMISSIONS.md#configure-access).
-For either model, open the web editor using the link from
-[sign-in setup](WEB.md#configure-the-worker), sign in, and follow
-[managing feeds](USAGE.md) to add a destination and feed using the web interface
-or CLI.
-
-In Discord, create the destination webhook under **Edit Channel → Integrations →
-Webhooks**. Use a feed you can publish to for the delivery check, such as your
-own repository's commit feed.
-
-Keep the account/database IDs, Worker address, Discord application credentials,
-encryption key, and webhook URLs in your password manager. Saved webhook URLs
-are never returned by either client; the encryption key is needed to read their
-stored values.
+**After adding your feed and destination, return here to verify delivery.**
 
 ## Verify delivery
 
 Watch the Worker using either method:
 
-- **Cloudflare Dashboard:** Open **Workers & Pages → your Worker → Logs → Live**
+- **Cloudflare Dashboard:** Open
+  [**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
+  select your Worker, then open **Logs → Live**
   ([real-time logs](https://developers.cloudflare.com/workers/observability/logs/real-time-logs/)).
 - **CLI:** Start a live tail:
 
@@ -184,7 +186,7 @@ For an npm installation, repeat the
 [packing and global-install steps](#optional-npm-installation), then run
 `npx syndicord deploy`. Keep the same account, Worker, and database identifiers.
 Deployments preserve feeds, webhook URLs, and Worker secrets. You can also
-enable [automatic deployment from GitHub](DEPLOYMENT.md).
+enable [automatic deployment from GitHub](GITHUB_DEPLOYMENT.md).
 
 [Documentation index](README.md) · [Manage feeds](USAGE.md) ·
 [Cloudflare database setup](https://developers.cloudflare.com/d1/get-started/)

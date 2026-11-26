@@ -9,17 +9,17 @@ export const groups = [
   {
     text: 'Run an installation',
     files: [
-      'WEB',
+      'DISCORD_SIGN_IN',
       'PERMISSIONS',
       'OPERATIONS',
       'STATUS',
       'RECOVERY',
-      'DEPLOYMENT',
+      'GITHUB_DEPLOYMENT',
     ],
   },
   {
     text: 'Understand & contribute',
-    files: ['BEHAVIOR', 'DEVELOPMENT', 'QUALITY', 'API', 'WEBSITE'],
+    files: ['BEHAVIOR', 'DEVELOPMENT', 'QUALITY', 'PROVIDER_API', 'WEBSITE'],
   },
 ];
 export const sources = [
