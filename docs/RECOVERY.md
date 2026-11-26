@@ -49,11 +49,10 @@ npm run syndicord -- cf observability tail --worker "$SYNDICORD_WORKER_NAME"
 Discord rate limits affect the destination, or all destinations for a global
 limit. Pending deliveries remain available after fetch or delivery failures.
 
-Feed indices refer to the zero-based active route list, not catalog IDs. In
-installations where **one admin role** can edit every feed and destination,
-inspect it with `npm run syndicord -- feeds get`. With **separate feed and
-channel permissions**, roles manage a shared feed catalog, specified channels,
-or both. For that model, someone with Cloudflare access can open
+Feed indices refer to the zero-based active route list, not catalog IDs. With
+**one admin role**, inspect it with `npm run syndicord -- feeds get`. With
+**separate feed and channel permissions**, someone with Cloudflare access can
+open
 [**D1 SQL database**](https://dash.cloudflare.com/?to=/:account/workers/d1),
 select the installation's database, and open **Console** to inspect
 `relay_configuration`: `feeds` contains the active route list; `catalog` maps
@@ -71,7 +70,6 @@ FROM relay_deliveries GROUP BY destination, state;
 ```
 
 ```sh
-export SYNDICORD_DATABASE_ID='your-existing-database-uuid'
 npm run syndicord -- cf d1 raw "$SYNDICORD_DATABASE_ID" --sql 'SELECT destination, state, COUNT(*) AS count FROM relay_deliveries GROUP BY destination, state'
 ```
 
@@ -183,16 +181,20 @@ Use `gh run view NEW_RUN_ID --web` if you prefer the browser summary.
 
 ## Pause and roll back
 
-With separate feed and channel permissions, save `subscriptions list` and remove
-the relevant subscriptions through the editor or
-`subscriptions remove FEED_ID DESTINATION_ID`. Restore them with
+### Pause delivery
+
+Pausing stops polling and delivery without a code deployment. Pending entries
+are kept and resume when the configuration is restored. A run already in
+progress may finish using the configuration it read at its start.
+
+With **separate feed and channel permissions**, save the output of
+`subscriptions list`, then remove the relevant subscriptions through the editor
+or `subscriptions remove FEED_ID DESTINATION_ID`. Restore them with
 `subscriptions add FEED_ID DESTINATION_ID`. Each removal requires permission for
-that destination; removing all subscriptions pauses relay work. The installation
-owner can also pause the Worker cron in Cloudflare’s dashboard. This access
+that destination; removing all subscriptions pauses relay work. This access
 model rejects the whole-configuration commands below.
 
-When one admin role can edit every feed and destination, save the current feed
-configuration first:
+With **one admin role**, save the current feed configuration first:
 
 ```sh
 npm run syndicord -- feeds get > .feeds.json
@@ -211,6 +213,20 @@ the saved list when ready:
 npm run syndicord -- feeds set --file .feeds.json
 ```
 
+Either model can instead pause the Worker's cron schedule, which stops polling
+without touching stored configuration. Open
+[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+in the Cloudflare dashboard, select your Worker, then open **Settings → Triggers
+→ Cron Triggers**. Record the current schedule, then remove it. Allow up to 15
+minutes for trigger changes to propagate, plus time for running invocations to
+finish, and keep deployments from running meanwhile: deployment reinstalls the
+schedule from source configuration. The pinned CLI has no direct cron-management
+command; to script it, use the
+[cron trigger recipe](PROVIDER_API.md#pause-and-restore-cron-triggers). Add the
+recorded schedule back on the same page to resume.
+
+### Roll back the code
+
 If GitHub manages deployments, disable the workflow and wait for any active run
 to finish before a manual rollback. In **Actions → CI**, use the **…** menu's
 **Disable workflow**, then inspect the run list; or run:
@@ -221,10 +237,9 @@ gh run list --workflow check.yml --limit 5
 ```
 
 For a code rollback, check out the intended revision, run `npm ci`, and run
-`npm run deploy`. For the npm-installed CLI, prepare the intended Git ref using
-`npm pack github:vhata/syndicord#COMMIT_OR_TAG`, install the resulting `.tgz`
-with `npm install --global ./FILENAME.tgz`, then run `npx syndicord deploy`. For
-a dashboard rollback, open
+`npm run deploy`. For an npm installation,
+[install the intended revision](CLI.md#update-the-cli), then run
+`npx syndicord deploy`. For a dashboard rollback, open
 [**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages),
 select your Worker, then use **Deployments → Rollback** to select an earlier
 version. A Worker rollback reverses neither D1 migrations, stored routing, nor
@@ -244,14 +259,9 @@ gh workflow run check.yml --ref main
 
 [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
 retains seven days on Workers Free and thirty days on Workers Paid. A restore
-overwrites the database. First, open
-[**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
-in the Cloudflare dashboard, select your Worker, then open **Settings → Triggers
-→ Cron Triggers**. Record the current schedule, then remove it temporarily.
-Prevent concurrent deployments and allow up to 15 minutes for trigger changes to
-propagate, plus time for running invocations to finish. The pinned CLI has no
-direct cron-management command. A pause stored as `[]` is insufficient:
-restoring D1 also restores the old feed configuration.
+overwrites the database. First [pause the cron schedule](#pause-delivery) and
+wait for it to take effect. A pause stored as `[]` is insufficient: restoring D1
+also restores the old feed configuration.
 
 Record the current bookmark, then look up the intended restore point:
 

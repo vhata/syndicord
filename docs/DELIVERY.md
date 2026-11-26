@@ -12,13 +12,9 @@ short description.
 
 ## Editing access and the shared catalog
 
-Some configuration behavior depends on how the installation grants editing
-access:
-
-| Access model                              | Who can edit what                                                                                                             |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| **One admin role**                        | Members of one Discord role can manage every feed, webhook, and route.                                                        |
-| **Separate feed and channel permissions** | Discord roles can manage the shared feed catalog, specified destination channels, or both. A person's matching roles combine. |
+Some configuration behavior depends on the installation's
+[access model](PERMISSIONS.md#access-models): **one admin role** or **separate
+feed and channel permissions**.
 
 The **feed catalog** is the shared list of sources used with separate feed and
 channel permissions. Everyone granted access can see its feed labels; channel
@@ -27,9 +23,7 @@ without subscriptions is saved but not polled. Saved source URLs stay hidden,
 even from feed administrators. With one admin role, every saved feed must have
 at least one destination and authorized editors can read its URL.
 
-These are permissions to edit syndicord, not to manage its Cloudflare hosting.
-See [access models and permissions](PERMISSIONS.md#access-models) for setup and
-examples. The delivery rules below apply to both models unless stated otherwise.
+The delivery rules below apply to both models unless stated otherwise.
 
 ## Messages
 

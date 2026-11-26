@@ -55,9 +55,8 @@ npm run syndicord -- cf workers get "$SYNDICORD_WORKER_NAME" -q
 
 Copy the `subdomain.url` value from the JSON output. The optional
 [Worker address lookup](PROVIDER_API.md#find-the-worker-address) shows how to
-extract just the URL with `jq`. For an
-[npm-installed CLI](CLI.md#npm-installation), replace `npm run syndicord --`
-with `npx syndicord`.
+extract just the URL with `jq`. Commands in this guide use the checkout form;
+see [Install the CLI](CLI.md#npm-installation) for the `npx syndicord` form.
 
 ### Choose an access model
 
@@ -154,8 +153,6 @@ Choose **Cloudflare Dashboard** or **CLI**; both save the same settings:
   `SYNDICORD_WORKER_NAME` during setup. If you opened a new terminal,
   [select the installation again](OPERATIONS.md#select-a-cloudflare-installation).
   Run each command below and paste that setting's value at its hidden prompt.
-  For an [npm-installed CLI](CLI.md#npm-installation), replace
-  `npm run syndicord --` with `npx syndicord`.
 
   ```sh
   npm run syndicord -- cf workers secrets update CONFIG_ENCRYPTION_KEY \
@@ -247,6 +244,9 @@ known expiry. Local sign-out, session expiry, and changes to the configured
 Discord access policy invalidate access immediately. Discord-side token
 revocation, role changes, and server departures are detected when the two-minute
 permission window expires. Using the editor or CLI does not extend that window.
+Every request validates the local session, and writes check authorization again
+after the upload is read and after any webhook lookup, refreshing expired
+permissions through Discord.
 
 A valid permission result can be reused during a Discord outage until its fixed
 deadline. After expiry, an outage, rate limit, or invalid Discord response
@@ -254,6 +254,8 @@ blocks access; expired permissions are never used as a fallback. A rate-limit
 error shows how many seconds to wait. Keep the open form, wait, then save again;
 the editor preserves an unsuccessful save's entered values and does not retry
 saves automatically.
+
+## Disable editing
 
 To disable administration without stopping the relay, open
 [**Workers & Pages**](https://dash.cloudflare.com/?to=/:account/workers-and-pages)

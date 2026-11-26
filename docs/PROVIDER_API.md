@@ -219,16 +219,17 @@ is kept in a private temporary file and deleted afterwards:
 
 This creates a webhook but sends no Discord message. If creation has an
 uncertain outcome, inspect the channel's webhooks before repeating it. Save the
-URL in your password manager, then choose your installation's access model:
+URL in your password manager, then follow your installation's
+[access model](PERMISSIONS.md#access-models):
 
-- **One admin role** (members can edit every feed and destination):
+- **One admin role:**
   [Configure the destination](FEEDS.md#add-or-change-webhooks) with
   `npm run syndicord -- webhooks set --file .webhooks.json`, or enter the URL in
   the web interface.
-- **Separate feed and channel permissions** (roles manage the shared feed
-  catalog, specified channels, or both): Copy the URL from the file's `updates`
-  value and [register a destination](FEEDS.md#2-register-a-destination) in the
-  web interface or with `destinations register`. That command takes a label and
+- **Separate feed and channel permissions:** Copy the URL from the file's
+  `updates` value and
+  [register a destination](FEEDS.md#2-register-a-destination) in the web
+  interface or with `destinations register`. That command takes a label and
   `webhookUrl`; this access model rejects the whole-configuration mapping and
   `webhooks set` command.
 

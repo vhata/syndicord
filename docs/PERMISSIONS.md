@@ -50,12 +50,11 @@ role.
 
 ### 1. Collect the Discord IDs
 
-Use the IDs saved during sign-in setup. For any you still need, open your
-**Discord client** and enable **User Settings → Advanced → Developer Mode**.
-Right-click each server where you want to deliver feeds and choose **Copy Server
-ID**. Copy role IDs from **Server Settings → Roles**, and channel IDs from each
-channel's context menu. Save them in your installation's password-manager entry,
-labelled by server, role, and channel name.
+Use the server, role, and channel IDs saved in step 4 of
+[Register a Discord application](DISCORD_SIGN_IN.md#register-a-discord-application),
+which shows how to copy them in the Discord client. Collect any more you need
+the same way, labelled by server, role, and channel name in your installation's
+password-manager entry.
 
 Assign the relevant roles to yourself under **Server Settings → Members** so you
 can test the permissions. For full setup, your account needs feed permission and
@@ -156,23 +155,16 @@ policy to regain editing access.
 
 ### Policy changes and sessions
 
-Configuring this secret requires access to the installation’s Cloudflare
-account. A present policy replaces the single-server gate; it never adds that
-gate's broad permissions. Invalid policy JSON disables administration. Policy
-changes invalidate existing sessions immediately. Removing a Discord role or
-server membership revokes its grants after the session's current permission
-window expires, at most two minutes after its last successful check. Reads and
-writes can reuse those verified permissions during that fixed window; use does
-not extend it.
+Changing this secret requires access to the installation's Cloudflare account. A
+present policy replaces the single-server gate; it never adds that gate's broad
+permissions. Invalid policy JSON disables administration. Policy changes
+invalidate existing sessions immediately. Existing routes keep delivering after
+someone's management access is revoked.
 
-Every request validates the local session. Writes check authorization after
-uploads and scoped webhook lookups, refreshing expired permissions through
-Discord. Once the window expires, outages, rate limits, or malformed responses
-block access until verification succeeds; stale grants are never a fallback.
-Local logout and known session expiry remain immediate. See
-[Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access) for the
-browser, CLI, and token-revocation behavior. Existing routes continue after
-management access is revoked.
+Removing a Discord role or server membership takes effect within the two-minute
+permission window described in
+[Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access), which
+also covers sign-out, session limits, and Discord outages.
 
 ## Initialize an existing installation
 
