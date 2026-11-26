@@ -154,4 +154,4 @@ completes. Migration failure stops upload. An upload failure leaves completed
 migrations in place; the next attempt applies only outstanding ones. CI never
 rolls back the database automatically. See [recovery](RECOVERY.md) for failed
 deployments. To deploy by hand instead, see
-[Update the installation](SETUP.md#update-the-installation).
+[Update the installation](OPERATIONS.md#update-the-installation).

@@ -14,10 +14,9 @@ Changes take effect on the next scheduled poll, without a deployment.
 Your Discord roles determine which controls you can use. No local software or
 Cloudflare account is needed.
 
-**CLI:** [Install the CLI](SETUP.md#run-from-the-repository), then select the
-same installation as below. Examples use a source checkout; for an
-[npm installation](SETUP.md#optional-npm-installation), replace
-`npm run syndicord --` with `npx syndicord`.
+**CLI:** [Install the CLI](CLI.md), then select the installation as below.
+Examples use the checkout form, `npm run syndicord --`; for an npm installation,
+use [the `npx syndicord` form](CLI.md#npm-installation).
 
 ### Select an installation
 
@@ -161,6 +160,9 @@ The first successful poll quietly records existing entries. Only new entries
 after that baseline are sent. With N subscribed feeds, each is normally checked
 about every N minutes. See [what to expect](#what-to-expect-after-saving).
 
+**Setting up a new installation?** Return to
+[Verify delivery](SETUP.md#verify-delivery).
+
 ### Change or remove something
 
 The CLI commands below follow `npm run syndicord --` (or your installed entry
@@ -283,6 +285,9 @@ editor, **Remove** deletes a feed and its routes. To pause polling and delivery,
 remove all feeds or save a CLI feed file containing `[]`. A run already in
 progress may finish using the configuration it read at its start.
 
+**Setting up a new installation?** Return to
+[Verify delivery](SETUP.md#verify-delivery).
+
 ## What to expect after saving
 
 - A new route starts with a **silent baseline**, then sends new entries. Saving
@@ -296,9 +301,10 @@ progress may finish using the configuration it read at its start.
   manager and delete temporary JSON files after use. File-based input also
   accepts `--file -` for stdin.
 
-For a first real message, follow [verify delivery](SETUP.md#verify-delivery).
-For missing messages, ask the installation owner to check
-[Operational status](STATUS.md) and [Troubleshooting and recovery](RECOVERY.md).
+Installation owners checking a first real message can follow
+[Verify delivery](SETUP.md#verify-delivery). For missing messages, ask the
+installation owner to check [Operational status](STATUS.md) and
+[Troubleshooting and recovery](RECOVERY.md).
 
 ## Polling limits
 

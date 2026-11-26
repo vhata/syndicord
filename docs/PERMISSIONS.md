@@ -151,10 +151,8 @@ After initialization, the installation uses the catalog editor. Removing the
 policy does not switch it back to the one-admin-role editor; restore a valid
 policy to regain editing access.
 
-**Access setup is complete. Continue to
-[managing the catalog and your channels](FEEDS.md#separate-feed-and-channel-permissions)**
-to add a feed, destination, and subscription. Then return to
-[Verify delivery](SETUP.md#verify-delivery).
+**Next:** access setup is complete. For a new installation, return to
+[Add a first feed and destination](SETUP.md#add-a-first-feed-and-destination).
 
 ### Policy changes and sessions
 
@@ -179,10 +177,10 @@ management access is revoked.
 ## Initialize an existing installation
 
 Apply the packaged migrations through the normal
-[deployment](SETUP.md#update-the-installation) flow before enabling the policy.
-Keep the existing encryption key and a database backup. Enabling policy blocks
-the old whole-configuration write API immediately; it does not change existing
-deliveries.
+[deployment](OPERATIONS.md#update-the-installation) flow before enabling the
+policy. Keep the existing encryption key and a database backup. Enabling policy
+blocks the old whole-configuration write API immediately; it does not change
+existing deliveries.
 
 **Verify and initialize catalog** verifies every saved webhook with Discord and
 imports all existing feeds, destinations, and subscriptions in one atomic save.

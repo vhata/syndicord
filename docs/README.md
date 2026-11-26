@@ -23,6 +23,7 @@ one Discord role every editing permission. See
 | Task                                                    | Guide                                                                                       |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Sign in with the web editor or CLI                      | [Sign in](FEEDS.md#sign-in)                                                                 |
+| Install the CLI for terminal editing                    | [Install the CLI](CLI.md)                                                                   |
 | Find out which editing mode your installation uses      | [Choose the section matching your editor](FEEDS.md#choose-the-section-matching-your-editor) |
 | Add a feed, register a channel, and subscribe it        | [Separate feed and channel permissions](FEEDS.md#separate-feed-and-channel-permissions)     |
 | Add feeds and webhooks when one role manages everything | [One admin role](FEEDS.md#one-admin-role)                                                   |
@@ -47,7 +48,7 @@ and brings you back to verify delivery.
 | Task                                                        | Guide                                                                              |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Point a terminal at the right Cloudflare installation       | [Select a Cloudflare installation](OPERATIONS.md#select-a-cloudflare-installation) |
-| Update the deployed code                                    | [Update the installation](SETUP.md#update-the-installation)                        |
+| Update the deployed code                                    | [Update the installation](OPERATIONS.md#update-the-installation)                   |
 | Grant or revoke someone's editing access                    | [Grant and revoke access](DISCORD_SIGN_IN.md#grant-and-revoke-access)              |
 | Change the editor's name or colour                          | [Installation name and colour](OPERATIONS.md#installation-name-and-colour)         |
 | Check health and pending deliveries                         | [Operational status](STATUS.md)                                                    |

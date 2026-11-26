@@ -10,11 +10,11 @@ host a new installation, start with [Set up an installation](SETUP.md).
 Deployment, migrations, and operational status require Cloudflare access.
 Signing in with Discord gives access to the feed editor, not to Cloudflare. Use
 the account ID, Worker name, and D1 database UUID saved during
-[setup](SETUP.md#select-an-installation). Reuse the existing database ID.
+[setup](SETUP.md#steps). Reuse the existing database ID.
 
 The examples use a source checkout. For the
-[npm-installed CLI](SETUP.md#optional-npm-installation), replace
-`npm run syndicord --` with `npx syndicord`.
+[npm-installed CLI](CLI.md#npm-installation), replace `npm run syndicord --`
+with `npx syndicord`.
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID='your-account-id'
@@ -31,6 +31,23 @@ refer to the same installation. The status command reads saved D1 health without
 sending a Discord message; [reading the report](STATUS.md#reading-the-report)
 explains its results. The [documentation](README.md#operate-an-installation)
 lists the other operating tasks.
+
+## Update the installation
+
+Use the same account, Worker, and database identifiers as above. For a checkout,
+pull the revision you want, then run:
+
+```sh
+npm ci
+npm run check
+npm run deploy
+```
+
+For an npm installation, [update the CLI](CLI.md#update-the-cli), then run
+`npx syndicord deploy`. Deployments preserve feeds, webhook URLs, and Worker
+secrets. To deploy on every push to `main` instead, set up
+[Automatic deployment from GitHub](GITHUB_DEPLOYMENT.md). To return to earlier
+code, see [Pause and roll back](RECOVERY.md#pause-and-roll-back).
 
 ## Where settings and state live
 
